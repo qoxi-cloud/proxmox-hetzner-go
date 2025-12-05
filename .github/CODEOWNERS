@@ -1,0 +1,21 @@
+# CODEOWNERS - Defines code owners for automatic review requests
+# https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Default owners for everything in the repo
+* @qoxi-cloud
+
+# Go code
+*.go @qoxi-cloud
+
+# Configuration files
+*.yaml @qoxi-cloud
+*.yml @qoxi-cloud
+*.json @qoxi-cloud
+*.toml @qoxi-cloud
+
+# Documentation
+*.md @qoxi-cloud
+
+# Build and CI
+Makefile @qoxi-cloud
+.github/ @qoxi-cloud

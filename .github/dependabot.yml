@@ -1,0 +1,49 @@
+# Dependabot configuration
+# https://docs.github.com/en/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
+
+version: 2
+updates:
+  # Go modules
+  - package-ecosystem: "gomod"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Europe/Kyiv"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "⬆️ deps"
+    labels:
+      - "dependencies"
+    reviewers:
+      - "qoxi-cloud"
+
+  # GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Europe/Kyiv"
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: "⬆️ ci"
+    labels:
+      - "dependencies"
+    reviewers:
+      - "qoxi-cloud"
+
+  # npm (for MCP servers)
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: "⬆️ deps"
+    labels:
+      - "dependencies"
+    reviewers:
+      - "qoxi-cloud"
