@@ -21,11 +21,11 @@ const (
 // Test constants for commonly used test values.
 // These constants avoid duplication and satisfy SonarCloud code smell checks.
 const (
-	testTimezoneKyiv       = "Europe/Kyiv"           // NOSONAR(go:S1313) Test timezone data
-	testTimezoneNewYork    = "America/New_York"      // NOSONAR(go:S1313) Test timezone data
-	testPassword           = "secret-password"       // NOSONAR(go:S1313) Test password - not real credential
-	testTailscaleAuthKey   = "tskey-auth-secret123"  // NOSONAR(go:S1313) Test Tailscale key - not real
-	testTailscaleAuthKey2  = "tskey-auth-supersecret" // NOSONAR(go:S1313) Test Tailscale key - not real
+	testTimezoneKyiv      = "Europe/Kyiv"            // NOSONAR(go:S1313) Test timezone data
+	testTimezoneNewYork   = "America/New_York"       // NOSONAR(go:S1313) Test timezone data
+	testPassword          = "secret-password"        // NOSONAR(go:S1313) Test password - not real credential
+	testTailscaleAuthKey  = "tskey-auth-secret123"   // NOSONAR(go:S1313) Test Tailscale key - not real
+	testTailscaleAuthKey2 = "tskey-auth-supersecret" // NOSONAR(go:S1313) Test Tailscale key - not real
 )
 
 func TestSystemConfig_SensitiveFieldsOmittedFromYAML(t *testing.T) {
