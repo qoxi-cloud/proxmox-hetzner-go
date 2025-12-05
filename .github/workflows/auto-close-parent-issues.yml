@@ -1,0 +1,104 @@
+# Auto-close parent issues when all sub-issues are closed
+# This workflow checks if a parent issue should be closed when a linked issue is closed
+
+name: Auto-close Parent Issues
+
+on:
+  issues:
+    types: [closed]
+
+permissions:
+  issues: write
+  contents: read
+
+jobs:
+  check-parent-issues:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check and close parent issues
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const closedIssue = context.payload.issue;
+            console.log(`Issue #${closedIssue.number} was closed: ${closedIssue.title}`);
+
+            // Get all open issues to find potential parents
+            const { data: openIssues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              per_page: 100
+            });
+
+            for (const parentIssue of openIssues) {
+              const body = parentIssue.body || '';
+
+              // Check if this issue references the closed issue as a subtask
+              // Patterns: "- #123", "- [ ] #123", "- [x] #123", "#123 ", etc.
+              const issueRefPattern = new RegExp(`#${closedIssue.number}\\b`);
+
+              if (!issueRefPattern.test(body)) {
+                continue;
+              }
+
+              console.log(`Found parent issue #${parentIssue.number}: ${parentIssue.title}`);
+
+              // Extract all referenced issue numbers from the body
+              const allRefs = body.match(/#(\d+)/g) || [];
+              const referencedIssueNumbers = [...new Set(allRefs.map(ref => parseInt(ref.slice(1))))];
+
+              // Filter out the parent issue itself and issues that are likely not subtasks
+              // (e.g., PRs or issues mentioned in other contexts)
+              const subtaskNumbers = referencedIssueNumbers.filter(num => num !== parentIssue.number);
+
+              if (subtaskNumbers.length === 0) {
+                console.log(`No subtask references found in issue #${parentIssue.number}`);
+                continue;
+              }
+
+              console.log(`Checking ${subtaskNumbers.length} potential subtasks: ${subtaskNumbers.join(', ')}`);
+
+              // Check if all referenced issues are closed
+              let allClosed = true;
+              for (const issueNum of subtaskNumbers) {
+                try {
+                  const { data: issue } = await github.rest.issues.get({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    issue_number: issueNum
+                  });
+
+                  if (issue.state === 'open') {
+                    console.log(`Subtask #${issueNum} is still open`);
+                    allClosed = false;
+                    break;
+                  }
+                } catch (e) {
+                  // Issue might not exist or be a PR
+                  console.log(`Could not fetch issue #${issueNum}: ${e.message}`);
+                }
+              }
+
+              if (allClosed) {
+                console.log(`All subtasks closed! Closing parent issue #${parentIssue.number}`);
+
+                // Add a comment explaining the auto-close
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: parentIssue.number,
+                  body: `All subtasks have been completed. Automatically closing this issue.\n\nSubtasks: ${subtaskNumbers.map(n => `#${n}`).join(', ')}`
+                });
+
+                // Close the parent issue
+                await github.rest.issues.update({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: parentIssue.number,
+                  state: 'closed',
+                  state_reason: 'completed'
+                });
+
+                console.log(`Successfully closed parent issue #${parentIssue.number}`);
+              }
+            }
