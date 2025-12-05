@@ -42,3 +42,18 @@ type StorageConfig struct {
 	// Disks is the list of disk devices to use (e.g., "/dev/sda", "/dev/sdb").
 	Disks []string `yaml:"disks" env:"DISKS" envSeparator:","`
 }
+
+// TailscaleConfig holds Tailscale VPN configuration settings.
+type TailscaleConfig struct {
+	// Enabled controls whether Tailscale should be installed.
+	Enabled bool `yaml:"enabled" env:"INSTALL_TAILSCALE"`
+
+	// AuthKey is the Tailscale authentication key (excluded from file serialization).
+	AuthKey string `yaml:"-" env:"TAILSCALE_AUTH_KEY"`
+
+	// SSH enables SSH advertisement on the Tailscale network.
+	SSH bool `yaml:"ssh" env:"TAILSCALE_SSH"`
+
+	// WebUI exposes Proxmox interface via Tailscale.
+	WebUI bool `yaml:"webui" env:"TAILSCALE_WEBUI"`
+}

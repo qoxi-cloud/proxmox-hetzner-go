@@ -772,3 +772,349 @@ func TestStorageConfig_EnvSeparatorTagPresent(t *testing.T) {
 	envSeparatorTag := field.Tag.Get("envSeparator")
 	assert.Equal(t, ",", envSeparatorTag, "envSeparator tag should be comma")
 }
+
+// TailscaleConfig tests
+
+func TestTailscaleConfig_AuthKeyOmittedFromYAML(t *testing.T) {
+	tests := []struct {
+		name             string
+		cfg              TailscaleConfig
+		shouldNotContain []string
+		shouldContain    []string
+	}{
+		{
+			name: "standard config with auth key",
+			cfg: TailscaleConfig{
+				Enabled: true,
+				AuthKey: "tskey-auth-secret123",
+				SSH:     true,
+				WebUI:   true,
+			},
+			shouldNotContain: []string{"tskey-auth-secret123", "auth_key"},
+			shouldContain:    []string{"enabled: true", "ssh: true", "webui: true"},
+		},
+		{
+			name: "disabled config with auth key",
+			cfg: TailscaleConfig{
+				Enabled: false,
+				AuthKey: "tskey-auth-anothersecret",
+				SSH:     false,
+				WebUI:   false,
+			},
+			shouldNotContain: []string{"tskey-auth-anothersecret", "auth_key"},
+			shouldContain:    []string{"enabled: false", "ssh: false", "webui: false"},
+		},
+		{
+			name: "config with empty auth key",
+			cfg: TailscaleConfig{
+				Enabled: true,
+				AuthKey: "",
+				SSH:     true,
+				WebUI:   false,
+			},
+			shouldNotContain: []string{"auth_key"},
+			shouldContain:    []string{"enabled: true", "ssh: true", "webui: false"},
+		},
+		{
+			name: "config with special characters in auth key",
+			cfg: TailscaleConfig{
+				Enabled: true,
+				AuthKey: "tskey-auth-!@#$%^&*()_+-=[]{}|;':\",./<>?",
+				SSH:     false,
+				WebUI:   true,
+			},
+			shouldNotContain: []string{"tskey-auth-!@#$%^&*()_+-=[]{}|;':\",./<>?", "auth_key"},
+			shouldContain:    []string{"enabled: true", "webui: true"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			data, err := yaml.Marshal(&tt.cfg)
+			require.NoError(t, err)
+
+			yamlStr := string(data)
+
+			for _, str := range tt.shouldNotContain {
+				assert.NotContains(t, yamlStr, str)
+			}
+			for _, str := range tt.shouldContain {
+				assert.Contains(t, yamlStr, str)
+			}
+		})
+	}
+}
+
+func TestTailscaleConfig_BooleanFieldsSerializeCorrectly(t *testing.T) {
+	tests := []struct {
+		name string
+		cfg  TailscaleConfig
+	}{
+		{
+			name: "all enabled",
+			cfg: TailscaleConfig{
+				Enabled: true,
+				SSH:     true,
+				WebUI:   true,
+			},
+		},
+		{
+			name: "all disabled",
+			cfg: TailscaleConfig{
+				Enabled: false,
+				SSH:     false,
+				WebUI:   false,
+			},
+		},
+		{
+			name: "mixed enabled states - SSH only",
+			cfg: TailscaleConfig{
+				Enabled: true,
+				SSH:     true,
+				WebUI:   false,
+			},
+		},
+		{
+			name: "mixed enabled states - WebUI only",
+			cfg: TailscaleConfig{
+				Enabled: true,
+				SSH:     false,
+				WebUI:   true,
+			},
+		},
+		{
+			name: "disabled with options enabled",
+			cfg: TailscaleConfig{
+				Enabled: false,
+				SSH:     true,
+				WebUI:   true,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			data, err := yaml.Marshal(&tt.cfg)
+			require.NoError(t, err)
+
+			var result TailscaleConfig
+			err = yaml.Unmarshal(data, &result)
+			require.NoError(t, err)
+
+			assert.Equal(t, tt.cfg.Enabled, result.Enabled)
+			assert.Equal(t, tt.cfg.SSH, result.SSH)
+			assert.Equal(t, tt.cfg.WebUI, result.WebUI)
+		})
+	}
+}
+
+func TestTailscaleConfig_DeserializeFromYAML(t *testing.T) {
+	tests := []struct {
+		name          string
+		yamlInput     string
+		expectedCfg   TailscaleConfig
+	}{
+		{
+			name: "fully enabled config",
+			yamlInput: `enabled: true
+ssh: true
+webui: true`,
+			expectedCfg: TailscaleConfig{
+				Enabled: true,
+				SSH:     true,
+				WebUI:   true,
+			},
+		},
+		{
+			name: "fully disabled config",
+			yamlInput: `enabled: false
+ssh: false
+webui: false`,
+			expectedCfg: TailscaleConfig{
+				Enabled: false,
+				SSH:     false,
+				WebUI:   false,
+			},
+		},
+		{
+			name: "enabled with SSH only",
+			yamlInput: `enabled: true
+ssh: true
+webui: false`,
+			expectedCfg: TailscaleConfig{
+				Enabled: true,
+				SSH:     true,
+				WebUI:   false,
+			},
+		},
+		{
+			name: "enabled with WebUI only",
+			yamlInput: `enabled: true
+ssh: false
+webui: true`,
+			expectedCfg: TailscaleConfig{
+				Enabled: true,
+				SSH:     false,
+				WebUI:   true,
+			},
+		},
+		{
+			name:      "empty config defaults to false",
+			yamlInput: `{}`,
+			expectedCfg: TailscaleConfig{
+				Enabled: false,
+				SSH:     false,
+				WebUI:   false,
+			},
+		},
+		{
+			name: "partial config - only enabled",
+			yamlInput: `enabled: true`,
+			expectedCfg: TailscaleConfig{
+				Enabled: true,
+				SSH:     false,
+				WebUI:   false,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var cfg TailscaleConfig
+			err := yaml.Unmarshal([]byte(tt.yamlInput), &cfg)
+			require.NoError(t, err)
+
+			assert.Equal(t, tt.expectedCfg.Enabled, cfg.Enabled)
+			assert.Equal(t, tt.expectedCfg.SSH, cfg.SSH)
+			assert.Equal(t, tt.expectedCfg.WebUI, cfg.WebUI)
+			// AuthKey should always be empty after deserialization (excluded from YAML)
+			assert.Empty(t, cfg.AuthKey)
+		})
+	}
+}
+
+func TestTailscaleConfig_RoundTripMarshalUnmarshal(t *testing.T) {
+	original := TailscaleConfig{
+		Enabled: true,
+		AuthKey: "tskey-auth-supersecret",
+		SSH:     true,
+		WebUI:   false,
+	}
+
+	// Marshal to YAML
+	data, err := yaml.Marshal(&original)
+	require.NoError(t, err)
+
+	// Unmarshal back
+	var restored TailscaleConfig
+	err = yaml.Unmarshal(data, &restored)
+	require.NoError(t, err)
+
+	// Non-sensitive fields should be restored
+	assert.Equal(t, original.Enabled, restored.Enabled)
+	assert.Equal(t, original.SSH, restored.SSH)
+	assert.Equal(t, original.WebUI, restored.WebUI)
+
+	// Sensitive field (AuthKey) should be empty after round-trip
+	assert.Empty(t, restored.AuthKey)
+}
+
+func TestTailscaleConfig_EnvironmentVariableTagsPresent(t *testing.T) {
+	expectedEnvTags := map[string]string{
+		"Enabled": "INSTALL_TAILSCALE",
+		"AuthKey": "TAILSCALE_AUTH_KEY",
+		"SSH":     "TAILSCALE_SSH",
+		"WebUI":   "TAILSCALE_WEBUI",
+	}
+
+	cfgType := reflect.TypeOf(TailscaleConfig{})
+
+	for fieldName, expectedTag := range expectedEnvTags {
+		field, found := cfgType.FieldByName(fieldName)
+		require.True(t, found, "field %s not found", fieldName)
+
+		envTag := field.Tag.Get("env")
+		assert.Equal(t, expectedTag, envTag, "env tag mismatch for field %s", fieldName)
+	}
+}
+
+func TestTailscaleConfig_YAMLTagsPresent(t *testing.T) {
+	expectedYAMLTags := map[string]string{
+		"Enabled": "enabled",
+		"AuthKey": "-",
+		"SSH":     "ssh",
+		"WebUI":   "webui",
+	}
+
+	cfgType := reflect.TypeOf(TailscaleConfig{})
+
+	for fieldName, expectedTag := range expectedYAMLTags {
+		field, found := cfgType.FieldByName(fieldName)
+		require.True(t, found, "field %s not found", fieldName)
+
+		yamlTag := field.Tag.Get("yaml")
+		assert.Equal(t, expectedTag, yamlTag, "yaml tag mismatch for field %s", fieldName)
+	}
+}
+
+func TestTailscaleConfig_AllFieldsExist(t *testing.T) {
+	expectedFields := map[string]string{
+		"Enabled": "bool",
+		"AuthKey": "string",
+		"SSH":     "bool",
+		"WebUI":   "bool",
+	}
+
+	cfgType := reflect.TypeOf(TailscaleConfig{})
+	assert.Equal(t, len(expectedFields), cfgType.NumField(), "unexpected number of fields")
+
+	for fieldName, expectedType := range expectedFields {
+		field, found := cfgType.FieldByName(fieldName)
+		assert.True(t, found, "required field %s not found", fieldName)
+		assert.Equal(t, expectedType, field.Type.Kind().String(), "field %s type mismatch", fieldName)
+	}
+}
+
+func TestTailscaleConfig_AllSSHWebUICombinations(t *testing.T) {
+	// Test all combinations of SSH and WebUI flags
+	combinations := []struct {
+		ssh   bool
+		webui bool
+	}{
+		{false, false},
+		{false, true},
+		{true, false},
+		{true, true},
+	}
+
+	for _, combo := range combinations {
+		t.Run("SSH="+boolToStr(combo.ssh)+"/WebUI="+boolToStr(combo.webui), func(t *testing.T) {
+			cfg := TailscaleConfig{
+				Enabled: true,
+				AuthKey: "test-key",
+				SSH:     combo.ssh,
+				WebUI:   combo.webui,
+			}
+
+			// Marshal to YAML
+			data, err := yaml.Marshal(&cfg)
+			require.NoError(t, err)
+
+			// Unmarshal back
+			var restored TailscaleConfig
+			err = yaml.Unmarshal(data, &restored)
+			require.NoError(t, err)
+
+			// Verify the flags are preserved
+			assert.Equal(t, combo.ssh, restored.SSH)
+			assert.Equal(t, combo.webui, restored.WebUI)
+		})
+	}
+}
+
+func boolToStr(b bool) string {
+	if b {
+		return "true"
+	}
+	return "false"
+}
