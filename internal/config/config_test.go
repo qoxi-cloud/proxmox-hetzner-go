@@ -235,3 +235,237 @@ func TestSystemConfig_AllFieldsExist(t *testing.T) {
 		assert.Equal(t, "string", field.Type.Kind().String(), "field %s should be string type", fieldName)
 	}
 }
+
+// NetworkConfig tests
+
+func TestNetworkConfig_BridgeModeSerializesToYAML(t *testing.T) {
+	tests := []struct {
+		name         string
+		cfg          NetworkConfig
+		expectedYAML string
+	}{
+		{
+			name: "internal bridge mode",
+			cfg: NetworkConfig{
+				InterfaceName: "eth0",
+				BridgeMode:    BridgeModeInternal,
+				PrivateSubnet: "10.0.0.0/24",
+			},
+			expectedYAML: "bridge_mode: internal",
+		},
+		{
+			name: "external bridge mode",
+			cfg: NetworkConfig{
+				InterfaceName: "enp0s31f6",
+				BridgeMode:    BridgeModeExternal,
+				PrivateSubnet: "192.168.1.0/24",
+			},
+			expectedYAML: "bridge_mode: external",
+		},
+		{
+			name: "both bridge mode",
+			cfg: NetworkConfig{
+				InterfaceName: "eth0",
+				BridgeMode:    BridgeModeBoth,
+				PrivateSubnet: "172.16.0.0/16",
+			},
+			expectedYAML: "bridge_mode: both",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			data, err := yaml.Marshal(&tt.cfg)
+			require.NoError(t, err)
+
+			yamlStr := string(data)
+			assert.Contains(t, yamlStr, tt.expectedYAML)
+		})
+	}
+}
+
+func TestNetworkConfig_DeserializeFromYAML(t *testing.T) {
+	tests := []struct {
+		name           string
+		yamlInput      string
+		expectedMode   BridgeMode
+		expectedIface  string
+		expectedSubnet string
+	}{
+		{
+			name: "valid internal mode",
+			yamlInput: `interface: eth0
+bridge_mode: internal
+private_subnet: "10.0.0.0/24"`,
+			expectedMode:   BridgeModeInternal,
+			expectedIface:  "eth0",
+			expectedSubnet: "10.0.0.0/24",
+		},
+		{
+			name: "valid external mode",
+			yamlInput: `interface: enp0s31f6
+bridge_mode: external
+private_subnet: "192.168.0.0/24"`,
+			expectedMode:   BridgeModeExternal,
+			expectedIface:  "enp0s31f6",
+			expectedSubnet: "192.168.0.0/24",
+		},
+		{
+			name: "valid both mode",
+			yamlInput: `interface: eth1
+bridge_mode: both
+private_subnet: "172.16.0.0/16"`,
+			expectedMode:   BridgeModeBoth,
+			expectedIface:  "eth1",
+			expectedSubnet: "172.16.0.0/16",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var cfg NetworkConfig
+			err := yaml.Unmarshal([]byte(tt.yamlInput), &cfg)
+			require.NoError(t, err)
+
+			assert.Equal(t, tt.expectedMode, cfg.BridgeMode)
+			assert.Equal(t, tt.expectedIface, cfg.InterfaceName)
+			assert.Equal(t, tt.expectedSubnet, cfg.PrivateSubnet)
+		})
+	}
+}
+
+func TestNetworkConfig_DeserializeInvalidBridgeMode(t *testing.T) {
+	tests := []struct {
+		name      string
+		yamlInput string
+	}{
+		{
+			name: "invalid bridge mode value",
+			yamlInput: `interface: eth0
+bridge_mode: invalid_mode
+private_subnet: "10.0.0.0/24"`,
+		},
+		{
+			name: "empty bridge mode",
+			yamlInput: `interface: eth0
+bridge_mode: ""
+private_subnet: "10.0.0.0/24"`,
+		},
+		{
+			name: "missing bridge mode",
+			yamlInput: `interface: eth0
+private_subnet: "10.0.0.0/24"`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var cfg NetworkConfig
+			err := yaml.Unmarshal([]byte(tt.yamlInput), &cfg)
+			require.NoError(t, err)
+
+			// Invalid or missing values result in empty/default BridgeMode
+			assert.False(t, cfg.BridgeMode.IsValid())
+		})
+	}
+}
+
+func TestNetworkConfig_EnvironmentVariableTagsPresent(t *testing.T) {
+	expectedEnvTags := map[string]string{
+		"InterfaceName": "PVE_INTERFACE_NAME",
+		"BridgeMode":    "PVE_BRIDGE_MODE",
+		"PrivateSubnet": "PVE_PRIVATE_SUBNET",
+	}
+
+	cfgType := reflect.TypeOf(NetworkConfig{})
+
+	for fieldName, expectedTag := range expectedEnvTags {
+		field, found := cfgType.FieldByName(fieldName)
+		require.True(t, found, "field %s not found", fieldName)
+
+		envTag := field.Tag.Get("env")
+		assert.Equal(t, expectedTag, envTag, "env tag mismatch for field %s", fieldName)
+	}
+}
+
+func TestNetworkConfig_YAMLTagsPresent(t *testing.T) {
+	expectedYAMLTags := map[string]string{
+		"InterfaceName": "interface",
+		"BridgeMode":    "bridge_mode",
+		"PrivateSubnet": "private_subnet",
+	}
+
+	cfgType := reflect.TypeOf(NetworkConfig{})
+
+	for fieldName, expectedTag := range expectedYAMLTags {
+		field, found := cfgType.FieldByName(fieldName)
+		require.True(t, found, "field %s not found", fieldName)
+
+		yamlTag := field.Tag.Get("yaml")
+		assert.Equal(t, expectedTag, yamlTag, "yaml tag mismatch for field %s", fieldName)
+	}
+}
+
+func TestNetworkConfig_AllFieldsExist(t *testing.T) {
+	expectedFields := map[string]string{
+		"InterfaceName": "string",
+		"BridgeMode":    "BridgeMode",
+		"PrivateSubnet": "string",
+	}
+
+	cfgType := reflect.TypeOf(NetworkConfig{})
+	assert.Equal(t, len(expectedFields), cfgType.NumField(), "unexpected number of fields")
+
+	for fieldName, expectedType := range expectedFields {
+		field, found := cfgType.FieldByName(fieldName)
+		assert.True(t, found, "required field %s not found", fieldName)
+		assert.Equal(t, expectedType, field.Type.Name(), "field %s type mismatch", fieldName)
+	}
+}
+
+func TestNetworkConfig_RoundTripMarshalUnmarshal(t *testing.T) {
+	tests := []struct {
+		name string
+		cfg  NetworkConfig
+	}{
+		{
+			name: "standard config",
+			cfg: NetworkConfig{
+				InterfaceName: "eth0",
+				BridgeMode:    BridgeModeInternal,
+				PrivateSubnet: "10.0.0.0/24",
+			},
+		},
+		{
+			name: "external mode config",
+			cfg: NetworkConfig{
+				InterfaceName: "enp0s31f6",
+				BridgeMode:    BridgeModeExternal,
+				PrivateSubnet: "192.168.1.0/24",
+			},
+		},
+		{
+			name: "both mode config",
+			cfg: NetworkConfig{
+				InterfaceName: "eth1",
+				BridgeMode:    BridgeModeBoth,
+				PrivateSubnet: "172.16.0.0/16",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			data, err := yaml.Marshal(&tt.cfg)
+			require.NoError(t, err)
+
+			var restored NetworkConfig
+			err = yaml.Unmarshal(data, &restored)
+			require.NoError(t, err)
+
+			assert.Equal(t, tt.cfg.InterfaceName, restored.InterfaceName)
+			assert.Equal(t, tt.cfg.BridgeMode, restored.BridgeMode)
+			assert.Equal(t, tt.cfg.PrivateSubnet, restored.PrivateSubnet)
+		})
+	}
+}

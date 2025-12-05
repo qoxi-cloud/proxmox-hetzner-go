@@ -21,3 +21,15 @@ type SystemConfig struct {
 	// SSHPublicKey is the SSH public key for authentication (excluded from file serialization).
 	SSHPublicKey string `yaml:"-" env:"PVE_SSH_PUBLIC_KEY"`
 }
+
+// NetworkConfig holds network configuration options.
+type NetworkConfig struct {
+	// InterfaceName is the primary network interface (e.g., "eth0").
+	InterfaceName string `yaml:"interface" env:"PVE_INTERFACE_NAME"`
+
+	// BridgeMode defines VM networking mode (internal, external, both).
+	BridgeMode BridgeMode `yaml:"bridge_mode" env:"PVE_BRIDGE_MODE"`
+
+	// PrivateSubnet is the NAT network subnet (e.g., "10.0.0.0/24").
+	PrivateSubnet string `yaml:"private_subnet" env:"PVE_PRIVATE_SUBNET"`
+}
