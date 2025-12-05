@@ -18,6 +18,16 @@ const (
 	testSubnetClassC2 = "192.168.1.0/24" // NOSONAR(go:S1313) Class C private range - test data
 )
 
+// Test constants for commonly used test values.
+// These constants avoid duplication and satisfy SonarCloud code smell checks.
+const (
+	testTimezoneKyiv       = "Europe/Kyiv"           // NOSONAR(go:S1313) Test timezone data
+	testTimezoneNewYork    = "America/New_York"      // NOSONAR(go:S1313) Test timezone data
+	testPassword           = "secret-password"       // NOSONAR(go:S1313) Test password - not real credential
+	testTailscaleAuthKey   = "tskey-auth-secret123"  // NOSONAR(go:S1313) Test Tailscale key - not real
+	testTailscaleAuthKey2  = "tskey-auth-supersecret" // NOSONAR(go:S1313) Test Tailscale key - not real
+)
+
 func TestSystemConfig_SensitiveFieldsOmittedFromYAML(t *testing.T) {
 	tests := []struct {
 		name             string
@@ -30,13 +40,13 @@ func TestSystemConfig_SensitiveFieldsOmittedFromYAML(t *testing.T) {
 			cfg: SystemConfig{
 				Hostname:     "pve-server",
 				DomainSuffix: "local",
-				Timezone:     "Europe/Kyiv",
+				Timezone:     testTimezoneKyiv,
 				Email:        "admin@example.com",
-				RootPassword: "secret-password",
+				RootPassword: testPassword,
 				SSHPublicKey: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIG...",
 			},
-			shouldNotContain: []string{"secret-password", "ssh-ed25519", "root_password", "ssh_public_key"},
-			shouldContain:    []string{"hostname: pve-server", "domain_suffix: local", "timezone: Europe/Kyiv", "email: admin@example.com"},
+			shouldNotContain: []string{testPassword, "ssh-ed25519", "root_password", "ssh_public_key"},
+			shouldContain:    []string{"hostname: pve-server", "domain_suffix: local", "timezone: " + testTimezoneKyiv, "email: admin@example.com"},
 		},
 		{
 			name: "config with special characters in sensitive fields",
@@ -111,7 +121,7 @@ func TestSystemConfig_StandardFieldsSerializeCorrectly(t *testing.T) {
 			cfg: SystemConfig{
 				Hostname:     "pve-server-01",
 				DomainSuffix: "sub.domain.example.com",
-				Timezone:     "America/New_York",
+				Timezone:     testTimezoneNewYork,
 				Email:        "admin+alerts@example.com",
 			},
 		},
@@ -120,7 +130,7 @@ func TestSystemConfig_StandardFieldsSerializeCorrectly(t *testing.T) {
 			cfg: SystemConfig{
 				Hostname:     "server",
 				DomainSuffix: "example.com",
-				Timezone:     "Europe/Kyiv",
+				Timezone:     testTimezoneKyiv,
 				Email:        "user@example.com",
 			},
 		},
@@ -156,7 +166,7 @@ func TestSystemConfig_RoundTripMarshalUnmarshal(t *testing.T) {
 	original := SystemConfig{
 		Hostname:     "production-pve",
 		DomainSuffix: "prod.example.com",
-		Timezone:     "America/New_York",
+		Timezone:     testTimezoneNewYork,
 		Email:        "ops@company.com",
 		RootPassword: "super-secret",
 		SSHPublicKey: "ssh-rsa AAAAB3NzaC1yc2E...",
@@ -792,11 +802,11 @@ func TestTailscaleConfig_AuthKeyOmittedFromYAML(t *testing.T) {
 			name: "standard config with auth key",
 			cfg: TailscaleConfig{
 				Enabled: true,
-				AuthKey: "tskey-auth-secret123",
+				AuthKey: testTailscaleAuthKey,
 				SSH:     true,
 				WebUI:   true,
 			},
-			shouldNotContain: []string{"tskey-auth-secret123", "auth_key"},
+			shouldNotContain: []string{testTailscaleAuthKey, "auth_key"},
 			shouldContain:    []string{"enabled: true", "ssh: true", "webui: true"},
 		},
 		{
@@ -1002,7 +1012,7 @@ webui: true`,
 func TestTailscaleConfig_RoundTripMarshalUnmarshal(t *testing.T) {
 	original := TailscaleConfig{
 		Enabled: true,
-		AuthKey: "tskey-auth-supersecret",
+		AuthKey: testTailscaleAuthKey2,
 		SSH:     true,
 		WebUI:   false,
 	}
@@ -1132,9 +1142,9 @@ func TestConfig_NestedStructsSerializeCorrectly(t *testing.T) {
 		System: SystemConfig{
 			Hostname:     "pve-server",
 			DomainSuffix: "local",
-			Timezone:     "Europe/Kyiv",
+			Timezone:     testTimezoneKyiv,
 			Email:        "admin@example.com",
-			RootPassword: "secret-password",
+			RootPassword: testPassword,
 			SSHPublicKey: "ssh-ed25519 AAAAC3...",
 		},
 		Network: NetworkConfig{
@@ -1148,7 +1158,7 @@ func TestConfig_NestedStructsSerializeCorrectly(t *testing.T) {
 		},
 		Tailscale: TailscaleConfig{
 			Enabled: true,
-			AuthKey: "tskey-auth-secret123",
+			AuthKey: testTailscaleAuthKey,
 			SSH:     true,
 			WebUI:   false,
 		},
@@ -1240,7 +1250,7 @@ func TestConfig_SensitiveFieldsNotSerialized(t *testing.T) {
 		},
 		Tailscale: TailscaleConfig{
 			Enabled: true,
-			AuthKey: "tskey-auth-supersecret",
+			AuthKey: testTailscaleAuthKey2,
 		},
 	}
 
@@ -1250,7 +1260,7 @@ func TestConfig_SensitiveFieldsNotSerialized(t *testing.T) {
 	yamlStr := string(data)
 	assert.NotContains(t, yamlStr, "super-secret-password")
 	assert.NotContains(t, yamlStr, "ssh-ed25519")
-	assert.NotContains(t, yamlStr, "tskey-auth-supersecret")
+	assert.NotContains(t, yamlStr, testTailscaleAuthKey2)
 	assert.NotContains(t, yamlStr, "root_password")
 	assert.NotContains(t, yamlStr, "ssh_public_key")
 	assert.NotContains(t, yamlStr, "auth_key")
@@ -1298,7 +1308,7 @@ func TestConfig_RoundTripMarshalUnmarshal(t *testing.T) {
 		System: SystemConfig{
 			Hostname:     "production-pve",
 			DomainSuffix: "prod.example.com",
-			Timezone:     "America/New_York",
+			Timezone:     testTimezoneNewYork,
 			Email:        "ops@company.com",
 			RootPassword: "secret",
 			SSHPublicKey: "ssh-rsa AAAAB...",
