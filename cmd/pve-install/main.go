@@ -41,7 +41,8 @@ var versionCmd = &cobra.Command{
 	Use:   "version",
 	Short: "Print version information",
 	Run: func(cmd *cobra.Command, _ []string) {
-		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "pve-install %s\n", version.Full())
+		//nolint:errcheck // Writing to stdout, error handling not needed
+		fmt.Fprintf(cmd.OutOrStdout(), "pve-install %s\n", version.Full())
 	},
 }
 
@@ -61,10 +62,14 @@ func init() {
 	rootCmd.PersistentFlags().StringVarP(&saveConfig, "save-config", "s", "", "save configuration to file after input")
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "enable verbose logging")
 
-	// Bind flags to viper
-	_ = viper.BindPFlag("config", rootCmd.PersistentFlags().Lookup("config"))
-	_ = viper.BindPFlag("save-config", rootCmd.PersistentFlags().Lookup("save-config"))
-	_ = viper.BindPFlag("verbose", rootCmd.PersistentFlags().Lookup("verbose"))
+	// Bind flags to viper (errors are intentionally ignored as these bindings cannot fail
+	// when the flags are properly defined above)
+	//nolint:errcheck // BindPFlag only fails if flag doesn't exist, but we just defined them
+	viper.BindPFlag("config", rootCmd.PersistentFlags().Lookup("config"))
+	//nolint:errcheck
+	viper.BindPFlag("save-config", rootCmd.PersistentFlags().Lookup("save-config"))
+	//nolint:errcheck
+	viper.BindPFlag("verbose", rootCmd.PersistentFlags().Lookup("verbose"))
 
 	// Add subcommands
 	rootCmd.AddCommand(versionCmd)
