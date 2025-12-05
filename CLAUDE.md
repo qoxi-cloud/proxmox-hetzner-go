@@ -642,6 +642,31 @@ make clean
 - Verify `GOOS=linux GOARCH=amd64` is set
 - Check CGO is disabled (CGO_ENABLED=0)
 
+## GitHub CLI
+
+Use `gh` (GitHub CLI) for all GitHub operations:
+
+```bash
+# Issues
+gh issue list
+gh issue create --title "Title" --body "Body"
+gh issue view 123
+gh issue close 123
+
+# Pull Requests
+gh pr create --title "Title" --body "Body"
+gh pr list
+gh pr view 123
+gh pr merge 123
+
+# Workflows
+gh run list
+gh run view 123
+
+# API (for advanced operations)
+gh api repos/{owner}/{repo}/issues
+```
+
 ## Resources
 
 - [Bubbletea Documentation](https://github.com/charmbracelet/bubbletea)
@@ -650,6 +675,7 @@ make clean
 - [Cobra CLI](https://github.com/spf13/cobra)
 - [Proxmox Auto-Install](https://pve.proxmox.com/wiki/Automated_Installation)
 - [RPG Methodology](https://github.com/eyaltoledano/claude-task-master)
+- [GitHub CLI](https://cli.github.com/manual/)
 
 ## Project Documents
 
