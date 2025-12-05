@@ -1,0 +1,198 @@
+# Proxmox VE Installer Configuration File
+# =========================================
+#
+# This file contains all available configuration options for pve-install.
+# Copy this file and modify the values according to your setup.
+#
+# Usage:
+#   pve-install --config /path/to/config.yaml
+#
+# Values can also be set via environment variables with PVE_ prefix.
+# Environment variables take precedence over config file values.
+#
+# Priority order (highest to lowest):
+#   1. User input in TUI
+#   2. Environment variables (PVE_*)
+#   3. Config file values
+#   4. Default values
+
+# =============================================================================
+# SERVER CONFIGURATION
+# =============================================================================
+
+# Server hostname (RFC 1123 compliant)
+# Must be lowercase, alphanumeric with hyphens, max 63 characters
+# Environment variable: PVE_HOSTNAME
+hostname: pve-server
+
+# =============================================================================
+# NETWORK CONFIGURATION
+# =============================================================================
+
+network:
+  # Network interface name for primary connection
+  # Auto-detected if not specified (first UP interface)
+  # Environment variable: PVE_NETWORK_INTERFACE
+  interface: eth0
+
+  # Static IP address for the server (CIDR notation)
+  # Example: 192.168.1.100/24 or public IP from Hetzner
+  # Environment variable: PVE_NETWORK_ADDRESS
+  address: ""
+
+  # Gateway IP address
+  # Usually provided by Hetzner for dedicated servers
+  # Environment variable: PVE_NETWORK_GATEWAY
+  gateway: ""
+
+  # DNS servers (comma-separated if multiple)
+  # Default uses Cloudflare and Google DNS
+  # Environment variable: PVE_NETWORK_DNS
+  dns:
+    - 1.1.1.1
+    - 8.8.8.8
+
+  # Bridge mode for VM networking
+  # Options:
+  #   - nat: VMs use NAT through host (private IPs like 10.10.10.x)
+  #   - external: VMs get public IPs (requires additional IPs from Hetzner)
+  #   - both: Creates both NAT and external bridges
+  # Environment variable: PVE_NETWORK_BRIDGE_MODE
+  bridge_mode: nat
+
+  # Subnet for NAT network (only used when bridge_mode is "nat" or "both")
+  # Default: 10.10.10.0/24
+  # Environment variable: PVE_NETWORK_SUBNET
+  subnet: 10.10.10.0/24
+
+# =============================================================================
+# DISK / STORAGE CONFIGURATION
+# =============================================================================
+
+storage:
+  # Disk devices to use for Proxmox installation
+  # Auto-detected if not specified
+  # Environment variable: PVE_STORAGE_DISKS (comma-separated)
+  disks:
+    - /dev/sda
+    # - /dev/sdb  # Uncomment for RAID configurations
+
+  # Filesystem type
+  # Options: ext4, xfs, zfs
+  # ZFS is recommended for better data integrity and snapshots
+  # Environment variable: PVE_STORAGE_FILESYSTEM
+  filesystem: zfs
+
+  # ZFS RAID level (only used when filesystem is "zfs")
+  # Options:
+  #   - single: Single disk (no redundancy)
+  #   - mirror: RAID1 mirror (requires 2 disks)
+  #   - raidz1: RAID5 equivalent (requires 3+ disks)
+  #   - raidz2: RAID6 equivalent (requires 4+ disks)
+  #   - raidz3: Triple parity (requires 5+ disks)
+  # Environment variable: PVE_STORAGE_ZFS_RAID
+  zfs_raid: single
+
+  # ZFS ARC (Adaptive Replacement Cache) maximum size in GB
+  # Set to 0 for automatic (50% of RAM)
+  # Recommended: Leave some RAM for VMs and system
+  # Environment variable: PVE_STORAGE_ZFS_ARC_MAX
+  zfs_arc_max: 0
+
+# =============================================================================
+# PROXMOX SETTINGS
+# =============================================================================
+
+proxmox:
+  # Proxmox repository type
+  # Options:
+  #   - no-subscription: Free community repository (recommended for homelab)
+  #   - enterprise: Requires valid subscription
+  # Environment variable: PVE_PROXMOX_REPOSITORY
+  repository: no-subscription
+
+  # Admin email address for Proxmox notifications
+  # Used for Let's Encrypt and system alerts
+  # Environment variable: PVE_PROXMOX_EMAIL
+  email: admin@example.com
+
+# =============================================================================
+# SSH CONFIGURATION
+# =============================================================================
+
+ssh:
+  # SSH port (default: 22)
+  # Consider changing to a non-standard port for security
+  # Environment variable: PVE_SSH_PORT
+  port: 22
+
+  # SSH public key for authentication
+  # Paste your full public key here (usually from ~/.ssh/id_rsa.pub)
+  # Auto-detected from /root/.ssh/authorized_keys if not specified
+  # Environment variable: PVE_SSH_PUBLIC_KEY
+  #
+  # SECURITY NOTE: This field is NOT saved when using --save-config
+  public_key: ""
+
+  # Disable password authentication
+  # Recommended: true (key-only authentication)
+  # WARNING: Make sure your SSH key works before enabling!
+  # Environment variable: PVE_SSH_DISABLE_PASSWORD
+  disable_password: true
+
+  # Apply SSH hardening (modern ciphers, disable weak algorithms)
+  # Environment variable: PVE_SSH_HARDENING
+  hardening: true
+
+# =============================================================================
+# TAILSCALE VPN (Optional)
+# =============================================================================
+
+tailscale:
+  # Enable Tailscale VPN installation
+  # Environment variable: PVE_TAILSCALE_ENABLED
+  enabled: false
+
+  # Tailscale authentication key
+  # Generate from: https://login.tailscale.com/admin/settings/keys
+  # Use a reusable key for easier management
+  # Environment variable: PVE_TAILSCALE_AUTH_KEY
+  #
+  # SECURITY NOTE: This field is NOT saved when using --save-config
+  auth_key: ""
+
+  # Advertise as SSH server on Tailscale network
+  # Allows SSH access via Tailscale IP
+  # Environment variable: PVE_TAILSCALE_SSH
+  ssh: true
+
+  # Expose Proxmox web UI via Tailscale Funnel
+  # Environment variable: PVE_TAILSCALE_FUNNEL
+  funnel: false
+
+# =============================================================================
+# SYSTEM SETTINGS
+# =============================================================================
+
+system:
+  # Server timezone
+  # Use standard timezone names: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
+  # Environment variable: PVE_SYSTEM_TIMEZONE
+  timezone: UTC
+
+# =============================================================================
+# INSTALLER SETTINGS
+# =============================================================================
+
+# Root password for Proxmox installation
+# Minimum 8 characters
+# Environment variable: PVE_ROOT_PASSWORD
+#
+# SECURITY NOTE: This field is NOT saved when using --save-config
+# If not provided, you will be prompted in the TUI
+root_password: ""
+
+# Enable verbose logging
+# Logs are saved to /var/log/pve-install.log
+# Environment variable: PVE_VERBOSE
+verbose: false
