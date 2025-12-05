@@ -22,41 +22,65 @@ jobs:
             const closedIssue = context.payload.issue;
             console.log(`Issue #${closedIssue.number} was closed: ${closedIssue.title}`);
 
-            // Get all open issues to find potential parents
-            const { data: openIssues } = await github.rest.issues.listForRepo({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              state: 'open',
-              per_page: 100
-            });
+            // Get all open issues with pagination to find potential parents
+            let page = 1;
+            const allOpenIssues = [];
 
-            for (const parentIssue of openIssues) {
+            while (true) {
+              const { data: openIssues } = await github.rest.issues.listForRepo({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                state: 'open',
+                per_page: 100,
+                page: page
+              });
+
+              if (openIssues.length === 0) break;
+
+              allOpenIssues.push(...openIssues);
+              page++;
+
+              // Safety limit to prevent infinite loops
+              if (page > 50) {
+                console.log('Warning: Reached pagination limit of 5000 issues');
+                break;
+              }
+            }
+
+            console.log(`Found ${allOpenIssues.length} open issues to check`);
+
+            for (const parentIssue of allOpenIssues) {
               const body = parentIssue.body || '';
 
               // Check if this issue references the closed issue as a subtask
-              // Patterns: "- #123", "- [ ] #123", "- [x] #123", "#123 ", etc.
-              const issueRefPattern = new RegExp(`#${closedIssue.number}\\b`);
+              // Only match checkbox-style references: "- [ ] #123" or "- [x] #123"
+              const closedIssueCheckboxPattern = new RegExp(`^\\s*[-*]\\s*\\[[x\\s]\\]\\s*#${closedIssue.number}\\b`, 'gim');
 
-              if (!issueRefPattern.test(body)) {
+              if (!closedIssueCheckboxPattern.test(body)) {
                 continue;
               }
 
               console.log(`Found parent issue #${parentIssue.number}: ${parentIssue.title}`);
 
-              // Extract all referenced issue numbers from the body
-              const allRefs = body.match(/#(\d+)/g) || [];
-              const referencedIssueNumbers = [...new Set(allRefs.map(ref => parseInt(ref.slice(1))))];
+              // Extract referenced issue numbers from checkbox items only (subtasks)
+              // Pattern: "- [ ] #123" or "- [x] #123" or "* [ ] #123"
+              const subtaskPattern = /^\s*[-*]\s*\[[x\s]\]\s*#(\d+)/gim;
+              const subtaskNumbers = [];
+              let match;
 
-              // Filter out the parent issue itself and issues that are likely not subtasks
-              // (e.g., PRs or issues mentioned in other contexts)
-              const subtaskNumbers = referencedIssueNumbers.filter(num => num !== parentIssue.number);
+              while ((match = subtaskPattern.exec(body)) !== null) {
+                const issueNum = parseInt(match[1]);
+                if (issueNum !== parentIssue.number && !subtaskNumbers.includes(issueNum)) {
+                  subtaskNumbers.push(issueNum);
+                }
+              }
 
               if (subtaskNumbers.length === 0) {
                 console.log(`No subtask references found in issue #${parentIssue.number}`);
                 continue;
               }
 
-              console.log(`Checking ${subtaskNumbers.length} potential subtasks: ${subtaskNumbers.join(', ')}`);
+              console.log(`Checking ${subtaskNumbers.length} subtasks: ${subtaskNumbers.join(', ')}`);
 
               // Check if all referenced issues are closed
               let allClosed = true;
