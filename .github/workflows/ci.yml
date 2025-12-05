@@ -12,6 +12,7 @@ env:
 
 permissions:
   contents: read
+  security-events: write
 
 jobs:
   lint:
@@ -28,9 +29,14 @@ jobs:
           cache: true
 
       - name: Run golangci-lint
-        uses: golangci/golangci-lint-action@v6
+        # v6 - pinned to commit SHA for supply chain security
+        uses: golangci/golangci-lint-action@55c2c1448f86e01eaae002a5a3a9624417608d84
         with:
           version: latest
+          args: --config=.golangci.yml
+
+      - name: Run go vet
+        run: go vet ./...
 
   test:
     name: Test
@@ -52,7 +58,8 @@ jobs:
         run: go test -v -race -coverprofile=coverage.out ./...
 
       - name: Upload coverage
-        uses: codecov/codecov-action@v5
+        # v5 - pinned to commit SHA for supply chain security
+        uses: codecov/codecov-action@5a1091511ad55cbe89839c7260b706298ca349f7
         with:
           files: coverage.out
           fail_ci_if_error: false
@@ -103,3 +110,28 @@ jobs:
             exit 1
           fi
           echo "✅ PR title format is valid: $PR_TITLE"
+
+  security:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Run gosec
+        # v2.22.10 - pinned to commit SHA for supply chain security
+        uses: securego/gosec@6be2b51fd78feca86af91f5186b7964d76cb1256
+        with:
+          args: -exclude=G104 -fmt sarif -out gosec-results.sarif ./...
+
+      - name: Upload SARIF file
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: gosec-results.sarif

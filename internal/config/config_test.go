@@ -9,6 +9,15 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// Test constants for private network subnets (RFC 1918).
+// These are intentionally hardcoded for testing network configuration validation.
+const (
+	testSubnetClassA  = "10.0.0.0/24"    // NOSONAR(go:S1313) Class A private range - test data
+	testSubnetClassB  = "172.16.0.0/16"  // NOSONAR(go:S1313) Class B private range - test data
+	testSubnetClassC  = "192.168.0.0/24" // NOSONAR(go:S1313) Class C private range - test data
+	testSubnetClassC2 = "192.168.1.0/24" // NOSONAR(go:S1313) Class C private range - test data
+)
+
 func TestSystemConfig_SensitiveFieldsOmittedFromYAML(t *testing.T) {
 	tests := []struct {
 		name             string
@@ -249,7 +258,7 @@ func TestNetworkConfig_BridgeModeSerializesToYAML(t *testing.T) {
 			cfg: NetworkConfig{
 				InterfaceName: "eth0",
 				BridgeMode:    BridgeModeInternal,
-				PrivateSubnet: "10.0.0.0/24",
+				PrivateSubnet: testSubnetClassA,
 			},
 			expectedYAML: "bridge_mode: internal",
 		},
@@ -258,7 +267,7 @@ func TestNetworkConfig_BridgeModeSerializesToYAML(t *testing.T) {
 			cfg: NetworkConfig{
 				InterfaceName: "enp0s31f6",
 				BridgeMode:    BridgeModeExternal,
-				PrivateSubnet: "192.168.1.0/24",
+				PrivateSubnet: testSubnetClassC2,
 			},
 			expectedYAML: "bridge_mode: external",
 		},
@@ -267,7 +276,7 @@ func TestNetworkConfig_BridgeModeSerializesToYAML(t *testing.T) {
 			cfg: NetworkConfig{
 				InterfaceName: "eth0",
 				BridgeMode:    BridgeModeBoth,
-				PrivateSubnet: "172.16.0.0/16",
+				PrivateSubnet: testSubnetClassB,
 			},
 			expectedYAML: "bridge_mode: both",
 		},
@@ -294,30 +303,27 @@ func TestNetworkConfig_DeserializeFromYAML(t *testing.T) {
 	}{
 		{
 			name: "valid internal mode",
-			yamlInput: `interface: eth0
-bridge_mode: internal
-private_subnet: "10.0.0.0/24"`,
+			yamlInput: "interface: eth0\nbridge_mode: internal\nprivate_subnet: \"" +
+				testSubnetClassA + "\"",
 			expectedMode:   BridgeModeInternal,
 			expectedIface:  "eth0",
-			expectedSubnet: "10.0.0.0/24",
+			expectedSubnet: testSubnetClassA,
 		},
 		{
 			name: "valid external mode",
-			yamlInput: `interface: enp0s31f6
-bridge_mode: external
-private_subnet: "192.168.0.0/24"`,
+			yamlInput: "interface: enp0s31f6\nbridge_mode: external\nprivate_subnet: \"" +
+				testSubnetClassC + "\"",
 			expectedMode:   BridgeModeExternal,
 			expectedIface:  "enp0s31f6",
-			expectedSubnet: "192.168.0.0/24",
+			expectedSubnet: testSubnetClassC,
 		},
 		{
 			name: "valid both mode",
-			yamlInput: `interface: eth1
-bridge_mode: both
-private_subnet: "172.16.0.0/16"`,
+			yamlInput: "interface: eth1\nbridge_mode: both\nprivate_subnet: \"" +
+				testSubnetClassB + "\"",
 			expectedMode:   BridgeModeBoth,
 			expectedIface:  "eth1",
-			expectedSubnet: "172.16.0.0/16",
+			expectedSubnet: testSubnetClassB,
 		},
 	}
 
@@ -433,7 +439,7 @@ func TestNetworkConfig_RoundTripMarshalUnmarshal(t *testing.T) {
 			cfg: NetworkConfig{
 				InterfaceName: "eth0",
 				BridgeMode:    BridgeModeInternal,
-				PrivateSubnet: "10.0.0.0/24",
+				PrivateSubnet: testSubnetClassA,
 			},
 		},
 		{
@@ -441,7 +447,7 @@ func TestNetworkConfig_RoundTripMarshalUnmarshal(t *testing.T) {
 			cfg: NetworkConfig{
 				InterfaceName: "enp0s31f6",
 				BridgeMode:    BridgeModeExternal,
-				PrivateSubnet: "192.168.1.0/24",
+				PrivateSubnet: testSubnetClassC2,
 			},
 		},
 		{
@@ -449,7 +455,7 @@ func TestNetworkConfig_RoundTripMarshalUnmarshal(t *testing.T) {
 			cfg: NetworkConfig{
 				InterfaceName: "eth1",
 				BridgeMode:    BridgeModeBoth,
-				PrivateSubnet: "172.16.0.0/16",
+				PrivateSubnet: testSubnetClassB,
 			},
 		},
 	}
@@ -910,9 +916,9 @@ func TestTailscaleConfig_BooleanFieldsSerializeCorrectly(t *testing.T) {
 
 func TestTailscaleConfig_DeserializeFromYAML(t *testing.T) {
 	tests := []struct {
-		name          string
-		yamlInput     string
-		expectedCfg   TailscaleConfig
+		name        string
+		yamlInput   string
+		expectedCfg TailscaleConfig
 	}{
 		{
 			name: "fully enabled config",
@@ -968,7 +974,7 @@ webui: true`,
 			},
 		},
 		{
-			name: "partial config - only enabled",
+			name:      "partial config - only enabled",
 			yamlInput: `enabled: true`,
 			expectedCfg: TailscaleConfig{
 				Enabled: true,

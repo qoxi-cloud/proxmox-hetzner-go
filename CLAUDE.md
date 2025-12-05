@@ -642,6 +642,31 @@ make clean
 - Verify `GOOS=linux GOARCH=amd64` is set
 - Check CGO is disabled (CGO_ENABLED=0)
 
+## GitHub CLI
+
+Use `gh` (GitHub CLI) for all GitHub operations:
+
+```bash
+# Issues
+gh issue list
+gh issue create --title "Title" --body "Body"
+gh issue view 123
+gh issue close 123
+
+# Pull Requests
+gh pr create --title "Title" --body "Body"
+gh pr list
+gh pr view 123
+gh pr merge 123
+
+# Workflows
+gh run list
+gh run view 123
+
+# API (for advanced operations)
+gh api repos/{owner}/{repo}/issues
+```
+
 ## Resources
 
 - [Bubbletea Documentation](https://github.com/charmbracelet/bubbletea)
@@ -650,6 +675,7 @@ make clean
 - [Cobra CLI](https://github.com/spf13/cobra)
 - [Proxmox Auto-Install](https://pve.proxmox.com/wiki/Automated_Installation)
 - [RPG Methodology](https://github.com/eyaltoledano/claude-task-master)
+- [GitHub CLI](https://cli.github.com/manual/)
 
 ## Project Documents
 
@@ -690,6 +716,43 @@ Configuration is in a separate file: `.mcp.json`
 | **sequential-thinking** | Step-by-step problem solving |
 | **fetch** | Web content fetching |
 
+### 🔒 Code Quality & Security
+
+| MCP Server | Description |
+|------------|-------------|
+| **sonarcloud** | Static code analysis, security scanning, code quality metrics |
+
+**SonarCloud Tools (2)**:
+- `fetch_sonarcloud_issues` - Fetch detailed issues for a specific PR or branch
+- `summarize_sonarcloud_issues` - Get a high-level summary of issues
+
+**SonarCloud Usage Examples:**
+
+```bash
+# Get summary of issues for a PR
+mcp__sonarcloud__summarize_sonarcloud_issues(pullRequest: "123")
+
+# Fetch detailed issues with filters
+mcp__sonarcloud__fetch_sonarcloud_issues(
+  pullRequest: "123",
+  impactSeverities: ["HIGH", "BLOCKER"],
+  issueStatuses: ["OPEN", "CONFIRMED"]
+)
+
+# Get issues for the main branch (new code period)
+mcp__sonarcloud__fetch_sonarcloud_issues(sinceLeakPeriod: true)
+```
+
+**Common SonarCloud Filters:**
+
+| Filter | Values |
+|--------|--------|
+| `impactSeverities` | INFO, LOW, MEDIUM, HIGH, BLOCKER |
+| `issueStatuses` | OPEN, CONFIRMED, FALSE_POSITIVE, ACCEPTED, FIXED |
+| `impactSoftwareQualities` | MAINTAINABILITY, RELIABILITY, SECURITY |
+
+**Note:** SonarCloud runs via Docker. Environment variables `SONARCLOUD_TOKEN`, `SONARCLOUD_ORGANISATION`, and `SONARCLOUD_PROJECT_KEY` are configured in `.mcp.json`.
+
 ### MCP Server Usage
 
 | Task | MCP Server |
@@ -701,3 +764,6 @@ Configuration is in a separate file: `.mcp.json`
 | Search documentation | fetch, context7 |
 | Complex tasks | sequential-thinking |
 | Save context | memory |
+| Code quality issues | sonarcloud |
+| Security scanning | sonarcloud |
+| PR code review | sonarcloud |

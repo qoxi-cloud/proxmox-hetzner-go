@@ -29,7 +29,7 @@ It provides a guided installation experience with:
 - SSH hardening
 - Tailscale integration
 - ZFS optimization`,
-	Run: func(cmd *cobra.Command, args []string) {
+	Run: func(_ *cobra.Command, _ []string) {
 		// TODO: Launch TUI here
 		fmt.Println("Starting Proxmox VE installer TUI...")
 		fmt.Println("TUI not implemented yet. Use 'pve-install --help' for available options.")
@@ -40,7 +40,8 @@ It provides a guided installation experience with:
 var versionCmd = &cobra.Command{
 	Use:   "version",
 	Short: "Print version information",
-	Run: func(cmd *cobra.Command, args []string) {
+	Run: func(cmd *cobra.Command, _ []string) {
+		//nolint:errcheck // Writing to stdout, error handling not needed
 		fmt.Fprintf(cmd.OutOrStdout(), "pve-install %s\n", version.Full())
 	},
 }
@@ -61,10 +62,14 @@ func init() {
 	rootCmd.PersistentFlags().StringVarP(&saveConfig, "save-config", "s", "", "save configuration to file after input")
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "enable verbose logging")
 
-	// Bind flags to viper
-	_ = viper.BindPFlag("config", rootCmd.PersistentFlags().Lookup("config"))
-	_ = viper.BindPFlag("save-config", rootCmd.PersistentFlags().Lookup("save-config"))
-	_ = viper.BindPFlag("verbose", rootCmd.PersistentFlags().Lookup("verbose"))
+	// Bind flags to viper (errors are intentionally ignored as these bindings cannot fail
+	// when the flags are properly defined above)
+	//nolint:errcheck // BindPFlag only fails if flag doesn't exist
+	viper.BindPFlag("config", rootCmd.PersistentFlags().Lookup("config"))
+	//nolint:errcheck // BindPFlag only fails if flag doesn't exist
+	viper.BindPFlag("save-config", rootCmd.PersistentFlags().Lookup("save-config"))
+	//nolint:errcheck // BindPFlag only fails if flag doesn't exist
+	viper.BindPFlag("verbose", rootCmd.PersistentFlags().Lookup("verbose"))
 
 	// Add subcommands
 	rootCmd.AddCommand(versionCmd)

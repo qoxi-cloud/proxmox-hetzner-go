@@ -23,6 +23,7 @@ func (b BridgeMode) IsValid() bool {
 	case BridgeModeInternal, BridgeModeExternal, BridgeModeBoth:
 		return true
 	}
+
 	return false
 }
 
@@ -49,5 +50,6 @@ func (z ZFSRaid) IsValid() bool {
 	case ZFSRaidSingle, ZFSRaid0, ZFSRaid1:
 		return true
 	}
+
 	return false
 }

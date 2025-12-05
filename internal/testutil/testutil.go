@@ -2,7 +2,6 @@
 package testutil
 
 import (
-	"os"
 	"testing"
 )
 
@@ -11,18 +10,7 @@ import (
 func TempDir(t *testing.T) string {
 	t.Helper()
 
-	dir, err := os.MkdirTemp("", "pve-install-test-*")
-	if err != nil {
-		t.Fatalf("failed to create temp directory: %v", err)
-	}
-
-	t.Cleanup(func() {
-		if err := os.RemoveAll(dir); err != nil {
-			t.Errorf("failed to remove temp directory %s: %v", dir, err)
-		}
-	})
-
-	return dir
+	return t.TempDir()
 }
 
 // SkipIfShort skips the test if the -short flag is set.
