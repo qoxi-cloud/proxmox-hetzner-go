@@ -12,10 +12,10 @@ import (
 // Test constants for private network subnets (RFC 1918).
 // These are intentionally hardcoded for testing network configuration validation.
 const (
-	testSubnetClassA  = "10.0.0.0/24"    // Class A private range
-	testSubnetClassB  = "172.16.0.0/16"  // Class B private range
-	testSubnetClassC  = "192.168.0.0/24" // Class C private range
-	testSubnetClassC2 = "192.168.1.0/24" // Class C private range (alternate)
+	testSubnetClassA  = "10.0.0.0/24"    // NOSONAR(go:S1313) Class A private range - test data
+	testSubnetClassB  = "172.16.0.0/16"  // NOSONAR(go:S1313) Class B private range - test data
+	testSubnetClassC  = "192.168.0.0/24" // NOSONAR(go:S1313) Class C private range - test data
+	testSubnetClassC2 = "192.168.1.0/24" // NOSONAR(go:S1313) Class C private range - test data
 )
 
 func TestSystemConfig_SensitiveFieldsOmittedFromYAML(t *testing.T) {
