@@ -132,28 +132,3 @@ jobs:
         if: always()
         with:
           sarif_file: gosec-results.sarif
-
-  sonarcloud:
-    name: SonarCloud
-    runs-on: ubuntu-latest
-    if: secrets.SONAR_TOKEN != ''
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
-
-      - name: Set up Go
-        uses: actions/setup-go@v6
-        with:
-          go-version: ${{ env.GO_VERSION }}
-          cache: true
-
-      - name: Run tests with coverage
-        run: go test -coverprofile=coverage.out ./...
-
-      - name: SonarCloud Scan
-        uses: SonarSource/sonarcloud-github-action@master
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
