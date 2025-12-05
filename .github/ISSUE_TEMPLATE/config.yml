@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Documentation
+    url: https://github.com/qoxi-cloud/proxmox-hetzner-go/blob/main/README.md
+    about: Check out the documentation before opening an issue
+  - name: Discussions
+    url: https://github.com/qoxi-cloud/proxmox-hetzner-go/discussions
+    about: Ask questions and discuss ideas
