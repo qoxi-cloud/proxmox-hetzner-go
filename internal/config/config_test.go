@@ -469,3 +469,306 @@ func TestNetworkConfig_RoundTripMarshalUnmarshal(t *testing.T) {
 		})
 	}
 }
+
+// StorageConfig tests
+
+func TestStorageConfig_ZFSRaidSerializesToYAML(t *testing.T) {
+	tests := []struct {
+		name         string
+		cfg          StorageConfig
+		expectedYAML string
+	}{
+		{
+			name: "single disk configuration",
+			cfg: StorageConfig{
+				ZFSRaid: ZFSRaidSingle,
+				Disks:   []string{"/dev/sda"},
+			},
+			expectedYAML: "zfs_raid: single",
+		},
+		{
+			name: "raid0 configuration",
+			cfg: StorageConfig{
+				ZFSRaid: ZFSRaid0,
+				Disks:   []string{"/dev/sda", "/dev/sdb"},
+			},
+			expectedYAML: "zfs_raid: raid0",
+		},
+		{
+			name: "raid1 configuration",
+			cfg: StorageConfig{
+				ZFSRaid: ZFSRaid1,
+				Disks:   []string{"/dev/sda", "/dev/sdb"},
+			},
+			expectedYAML: "zfs_raid: raid1",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			data, err := yaml.Marshal(&tt.cfg)
+			require.NoError(t, err)
+
+			yamlStr := string(data)
+			assert.Contains(t, yamlStr, tt.expectedYAML)
+		})
+	}
+}
+
+func TestStorageConfig_DisksArraySerializesToYAML(t *testing.T) {
+	tests := []struct {
+		name      string
+		cfg       StorageConfig
+		wantDisks []string
+	}{
+		{
+			name: "single disk",
+			cfg: StorageConfig{
+				ZFSRaid: ZFSRaidSingle,
+				Disks:   []string{"/dev/sda"},
+			},
+			wantDisks: []string{"/dev/sda"},
+		},
+		{
+			name: "multiple disks",
+			cfg: StorageConfig{
+				ZFSRaid: ZFSRaid1,
+				Disks:   []string{"/dev/sda", "/dev/sdb"},
+			},
+			wantDisks: []string{"/dev/sda", "/dev/sdb"},
+		},
+		{
+			name: "many disks",
+			cfg: StorageConfig{
+				ZFSRaid: ZFSRaid0,
+				Disks:   []string{"/dev/nvme0n1", "/dev/nvme1n1", "/dev/nvme2n1"},
+			},
+			wantDisks: []string{"/dev/nvme0n1", "/dev/nvme1n1", "/dev/nvme2n1"},
+		},
+		{
+			name: "empty disk list",
+			cfg: StorageConfig{
+				ZFSRaid: ZFSRaidSingle,
+				Disks:   []string{},
+			},
+			wantDisks: []string{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			data, err := yaml.Marshal(&tt.cfg)
+			require.NoError(t, err)
+
+			var restored StorageConfig
+			err = yaml.Unmarshal(data, &restored)
+			require.NoError(t, err)
+
+			assert.Equal(t, tt.wantDisks, restored.Disks)
+		})
+	}
+}
+
+func TestStorageConfig_DeserializeFromYAML(t *testing.T) {
+	tests := []struct {
+		name          string
+		yamlInput     string
+		expectedRaid  ZFSRaid
+		expectedDisks []string
+	}{
+		{
+			name: "single disk config",
+			yamlInput: `zfs_raid: single
+disks:
+  - /dev/sda`,
+			expectedRaid:  ZFSRaidSingle,
+			expectedDisks: []string{"/dev/sda"},
+		},
+		{
+			name: "raid0 with two disks",
+			yamlInput: `zfs_raid: raid0
+disks:
+  - /dev/sda
+  - /dev/sdb`,
+			expectedRaid:  ZFSRaid0,
+			expectedDisks: []string{"/dev/sda", "/dev/sdb"},
+		},
+		{
+			name: "raid1 with nvme disks",
+			yamlInput: `zfs_raid: raid1
+disks:
+  - /dev/nvme0n1
+  - /dev/nvme1n1`,
+			expectedRaid:  ZFSRaid1,
+			expectedDisks: []string{"/dev/nvme0n1", "/dev/nvme1n1"},
+		},
+		{
+			name: "empty disks",
+			yamlInput: `zfs_raid: single
+disks: []`,
+			expectedRaid:  ZFSRaidSingle,
+			expectedDisks: []string{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var cfg StorageConfig
+			err := yaml.Unmarshal([]byte(tt.yamlInput), &cfg)
+			require.NoError(t, err)
+
+			assert.Equal(t, tt.expectedRaid, cfg.ZFSRaid)
+			assert.Equal(t, tt.expectedDisks, cfg.Disks)
+		})
+	}
+}
+
+func TestStorageConfig_DeserializeInvalidZFSRaid(t *testing.T) {
+	tests := []struct {
+		name      string
+		yamlInput string
+	}{
+		{
+			name: "invalid raid value",
+			yamlInput: `zfs_raid: invalid_raid
+disks:
+  - /dev/sda`,
+		},
+		{
+			name: "empty raid value",
+			yamlInput: `zfs_raid: ""
+disks:
+  - /dev/sda`,
+		},
+		{
+			name: "missing raid value",
+			yamlInput: `disks:
+  - /dev/sda`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var cfg StorageConfig
+			err := yaml.Unmarshal([]byte(tt.yamlInput), &cfg)
+			require.NoError(t, err)
+
+			// Invalid or missing values result in empty/default ZFSRaid
+			assert.False(t, cfg.ZFSRaid.IsValid())
+		})
+	}
+}
+
+func TestStorageConfig_EnvironmentVariableTagsPresent(t *testing.T) {
+	expectedEnvTags := map[string]string{
+		"ZFSRaid": "ZFS_RAID",
+		"Disks":   "DISKS",
+	}
+
+	cfgType := reflect.TypeOf(StorageConfig{})
+
+	for fieldName, expectedTag := range expectedEnvTags {
+		field, found := cfgType.FieldByName(fieldName)
+		require.True(t, found, "field %s not found", fieldName)
+
+		envTag := field.Tag.Get("env")
+		assert.Equal(t, expectedTag, envTag, "env tag mismatch for field %s", fieldName)
+	}
+}
+
+func TestStorageConfig_YAMLTagsPresent(t *testing.T) {
+	expectedYAMLTags := map[string]string{
+		"ZFSRaid": "zfs_raid",
+		"Disks":   "disks",
+	}
+
+	cfgType := reflect.TypeOf(StorageConfig{})
+
+	for fieldName, expectedTag := range expectedYAMLTags {
+		field, found := cfgType.FieldByName(fieldName)
+		require.True(t, found, "field %s not found", fieldName)
+
+		yamlTag := field.Tag.Get("yaml")
+		assert.Equal(t, expectedTag, yamlTag, "yaml tag mismatch for field %s", fieldName)
+	}
+}
+
+func TestStorageConfig_AllFieldsExist(t *testing.T) {
+	expectedFields := map[string]string{
+		"ZFSRaid": "ZFSRaid",
+		"Disks":   "slice",
+	}
+
+	cfgType := reflect.TypeOf(StorageConfig{})
+	assert.Equal(t, len(expectedFields), cfgType.NumField(), "unexpected number of fields")
+
+	for fieldName, expectedType := range expectedFields {
+		field, found := cfgType.FieldByName(fieldName)
+		assert.True(t, found, "required field %s not found", fieldName)
+		if expectedType == "slice" {
+			assert.Equal(t, reflect.Slice, field.Type.Kind(), "field %s should be slice type", fieldName)
+		} else {
+			assert.Equal(t, expectedType, field.Type.Name(), "field %s type mismatch", fieldName)
+		}
+	}
+}
+
+func TestStorageConfig_RoundTripMarshalUnmarshal(t *testing.T) {
+	tests := []struct {
+		name string
+		cfg  StorageConfig
+	}{
+		{
+			name: "single disk config",
+			cfg: StorageConfig{
+				ZFSRaid: ZFSRaidSingle,
+				Disks:   []string{"/dev/sda"},
+			},
+		},
+		{
+			name: "raid0 config",
+			cfg: StorageConfig{
+				ZFSRaid: ZFSRaid0,
+				Disks:   []string{"/dev/sda", "/dev/sdb"},
+			},
+		},
+		{
+			name: "raid1 with nvme",
+			cfg: StorageConfig{
+				ZFSRaid: ZFSRaid1,
+				Disks:   []string{"/dev/nvme0n1", "/dev/nvme1n1"},
+			},
+		},
+		{
+			name: "empty disks",
+			cfg: StorageConfig{
+				ZFSRaid: ZFSRaidSingle,
+				Disks:   []string{},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			data, err := yaml.Marshal(&tt.cfg)
+			require.NoError(t, err)
+
+			var restored StorageConfig
+			err = yaml.Unmarshal(data, &restored)
+			require.NoError(t, err)
+
+			assert.Equal(t, tt.cfg.ZFSRaid, restored.ZFSRaid)
+			assert.Equal(t, tt.cfg.Disks, restored.Disks)
+		})
+	}
+}
+
+func TestStorageConfig_EnvSeparatorTagPresent(t *testing.T) {
+	cfgType := reflect.TypeOf(StorageConfig{})
+
+	field, found := cfgType.FieldByName("Disks")
+	require.True(t, found, "field Disks not found")
+
+	envSeparatorTag := field.Tag.Get("envSeparator")
+	assert.Equal(t, ",", envSeparatorTag, "envSeparator tag should be comma")
+}
