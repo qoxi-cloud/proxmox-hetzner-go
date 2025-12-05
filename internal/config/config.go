@@ -33,3 +33,12 @@ type NetworkConfig struct {
 	// PrivateSubnet is the NAT network subnet (e.g., "10.0.0.0/24").
 	PrivateSubnet string `yaml:"private_subnet" env:"PRIVATE_SUBNET"`
 }
+
+// StorageConfig holds storage and disk configuration.
+type StorageConfig struct {
+	// ZFSRaid is the ZFS RAID level (single, raid0, raid1).
+	ZFSRaid ZFSRaid `yaml:"zfs_raid" env:"ZFS_RAID"`
+
+	// Disks is the list of disk devices to use (e.g., "/dev/sda", "/dev/sdb").
+	Disks []string `yaml:"disks" env:"DISKS" envSeparator:","`
+}
