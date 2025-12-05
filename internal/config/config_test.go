@@ -372,9 +372,9 @@ private_subnet: "10.0.0.0/24"`,
 
 func TestNetworkConfig_EnvironmentVariableTagsPresent(t *testing.T) {
 	expectedEnvTags := map[string]string{
-		"InterfaceName": "PVE_INTERFACE_NAME",
-		"BridgeMode":    "PVE_BRIDGE_MODE",
-		"PrivateSubnet": "PVE_PRIVATE_SUBNET",
+		"InterfaceName": "INTERFACE_NAME",
+		"BridgeMode":    "BRIDGE_MODE",
+		"PrivateSubnet": "PRIVATE_SUBNET",
 	}
 
 	cfgType := reflect.TypeOf(NetworkConfig{})
