@@ -1124,3 +1124,275 @@ func boolToStr(b bool) string {
 	}
 	return "false"
 }
+
+// Config tests
+
+func TestConfig_NestedStructsSerializeCorrectly(t *testing.T) {
+	cfg := Config{
+		System: SystemConfig{
+			Hostname:     "pve-server",
+			DomainSuffix: "local",
+			Timezone:     "Europe/Kyiv",
+			Email:        "admin@example.com",
+			RootPassword: "secret-password",
+			SSHPublicKey: "ssh-ed25519 AAAAC3...",
+		},
+		Network: NetworkConfig{
+			InterfaceName: "eth0",
+			BridgeMode:    BridgeModeInternal,
+			PrivateSubnet: testSubnetClassA,
+		},
+		Storage: StorageConfig{
+			ZFSRaid: ZFSRaid1,
+			Disks:   []string{"/dev/sda", "/dev/sdb"},
+		},
+		Tailscale: TailscaleConfig{
+			Enabled: true,
+			AuthKey: "tskey-auth-secret123",
+			SSH:     true,
+			WebUI:   false,
+		},
+		Verbose: true,
+	}
+
+	data, err := yaml.Marshal(&cfg)
+	require.NoError(t, err)
+
+	yamlStr := string(data)
+
+	// Check nested structure serialization
+	assert.Contains(t, yamlStr, "system:")
+	assert.Contains(t, yamlStr, "network:")
+	assert.Contains(t, yamlStr, "storage:")
+	assert.Contains(t, yamlStr, "tailscale:")
+
+	// Check nested values
+	assert.Contains(t, yamlStr, "hostname: pve-server")
+	assert.Contains(t, yamlStr, "interface: eth0")
+	assert.Contains(t, yamlStr, "zfs_raid: raid1")
+	assert.Contains(t, yamlStr, "enabled: true")
+}
+
+func TestConfig_DeserializeFromYAML(t *testing.T) {
+	yamlInput := `system:
+  hostname: test-server
+  domain_suffix: example.com
+  timezone: UTC
+  email: test@test.com
+network:
+  interface: enp0s31f6
+  bridge_mode: external
+  private_subnet: "192.168.0.0/24"
+storage:
+  zfs_raid: single
+  disks:
+    - /dev/nvme0n1
+tailscale:
+  enabled: true
+  ssh: true
+  webui: false`
+
+	var cfg Config
+	err := yaml.Unmarshal([]byte(yamlInput), &cfg)
+	require.NoError(t, err)
+
+	assert.Equal(t, "test-server", cfg.System.Hostname)
+	assert.Equal(t, "example.com", cfg.System.DomainSuffix)
+	assert.Equal(t, "UTC", cfg.System.Timezone)
+	assert.Equal(t, "test@test.com", cfg.System.Email)
+
+	assert.Equal(t, "enp0s31f6", cfg.Network.InterfaceName)
+	assert.Equal(t, BridgeModeExternal, cfg.Network.BridgeMode)
+	assert.Equal(t, testSubnetClassC, cfg.Network.PrivateSubnet)
+
+	assert.Equal(t, ZFSRaidSingle, cfg.Storage.ZFSRaid)
+	assert.Equal(t, []string{"/dev/nvme0n1"}, cfg.Storage.Disks)
+
+	assert.True(t, cfg.Tailscale.Enabled)
+	assert.True(t, cfg.Tailscale.SSH)
+	assert.False(t, cfg.Tailscale.WebUI)
+
+	// Verbose should be false (not in YAML)
+	assert.False(t, cfg.Verbose)
+}
+
+func TestConfig_VerboseExcludedFromYAML(t *testing.T) {
+	cfg := Config{
+		System: SystemConfig{
+			Hostname: "test",
+		},
+		Verbose: true,
+	}
+
+	data, err := yaml.Marshal(&cfg)
+	require.NoError(t, err)
+
+	yamlStr := string(data)
+	assert.NotContains(t, yamlStr, "verbose")
+}
+
+func TestConfig_SensitiveFieldsNotSerialized(t *testing.T) {
+	cfg := Config{
+		System: SystemConfig{
+			Hostname:     "pve",
+			RootPassword: "super-secret-password",
+			SSHPublicKey: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5...",
+		},
+		Tailscale: TailscaleConfig{
+			Enabled: true,
+			AuthKey: "tskey-auth-supersecret",
+		},
+	}
+
+	data, err := yaml.Marshal(&cfg)
+	require.NoError(t, err)
+
+	yamlStr := string(data)
+	assert.NotContains(t, yamlStr, "super-secret-password")
+	assert.NotContains(t, yamlStr, "ssh-ed25519")
+	assert.NotContains(t, yamlStr, "tskey-auth-supersecret")
+	assert.NotContains(t, yamlStr, "root_password")
+	assert.NotContains(t, yamlStr, "ssh_public_key")
+	assert.NotContains(t, yamlStr, "auth_key")
+}
+
+func TestConfig_PartialConfigDeserialize(t *testing.T) {
+	tests := []struct {
+		name      string
+		yamlInput string
+	}{
+		{
+			name:      "only system section",
+			yamlInput: "system:\n  hostname: test",
+		},
+		{
+			name:      "only network section",
+			yamlInput: "network:\n  interface: eth0",
+		},
+		{
+			name:      "only storage section",
+			yamlInput: "storage:\n  zfs_raid: single",
+		},
+		{
+			name:      "only tailscale section",
+			yamlInput: "tailscale:\n  enabled: true",
+		},
+		{
+			name:      "empty config",
+			yamlInput: "{}",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var cfg Config
+			err := yaml.Unmarshal([]byte(tt.yamlInput), &cfg)
+			require.NoError(t, err)
+			// Should not error on partial configs - missing sections use zero values
+		})
+	}
+}
+
+func TestConfig_RoundTripMarshalUnmarshal(t *testing.T) {
+	original := Config{
+		System: SystemConfig{
+			Hostname:     "production-pve",
+			DomainSuffix: "prod.example.com",
+			Timezone:     "America/New_York",
+			Email:        "ops@company.com",
+			RootPassword: "secret",
+			SSHPublicKey: "ssh-rsa AAAAB...",
+		},
+		Network: NetworkConfig{
+			InterfaceName: "eth0",
+			BridgeMode:    BridgeModeBoth,
+			PrivateSubnet: testSubnetClassA,
+		},
+		Storage: StorageConfig{
+			ZFSRaid: ZFSRaid1,
+			Disks:   []string{"/dev/sda", "/dev/sdb"},
+		},
+		Tailscale: TailscaleConfig{
+			Enabled: true,
+			AuthKey: "tskey-secret",
+			SSH:     true,
+			WebUI:   true,
+		},
+		Verbose: true,
+	}
+
+	data, err := yaml.Marshal(&original)
+	require.NoError(t, err)
+
+	var restored Config
+	err = yaml.Unmarshal(data, &restored)
+	require.NoError(t, err)
+
+	// Non-sensitive fields should be restored
+	assert.Equal(t, original.System.Hostname, restored.System.Hostname)
+	assert.Equal(t, original.System.DomainSuffix, restored.System.DomainSuffix)
+	assert.Equal(t, original.System.Timezone, restored.System.Timezone)
+	assert.Equal(t, original.System.Email, restored.System.Email)
+
+	assert.Equal(t, original.Network.InterfaceName, restored.Network.InterfaceName)
+	assert.Equal(t, original.Network.BridgeMode, restored.Network.BridgeMode)
+	assert.Equal(t, original.Network.PrivateSubnet, restored.Network.PrivateSubnet)
+
+	assert.Equal(t, original.Storage.ZFSRaid, restored.Storage.ZFSRaid)
+	assert.Equal(t, original.Storage.Disks, restored.Storage.Disks)
+
+	assert.Equal(t, original.Tailscale.Enabled, restored.Tailscale.Enabled)
+	assert.Equal(t, original.Tailscale.SSH, restored.Tailscale.SSH)
+	assert.Equal(t, original.Tailscale.WebUI, restored.Tailscale.WebUI)
+
+	// Sensitive fields should be empty after round-trip
+	assert.Empty(t, restored.System.RootPassword)
+	assert.Empty(t, restored.System.SSHPublicKey)
+	assert.Empty(t, restored.Tailscale.AuthKey)
+
+	// Verbose should be false (excluded from YAML)
+	assert.False(t, restored.Verbose)
+}
+
+func TestConfig_YAMLTagsPresent(t *testing.T) {
+	expectedYAMLTags := map[string]string{
+		"System":    "system",
+		"Network":   "network",
+		"Storage":   "storage",
+		"Tailscale": "tailscale",
+		"Verbose":   "-",
+	}
+
+	cfgType := reflect.TypeOf(Config{})
+
+	for fieldName, expectedTag := range expectedYAMLTags {
+		field, found := cfgType.FieldByName(fieldName)
+		require.True(t, found, "field %s not found", fieldName)
+
+		yamlTag := field.Tag.Get("yaml")
+		assert.Equal(t, expectedTag, yamlTag, "yaml tag mismatch for field %s", fieldName)
+	}
+}
+
+func TestConfig_AllFieldsExist(t *testing.T) {
+	expectedFields := map[string]string{
+		"System":    "SystemConfig",
+		"Network":   "NetworkConfig",
+		"Storage":   "StorageConfig",
+		"Tailscale": "TailscaleConfig",
+		"Verbose":   "bool",
+	}
+
+	cfgType := reflect.TypeOf(Config{})
+	assert.Equal(t, len(expectedFields), cfgType.NumField(), "unexpected number of fields")
+
+	for fieldName, expectedType := range expectedFields {
+		field, found := cfgType.FieldByName(fieldName)
+		assert.True(t, found, "required field %s not found", fieldName)
+		if expectedType == "bool" {
+			assert.Equal(t, "bool", field.Type.Kind().String(), "field %s type mismatch", fieldName)
+		} else {
+			assert.Equal(t, expectedType, field.Type.Name(), "field %s type mismatch", fieldName)
+		}
+	}
+}
