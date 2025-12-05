@@ -95,7 +95,7 @@ jobs:
         run: |
           PR_TITLE="${{ github.event.pull_request.title }}"
           # Check if PR title starts with emoji
-          if [[ ! "$PR_TITLE" =~ ^[[:space:]]*[🎨✨🔥🐛🚑️✏️💄🎉✅🔒️🔐🔖💚👷📈♻️➕➖🔧🔨🌐💬🗃️🔊🔇👥🚸🏗️📱🤡🥚📝💩⏪️🔀📦👽️🚚📄📜🚀💥♿️💡🍻🍺📸🔍️🩺🧪🔫🏷️🌱🚩🥅💫🗑️🛂🩹🧐📌🔨🧱🧪🎬🔇🙈📸🔐⚰️🧑‍💻📦️🧵🦺🛡️⬆️⬇️➕➖🚨🩺🎯][[:space:]] ]] && \
+          if [[ ! "$PR_TITLE" =~ ^[[:space:]]*[🎨✨🔥🐛🚑️✏️💄🎉✅🔒️🔐🔖💚👷📈♻️➕➖🔧🔨🌐💬🗃️🔊🔇👥🚸🏗️📱🤡🥚📝💩⏪️🔀📦👽️🚚📄📜🚀💥♿️💡🍻🍺📸🔍️🩺🧪🔫🏷️🌱🚩🥅💫🗑️🛂🩹🧐📌🔨🧱🧪🎬🔇🙈📸🔐⚰️🧑‍💻📦️🧵🦺🛡️⬆⬇➕➖🚨🩺🎯] ]] && \
              [[ ! "$PR_TITLE" =~ ^[[:space:]]*:[a-z_]+:[[:space:]] ]]; then
             echo "❌ PR title must start with an emoji"
             echo "Example: ✨ feat: add new feature"
