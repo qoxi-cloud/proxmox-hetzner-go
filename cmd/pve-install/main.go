@@ -29,7 +29,7 @@ It provides a guided installation experience with:
 - SSH hardening
 - Tailscale integration
 - ZFS optimization`,
-	Run: func(cmd *cobra.Command, args []string) {
+	Run: func(_ *cobra.Command, _ []string) {
 		// TODO: Launch TUI here
 		fmt.Println("Starting Proxmox VE installer TUI...")
 		fmt.Println("TUI not implemented yet. Use 'pve-install --help' for available options.")
@@ -40,8 +40,8 @@ It provides a guided installation experience with:
 var versionCmd = &cobra.Command{
 	Use:   "version",
 	Short: "Print version information",
-	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Fprintf(cmd.OutOrStdout(), "pve-install %s\n", version.Full())
+	Run: func(cmd *cobra.Command, _ []string) {
+		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "pve-install %s\n", version.Full())
 	},
 }
 

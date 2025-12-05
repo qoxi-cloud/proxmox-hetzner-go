@@ -910,9 +910,9 @@ func TestTailscaleConfig_BooleanFieldsSerializeCorrectly(t *testing.T) {
 
 func TestTailscaleConfig_DeserializeFromYAML(t *testing.T) {
 	tests := []struct {
-		name          string
-		yamlInput     string
-		expectedCfg   TailscaleConfig
+		name        string
+		yamlInput   string
+		expectedCfg TailscaleConfig
 	}{
 		{
 			name: "fully enabled config",
@@ -968,7 +968,7 @@ webui: true`,
 			},
 		},
 		{
-			name: "partial config - only enabled",
+			name:      "partial config - only enabled",
 			yamlInput: `enabled: true`,
 			expectedCfg: TailscaleConfig{
 				Enabled: true,

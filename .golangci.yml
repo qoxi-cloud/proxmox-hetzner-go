@@ -59,7 +59,7 @@ linters:
     - predeclared
     - revive
     - stylecheck
-    - tenv
+    - usetesting   # replaced deprecated tenv
     - tparallel
     - unconvert
     - unparam
@@ -73,8 +73,7 @@ linters:
     - gochecknoglobals
     - gochecknoinits
     - godox
-    - goerr113
-    - gomnd
+    - err113        # renamed from goerr113
     - ireturn
     - lll
     - nlreturn

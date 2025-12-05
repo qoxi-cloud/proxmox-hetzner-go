@@ -19,7 +19,7 @@ func TestTempDir(t *testing.T) {
 
 	// Verify we can write to the directory
 	testFile := filepath.Join(dir, "test.txt")
-	err = os.WriteFile(testFile, []byte("test"), 0644)
+	err = os.WriteFile(testFile, []byte("test"), 0o644)
 	require.NoError(t, err)
 
 	// Verify file was created

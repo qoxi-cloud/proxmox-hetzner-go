@@ -1,3 +1,5 @@
+// Package config provides configuration structures and utilities for the
+// Proxmox VE installer on Hetzner dedicated servers.
 package config
 
 // SystemConfig holds system-level configuration settings for the server.
