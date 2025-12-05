@@ -59,3 +59,22 @@ type TailscaleConfig struct {
 	// WebUI exposes Proxmox interface via Tailscale.
 	WebUI bool `yaml:"webui" env:"TAILSCALE_WEBUI"`
 }
+
+// Config holds all installation configuration.
+// It can be loaded from YAML files or environment variables.
+type Config struct {
+	// System contains system-level configuration.
+	System SystemConfig `yaml:"system"`
+
+	// Network contains network configuration.
+	Network NetworkConfig `yaml:"network"`
+
+	// Storage contains storage and disk configuration.
+	Storage StorageConfig `yaml:"storage"`
+
+	// Tailscale contains Tailscale VPN configuration.
+	Tailscale TailscaleConfig `yaml:"tailscale"`
+
+	// Verbose enables verbose logging (runtime only, not saved).
+	Verbose bool `yaml:"-"`
+}
