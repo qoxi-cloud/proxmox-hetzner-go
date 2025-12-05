@@ -1,0 +1,73 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+language: "en-US"
+early_access: true
+enable_free_tier: true
+
+reviews:
+  profile: "chill"
+  request_changes_workflow: false
+  high_level_summary: true
+  high_level_summary_placeholder: "@coderabbitai summary"
+  auto_title_placeholder: "@coderabbitai"
+  review_status: true
+  collapse_walkthrough: false
+  poem: false
+
+  tools:
+    github-checks:
+      enabled: true
+    shellcheck:
+      enabled: true
+    golangci-lint:
+      enabled: true
+
+  # Project uses emoji conventional commits format
+  # Example: ✨ feat: add new feature
+  # Do NOT flag emojis in commit messages or PR titles as issues
+  path_instructions:
+    - path: "**/*.go"
+      instructions: |
+        Review Go code for:
+        - Error handling (always return errors, never panic)
+        - Proper use of context.Context
+        - Following Go naming conventions
+        - Avoid global state
+        - Use of interfaces for testability
+    - path: "cmd/**"
+      instructions: |
+        This is the CLI entry point using Cobra.
+        Ensure flags are properly defined and documented.
+    - path: "internal/**"
+      instructions: |
+        Internal packages should not be exposed.
+        Check for proper encapsulation.
+    - path: "pkg/**"
+      instructions: |
+        Public packages that can be imported by external code.
+        Ensure proper documentation and stability.
+
+  path_filters:
+    - "!**/*.md"
+    - "!**/vendor/**"
+    - "!**/.git/**"
+    - "!**/node_modules/**"
+
+chat:
+  auto_reply: true
+
+knowledge_base:
+  opt_out: false
+  learnings:
+    scope: "auto"
+  issues:
+    scope: "auto"
+  jira:
+    project_keys: []
+  linear:
+    team_keys: []
+
+# Project conventions - DO NOT flag these as issues:
+# 1. Commit messages use emoji conventional format: <emoji> <type>: <description>
+#    Examples: ✨ feat:, 🐛 fix:, 📝 docs:, 🔧 chore:, ♻️ refactor:
+# 2. PR titles follow the same emoji conventional format
+# 3. This is intentional and documented in CLAUDE.md
