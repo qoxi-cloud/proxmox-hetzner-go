@@ -64,11 +64,11 @@ func init() {
 
 	// Bind flags to viper (errors are intentionally ignored as these bindings cannot fail
 	// when the flags are properly defined above)
-	//nolint:errcheck // BindPFlag only fails if flag doesn't exist, but we just defined them
+	//nolint:errcheck // BindPFlag only fails if flag doesn't exist
 	viper.BindPFlag("config", rootCmd.PersistentFlags().Lookup("config"))
-	//nolint:errcheck
+	//nolint:errcheck // BindPFlag only fails if flag doesn't exist
 	viper.BindPFlag("save-config", rootCmd.PersistentFlags().Lookup("save-config"))
-	//nolint:errcheck
+	//nolint:errcheck // BindPFlag only fails if flag doesn't exist
 	viper.BindPFlag("verbose", rootCmd.PersistentFlags().Lookup("verbose"))
 
 	// Add subcommands
