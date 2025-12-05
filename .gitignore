@@ -7,6 +7,11 @@
 *.dll
 *.so
 *.dylib
+/pve-install
+/pve-install-linux
+
+# Build output directory
+build/
 
 # Test binary, built with `go test -c`
 *.test
