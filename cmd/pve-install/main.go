@@ -41,7 +41,7 @@ var versionCmd = &cobra.Command{
 	Use:   "version",
 	Short: "Print version information",
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Printf("pve-install %s\n", version.Full())
+		fmt.Fprintf(cmd.OutOrStdout(), "pve-install %s\n", version.Full())
 	},
 }
 

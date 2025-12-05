@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -48,4 +49,46 @@ func TestFlagsExist(t *testing.T) {
 	verboseFlag := rootCmd.PersistentFlags().Lookup("verbose")
 	require.NotNil(t, verboseFlag)
 	assert.Equal(t, "v", verboseFlag.Shorthand)
+}
+
+func TestRootCmdHelpOutput(t *testing.T) {
+	// Capture help output
+	buf := new(bytes.Buffer)
+	rootCmd.SetOut(buf)
+	rootCmd.SetArgs([]string{"--help"})
+
+	err := rootCmd.Execute()
+	require.NoError(t, err)
+
+	output := buf.String()
+
+	// Verify help contains expected content
+	assert.Contains(t, output, "pve-install")
+	assert.Contains(t, output, "TUI-based installer for Proxmox VE")
+	assert.Contains(t, output, "--config")
+	assert.Contains(t, output, "--save-config")
+	assert.Contains(t, output, "--verbose")
+	assert.Contains(t, output, "version")
+
+	// Reset args for other tests
+	rootCmd.SetArgs(nil)
+}
+
+func TestVersionCmdOutput(t *testing.T) {
+	// Capture version output
+	buf := new(bytes.Buffer)
+	rootCmd.SetOut(buf)
+	rootCmd.SetArgs([]string{"version"})
+
+	err := rootCmd.Execute()
+	require.NoError(t, err)
+
+	output := buf.String()
+
+	// Verify version output contains expected content
+	assert.Contains(t, output, "pve-install")
+	assert.Contains(t, output, version.Version)
+
+	// Reset args for other tests
+	rootCmd.SetArgs(nil)
 }
