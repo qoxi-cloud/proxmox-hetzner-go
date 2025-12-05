@@ -6,7 +6,7 @@
 
 **Name**: proxmox-hetzner-go  
 **Purpose**: TUI-based installer for Proxmox VE on Hetzner dedicated servers  
-**Language**: Go 1.25+  
+**Language**: Go 1.24+  
 **TUI Framework**: Bubbletea (github.com/charmbracelet/bubbletea)  
 **Architecture**: RPG (Repository Planning Graph) methodology
 
@@ -27,7 +27,7 @@
 
 Defined in `.tool-versions`:
 ```
-golang 1.25.5
+golang 1.24.0
 nodejs 24.11.0
 ```
 
@@ -113,7 +113,7 @@ Hetzner Server (Manual)
 
 | Component | Technology | Version |
 |-----------|------------|---------|
-| Language | Go | 1.23+ |
+| Language | Go | 1.24+ |
 | TUI Framework | Bubbletea | v1.2+ |
 | TUI Components | Bubbles | v0.20+ |
 | Styling | Lipgloss | v1.0+ |
@@ -172,7 +172,7 @@ proxmox-hetzner-go/
 │   └── workflows/
 │       ├── build.yml              # CI build workflow
 │       └── release.yml            # Release workflow
-├── .tool-versions                 # asdf: golang 1.23.3, nodejs 22.11.0
+├── .tool-versions                 # asdf: golang 1.24.0, nodejs 24.11.0
 ├── package.json                   # MCP server dependencies (local)
 ├── .mcp.json                      # MCP configuration
 ├── go.mod
