@@ -29,7 +29,8 @@ jobs:
           cache: true
 
       - name: Run golangci-lint
-        uses: golangci/golangci-lint-action@v6
+        # v6 - pinned to commit SHA for supply chain security
+        uses: golangci/golangci-lint-action@55c2c1448f86e01eaae002a5a3a9624417608d84
         with:
           version: latest
           args: --config=.golangci.yml
@@ -57,7 +58,8 @@ jobs:
         run: go test -v -race -coverprofile=coverage.out ./...
 
       - name: Upload coverage
-        uses: codecov/codecov-action@v5
+        # v5 - pinned to commit SHA for supply chain security
+        uses: codecov/codecov-action@5a1091511ad55cbe89839c7260b706298ca349f7
         with:
           files: coverage.out
           fail_ci_if_error: false
