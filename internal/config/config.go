@@ -79,6 +79,10 @@ type Config struct {
 	Verbose bool `yaml:"-"`
 }
 
+// Default private subnet for NAT network (RFC 1918 Class A private range).
+// This is intentionally hardcoded as the default value per PRD specification.
+const defaultPrivateSubnet = "10.0.0.0/24" //nolint:gosec // NOSONAR(go:S1313) RFC 1918 private range - default config
+
 // DefaultConfig returns a Config with sensible default values.
 // Each call returns a new Config instance to avoid shared state.
 func DefaultConfig() *Config {
@@ -91,7 +95,7 @@ func DefaultConfig() *Config {
 		},
 		Network: NetworkConfig{
 			BridgeMode:    BridgeModeInternal,
-			PrivateSubnet: "10.0.0.0/24",
+			PrivateSubnet: defaultPrivateSubnet,
 		},
 		Storage: StorageConfig{
 			ZFSRaid: ZFSRaid1,

@@ -1489,7 +1489,7 @@ func TestDefaultConfig_AllDefaultsMatchPRDSpecification(t *testing.T) {
 		{"Timezone", cfg.System.Timezone, "Europe/Kyiv"},
 		{"Email", cfg.System.Email, "admin@qoxi.cloud"},
 		{"BridgeMode", cfg.Network.BridgeMode, BridgeModeInternal},
-		{"PrivateSubnet", cfg.Network.PrivateSubnet, "10.0.0.0/24"},
+		{"PrivateSubnet", cfg.Network.PrivateSubnet, testSubnetClassA},
 		{"ZFSRaid", cfg.Storage.ZFSRaid, ZFSRaid1},
 		{"TailscaleEnabled", cfg.Tailscale.Enabled, false},
 		{"TailscaleSSH", cfg.Tailscale.SSH, true},
