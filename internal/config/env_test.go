@@ -887,35 +887,73 @@ func TestLoadFromEnvOverridesFileConfig(t *testing.T) {
 	assertBoolField(t, fieldTailscaleWebUI, cfg.Tailscale.WebUI, true)
 }
 
-// TestLoadFromEnvEmptyVsUnset verifies that empty string env vars preserve existing config values.
+// TestLoadFromEnvEmptyVsUnset verifies the distinction between:
+// - Empty string env vars (set but empty) - should NOT override
+// - Unset env vars - should NOT override
+// Both should preserve the existing configuration values.
 func TestLoadFromEnvEmptyVsUnset(t *testing.T) {
 	tests := []struct {
 		name         string
 		envName      string
+		setValue     *string // nil = unset, non-nil = set to that value (including empty string)
 		initialValue string
 		setField     func(*Config, string)
 		getField     func(*Config) string
 	}{
+		// Empty string cases (env var set to "")
 		{
 			name: "PVE_HOSTNAME empty preserves value", envName: "PVE_HOSTNAME",
+			setValue:     ptrString(""),
 			initialValue: "original-hostname",
 			setField:     func(c *Config, v string) { c.System.Hostname = v },
 			getField:     func(c *Config) string { return c.System.Hostname },
 		},
 		{
 			name: "PVE_DOMAIN_SUFFIX empty preserves value", envName: "PVE_DOMAIN_SUFFIX",
+			setValue:     ptrString(""),
 			initialValue: "original.local",
 			setField:     func(c *Config, v string) { c.System.DomainSuffix = v },
 			getField:     func(c *Config) string { return c.System.DomainSuffix },
 		},
 		{
 			name: "INTERFACE_NAME empty preserves value", envName: "INTERFACE_NAME",
+			setValue:     ptrString(""),
 			initialValue: "eth99",
 			setField:     func(c *Config, v string) { c.Network.InterfaceName = v },
 			getField:     func(c *Config) string { return c.Network.InterfaceName },
 		},
 		{
 			name: "PRIVATE_SUBNET empty preserves value", envName: "PRIVATE_SUBNET",
+			setValue:     ptrString(""),
+			initialValue: "192.168.99.0/24", // NOSONAR(go:S1313) RFC 1918 test value
+			setField:     func(c *Config, v string) { c.Network.PrivateSubnet = v },
+			getField:     func(c *Config) string { return c.Network.PrivateSubnet },
+		},
+		// Unset cases (env var not set at all)
+		{
+			name: "PVE_HOSTNAME unset preserves value", envName: "PVE_HOSTNAME",
+			setValue:     nil, // unset
+			initialValue: "original-hostname",
+			setField:     func(c *Config, v string) { c.System.Hostname = v },
+			getField:     func(c *Config) string { return c.System.Hostname },
+		},
+		{
+			name: "PVE_DOMAIN_SUFFIX unset preserves value", envName: "PVE_DOMAIN_SUFFIX",
+			setValue:     nil, // unset
+			initialValue: "original.local",
+			setField:     func(c *Config, v string) { c.System.DomainSuffix = v },
+			getField:     func(c *Config) string { return c.System.DomainSuffix },
+		},
+		{
+			name: "INTERFACE_NAME unset preserves value", envName: "INTERFACE_NAME",
+			setValue:     nil, // unset
+			initialValue: "eth99",
+			setField:     func(c *Config, v string) { c.Network.InterfaceName = v },
+			getField:     func(c *Config) string { return c.Network.InterfaceName },
+		},
+		{
+			name: "PRIVATE_SUBNET unset preserves value", envName: "PRIVATE_SUBNET",
+			setValue:     nil,               // unset
 			initialValue: "192.168.99.0/24", // NOSONAR(go:S1313) RFC 1918 test value
 			setField:     func(c *Config, v string) { c.Network.PrivateSubnet = v },
 			getField:     func(c *Config) string { return c.Network.PrivateSubnet },
@@ -926,7 +964,15 @@ func TestLoadFromEnvEmptyVsUnset(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			cfg := DefaultConfig()
 			tt.setField(cfg, tt.initialValue)
-			t.Setenv(tt.envName, "")
+
+			if tt.setValue != nil {
+				// Set env var to the specified value (including empty string)
+				t.Setenv(tt.envName, *tt.setValue)
+			} else {
+				// Ensure env var is unset for this test
+				unsetEnvWithCleanup(t, tt.envName)
+			}
+
 			LoadFromEnv(cfg)
 			if got := tt.getField(cfg); got != tt.initialValue {
 				t.Errorf("%s: got %q, want %q (original)", tt.envName, got, tt.initialValue)
