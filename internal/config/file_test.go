@@ -10,9 +10,10 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// Test constants for file names to avoid duplication.
+// Test constants to avoid duplication.
 const (
-	testConfigFileName = "config.yaml"
+	testConfigFileName    = "config.yaml"
+	errMsgFailedParseYAML = "failed to parse YAML"
 )
 
 func TestSaveToFileSuccessfulSave(t *testing.T) {
@@ -467,35 +468,7 @@ func TestLoadFromFileEmptyFileDefaults(t *testing.T) {
 	assert.Equal(t, defaults.Tailscale.WebUI, cfg.Tailscale.WebUI)
 }
 
-// LoadFromFile Error Tests
-
-func TestLoadFromFileNotFound(t *testing.T) {
-	cfg, err := LoadFromFile("/nonexistent/path/config.yaml")
-
-	require.Error(t, err)
-	require.Nil(t, cfg)
-	assert.Contains(t, err.Error(), "config file not found")
-	assert.ErrorIs(t, err, os.ErrNotExist)
-}
-
-func TestLoadFromFileMalformedYAML(t *testing.T) {
-	tmpDir := t.TempDir()
-	filePath := filepath.Join(tmpDir, testConfigFileName)
-
-	malformedYAML := `
-system:
-  hostname: test
-  invalid yaml content here: [unclosed
-`
-	err := os.WriteFile(filePath, []byte(malformedYAML), 0o600)
-	require.NoError(t, err)
-
-	cfg, err := LoadFromFile(filePath)
-
-	require.Error(t, err)
-	require.Nil(t, cfg)
-	assert.Contains(t, err.Error(), "failed to parse YAML")
-}
+// LoadFromFile Error Tests are covered by TestLoadFromFileDescriptiveErrors table-driven tests.
 
 func TestLoadFromFileRoundTrip(t *testing.T) {
 	// Create a config, save it, load it back
@@ -572,4 +545,102 @@ storage:
 	require.NoError(t, err)
 
 	assert.Equal(t, []string{"/dev/sda", "/dev/sdb", "/dev/sdc"}, cfg.Storage.Disks)
+}
+
+// TestLoadFromFileErrorCases uses table-driven tests to verify error handling
+// across multiple failure scenarios with descriptive error messages.
+func TestLoadFromFileErrorCases(t *testing.T) {
+	tests := []struct {
+		name        string
+		content     []byte
+		wantErr     bool
+		errContains string
+		errIs       error
+	}{
+		{
+			name:        "malformed YAML with unclosed bracket",
+			content:     []byte("system:\n  hostname: [unclosed"),
+			wantErr:     true,
+			errContains: errMsgFailedParseYAML,
+		},
+		{
+			name:        "malformed YAML with tabs",
+			content:     []byte("system:\n\thostname: tab-indented"),
+			wantErr:     true,
+			errContains: errMsgFailedParseYAML,
+		},
+		{
+			name:        "malformed YAML with duplicate keys",
+			content:     []byte("system:\n  hostname: first\n  hostname: second"),
+			wantErr:     true,
+			errContains: errMsgFailedParseYAML,
+		},
+		{
+			name:        "invalid type coercion",
+			content:     []byte("storage:\n  disks:\n    invalid: not-a-list"),
+			wantErr:     true,
+			errContains: errMsgFailedParseYAML,
+		},
+		{
+			name:        "binary content",
+			content:     []byte{0x00, 0x01, 0x02, 0xFF, 0xFE, 0xFD},
+			wantErr:     true,
+			errContains: errMsgFailedParseYAML,
+		},
+		{
+			name:    "YAML with only comments",
+			content: []byte("# This is a comment\n"),
+			wantErr: false,
+		},
+		{
+			name:    "null document",
+			content: []byte("null"),
+			wantErr: false,
+		},
+		{
+			name:    "valid indentation edge case",
+			content: []byte("system:\nhostname: at-root-level"),
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			filePath := filepath.Join(t.TempDir(), "test.yaml")
+			require.NoError(t, os.WriteFile(filePath, tt.content, 0o600))
+
+			cfg, err := LoadFromFile(filePath)
+
+			if !tt.wantErr {
+				require.NoError(t, err)
+				assert.NotNil(t, cfg)
+				return
+			}
+			require.Error(t, err)
+			require.Nil(t, cfg)
+			assert.Contains(t, err.Error(), tt.errContains)
+			if tt.errIs != nil {
+				assert.ErrorIs(t, err, tt.errIs)
+			}
+		})
+	}
+}
+
+// TestLoadFromFileNotFound verifies error when config file does not exist.
+func TestLoadFromFileNotFound(t *testing.T) {
+	cfg, err := LoadFromFile("/nonexistent/path/config.yaml")
+
+	require.Error(t, err)
+	require.Nil(t, cfg)
+	assert.Contains(t, err.Error(), "config file not found")
+	assert.ErrorIs(t, err, os.ErrNotExist)
+}
+
+// TestLoadFromFileDirectoryPath verifies behavior when path points to a directory.
+func TestLoadFromFileDirectoryPath(t *testing.T) {
+	cfg, err := LoadFromFile(t.TempDir())
+
+	require.Error(t, err)
+	require.Nil(t, cfg)
+	assert.Contains(t, err.Error(), "failed to read config file")
 }
