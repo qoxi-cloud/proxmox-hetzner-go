@@ -182,76 +182,29 @@ func TestLoadFromEnvNilConfig(t *testing.T) {
 	t.Log("LoadFromEnv(nil) completed without panic")
 }
 
-func TestLoadFromEnvHostname(t *testing.T) {
-	cfg := DefaultConfig()
-	original := cfg.System.Hostname
-
-	t.Setenv("PVE_HOSTNAME", testHostname)
-	LoadFromEnv(cfg)
-
-	if cfg.System.Hostname != testHostname {
-		t.Errorf(errFmtHostname, cfg.System.Hostname, testHostname)
+func TestLoadFromEnvSystemFields(t *testing.T) {
+	testPassword := "supersecret" // NOSONAR(go:S2068) test value
+	tests := []struct {
+		envName  string
+		value    string
+		getField func(*Config) string
+	}{
+		{"PVE_HOSTNAME", testHostname, func(c *Config) string { return c.System.Hostname }},
+		{"PVE_DOMAIN_SUFFIX", testDomain, func(c *Config) string { return c.System.DomainSuffix }},
+		{"PVE_TIMEZONE", testTimezone, func(c *Config) string { return c.System.Timezone }},
+		{"PVE_EMAIL", testEmail, func(c *Config) string { return c.System.Email }},
+		{"PVE_ROOT_PASSWORD", testPassword, func(c *Config) string { return c.System.RootPassword }},
+		{"PVE_SSH_PUBLIC_KEY", testSSHKey, func(c *Config) string { return c.System.SSHPublicKey }},
 	}
-
-	// Verify original was different
-	if original == testHostname {
-		t.Error("Default hostname should not be 'test-server'")
-	}
-}
-
-func TestLoadFromEnvDomainSuffix(t *testing.T) {
-	cfg := DefaultConfig()
-
-	t.Setenv("PVE_DOMAIN_SUFFIX", testDomain)
-	LoadFromEnv(cfg)
-
-	if cfg.System.DomainSuffix != testDomain {
-		t.Errorf("DomainSuffix = %q, want %q", cfg.System.DomainSuffix, testDomain)
-	}
-}
-
-func TestLoadFromEnvTimezone(t *testing.T) {
-	cfg := DefaultConfig()
-
-	t.Setenv("PVE_TIMEZONE", testTimezone)
-	LoadFromEnv(cfg)
-
-	if cfg.System.Timezone != testTimezone {
-		t.Errorf("Timezone = %q, want %q", cfg.System.Timezone, testTimezone)
-	}
-}
-
-func TestLoadFromEnvEmail(t *testing.T) {
-	cfg := DefaultConfig()
-
-	t.Setenv("PVE_EMAIL", testEmail)
-	LoadFromEnv(cfg)
-
-	if cfg.System.Email != testEmail {
-		t.Errorf("Email = %q, want %q", cfg.System.Email, testEmail)
-	}
-}
-
-func TestLoadFromEnvRootPassword(t *testing.T) {
-	cfg := DefaultConfig()
-	testValue := "supersecret" // NOSONAR(go:S2068) test value, not a real credential
-
-	t.Setenv("PVE_ROOT_PASSWORD", testValue)
-	LoadFromEnv(cfg)
-
-	if cfg.System.RootPassword != testValue {
-		t.Errorf("RootPassword = %q, want %q", cfg.System.RootPassword, testValue)
-	}
-}
-
-func TestLoadFromEnvSSHPublicKey(t *testing.T) {
-	cfg := DefaultConfig()
-
-	t.Setenv("PVE_SSH_PUBLIC_KEY", testSSHKey)
-	LoadFromEnv(cfg)
-
-	if cfg.System.SSHPublicKey != testSSHKey {
-		t.Errorf("SSHPublicKey = %q, want %q", cfg.System.SSHPublicKey, testSSHKey)
+	for _, tt := range tests {
+		t.Run(tt.envName, func(t *testing.T) {
+			cfg := DefaultConfig()
+			t.Setenv(tt.envName, tt.value)
+			LoadFromEnv(cfg)
+			if got := tt.getField(cfg); got != tt.value {
+				t.Errorf("%s = %q, want %q", tt.envName, got, tt.value)
+			}
+		})
 	}
 }
 
