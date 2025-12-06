@@ -134,6 +134,8 @@ See [configs/example.yaml](configs/example.yaml) for a complete configuration re
 
 All configuration options can be set via environment variables. Environment variables override config file values but are overridden by TUI user input.
 
+> **Note:** System configuration variables use the `PVE_` prefix, while network, storage, and Tailscale variables use descriptive names without prefix for clarity and brevity.
+
 #### System Configuration
 
 | Variable | Description | Example |
@@ -166,8 +168,8 @@ All configuration options can be set via environment variables. Environment vari
 |----------|-------------|---------|
 | `INSTALL_TAILSCALE` | Enable Tailscale installation | `true`, `false`, `yes`, `no`, `1`, `0` |
 | `TAILSCALE_AUTH_KEY` | Tailscale auth key (sensitive) | - |
-| `TAILSCALE_SSH` | Enable SSH over Tailscale | `true`, `false` |
-| `TAILSCALE_WEBUI` | Expose WebUI via Tailscale | `true`, `false` |
+| `TAILSCALE_SSH` | Enable SSH over Tailscale | `true`, `false`, `yes`, `no`, `1`, `0` |
+| `TAILSCALE_WEBUI` | Expose WebUI via Tailscale | `true`, `false`, `yes`, `no`, `1`, `0` |
 
 #### Example Usage
 

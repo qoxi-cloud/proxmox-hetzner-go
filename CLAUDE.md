@@ -556,8 +556,8 @@ All configuration fields can be set via environment variables. See `internal/con
 | `DISKS` | `Storage.Disks` | []string | Comma-separated |
 | `INSTALL_TAILSCALE` | `Tailscale.Enabled` | bool | true/false/yes/no/1/0 |
 | `TAILSCALE_AUTH_KEY` | `Tailscale.AuthKey` | string | Sensitive |
-| `TAILSCALE_SSH` | `Tailscale.SSH` | bool | true/false |
-| `TAILSCALE_WEBUI` | `Tailscale.WebUI` | bool | true/false |
+| `TAILSCALE_SSH` | `Tailscale.SSH` | bool | true/false/yes/no/1/0 |
+| `TAILSCALE_WEBUI` | `Tailscale.WebUI` | bool | true/false/yes/no/1/0 |
 
 **Boolean Parsing:** Accepts `true`, `yes`, `1` (case-insensitive) as true; all other values are false.
 
