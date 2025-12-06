@@ -15,6 +15,11 @@ const (
 	errMsgPasswordTooWeak = "password must be at least 8 characters"
 )
 
+// Test name constants to avoid duplication.
+const (
+	testNameInvalidRandomString = "invalid random string"
+)
+
 // Test error variables for validation tests.
 var (
 	errHostnameEmpty   = errors.New(errMsgHostnameEmpty)
@@ -538,7 +543,7 @@ func TestValidateTimezone(t *testing.T) {
 		{"invalid non-existent Mars/Olympus", "Mars/Olympus", ErrTimezoneInvalid},
 		{"invalid non-existent Antarctica/NonExistent", "Antarctica/NonExistent", ErrTimezoneInvalid},
 		// Invalid - random strings
-		{"invalid random string", "not-a-timezone", ErrTimezoneInvalid},
+		{testNameInvalidRandomString, "not-a-timezone", ErrTimezoneInvalid},
 		{"invalid numbers only", "12345", ErrTimezoneInvalid},
 		// Case sensitivity - "local" lowercase is not valid (only "Local")
 		// Note: "utc" behavior varies by platform (valid on macOS, invalid on Linux)
@@ -580,7 +585,7 @@ func TestValidateBridgeMode(t *testing.T) {
 		{"invalid uppercase INTERNAL", BridgeMode("INTERNAL"), ErrBridgeModeInvalid},
 		{"invalid uppercase External", BridgeMode("External"), ErrBridgeModeInvalid},
 		{"invalid uppercase Both", BridgeMode("Both"), ErrBridgeModeInvalid},
-		{"invalid random string", BridgeMode("random"), ErrBridgeModeInvalid},
+		{testNameInvalidRandomString, BridgeMode("random"), ErrBridgeModeInvalid},
 		{"invalid partial match intern", BridgeMode("intern"), ErrBridgeModeInvalid},
 		{"invalid partial match extern", BridgeMode("extern"), ErrBridgeModeInvalid},
 		{"invalid with spaces", BridgeMode(" internal"), ErrBridgeModeInvalid},
@@ -628,7 +633,7 @@ func TestValidateZFSRaid(t *testing.T) {
 		{"invalid uppercase Raid0", ZFSRaid("Raid0"), ErrZFSRaidInvalid},
 		{"invalid uppercase RAID1", ZFSRaid("RAID1"), ErrZFSRaidInvalid},
 		// Invalid - random strings
-		{"invalid random string", ZFSRaid("random"), ErrZFSRaidInvalid},
+		{testNameInvalidRandomString, ZFSRaid("random"), ErrZFSRaidInvalid},
 		{"invalid numeric only", ZFSRaid("123"), ErrZFSRaidInvalid},
 		// Invalid - partial matches
 		{"invalid partial raid", ZFSRaid("raid"), ErrZFSRaidInvalid},
