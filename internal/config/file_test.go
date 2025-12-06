@@ -765,6 +765,31 @@ func TestLoadFromFileDirectoryPath(t *testing.T) {
 	assert.Contains(t, err.Error(), "failed to read config file")
 }
 
+// TestLoadFromFileExampleYAML verifies that configs/example.yaml loads without errors
+// and produces valid configuration values (Issue #88).
+func TestLoadFromFileExampleYAML(t *testing.T) {
+	cfg, err := LoadFromFile("../../configs/example.yaml")
+	require.NoError(t, err, "example.yaml should load without errors")
+	require.NotNil(t, cfg)
+
+	// Verify example.yaml values are loaded correctly
+	assert.Equal(t, "pve-server", cfg.System.Hostname)
+	assert.Equal(t, "local", cfg.System.DomainSuffix)
+	assert.Equal(t, "UTC", cfg.System.Timezone)
+	assert.Equal(t, "admin@example.com", cfg.System.Email)
+
+	assert.Equal(t, "eth0", cfg.Network.InterfaceName)
+	assert.Equal(t, BridgeModeInternal, cfg.Network.BridgeMode)
+	assert.Equal(t, "10.0.0.0/24", cfg.Network.PrivateSubnet) // NOSONAR(go:S1313) Class A private range - test data
+
+	assert.Equal(t, ZFSRaid1, cfg.Storage.ZFSRaid)
+	assert.Equal(t, []string{"/dev/sda"}, cfg.Storage.Disks)
+
+	assert.False(t, cfg.Tailscale.Enabled)
+	assert.True(t, cfg.Tailscale.SSH)
+	assert.False(t, cfg.Tailscale.WebUI)
+}
+
 // Tests for Sensitive Field Exclusion (Issue #86)
 
 // TestSaveToFileExcludesSensitiveFieldsIssue86 verifies that sensitive credentials

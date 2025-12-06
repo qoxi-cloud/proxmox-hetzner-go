@@ -1,5 +1,45 @@
 // Package config provides configuration structures and utilities for the
 // Proxmox VE installer on Hetzner dedicated servers.
+//
+// # File Operations
+//
+// This file provides functions for loading and saving YAML configuration files.
+// Configuration files use YAML format and support hierarchical structure with
+// nested sections for system, network, storage, and tailscale settings.
+//
+// # Example Usage
+//
+//	// Load configuration from file
+//	cfg, err := config.LoadFromFile("/path/to/config.yaml")
+//	if err != nil {
+//		log.Fatalf("Failed to load config: %v", err)
+//	}
+//
+//	// Modify configuration
+//	cfg.System.Hostname = "my-server"
+//
+//	// Save configuration (sensitive fields excluded automatically)
+//	if err := cfg.SaveToFile("/path/to/output.yaml"); err != nil {
+//		log.Fatalf("Failed to save config: %v", err)
+//	}
+//
+// # Sensitive Fields
+//
+// The following fields are never written to saved files:
+//   - System.RootPassword - Root password for installation
+//   - System.SSHPublicKey - SSH public key for authentication
+//   - Tailscale.AuthKey - Tailscale authentication key
+//
+// These fields must be provided via environment variables or TUI input
+// and remain in memory only during execution.
+//
+// # Configuration Priority
+//
+// Values are resolved in this order (highest to lowest):
+//  1. User input in TUI
+//  2. Environment variables (PVE_* prefix)
+//  3. Config file values
+//  4. Default values from DefaultConfig()
 package config
 
 import (
