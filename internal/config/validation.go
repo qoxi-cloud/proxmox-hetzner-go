@@ -325,3 +325,51 @@ func ValidateSubnet(subnet string) error {
 
 	return nil
 }
+
+// Validate validates the entire configuration.
+// It runs all validation checks and returns all errors found,
+// not just the first one, allowing users to fix all issues at once.
+func (c *Config) Validate() error {
+	var errs []error
+
+	// System validations
+	if err := ValidateHostname(c.System.Hostname); err != nil {
+		errs = append(errs, err)
+	}
+
+	if err := ValidateEmail(c.System.Email); err != nil {
+		errs = append(errs, err)
+	}
+
+	if err := ValidatePassword(c.System.RootPassword); err != nil {
+		errs = append(errs, err)
+	}
+
+	if err := ValidateSSHKey(c.System.SSHPublicKey); err != nil {
+		errs = append(errs, err)
+	}
+
+	if err := ValidateTimezone(c.System.Timezone); err != nil {
+		errs = append(errs, err)
+	}
+
+	// Network validations
+	if err := ValidateBridgeMode(c.Network.BridgeMode); err != nil {
+		errs = append(errs, err)
+	}
+
+	if err := ValidateSubnet(c.Network.PrivateSubnet); err != nil {
+		errs = append(errs, err)
+	}
+
+	// Storage validations
+	if err := ValidateZFSRaid(c.Storage.ZFSRaid); err != nil {
+		errs = append(errs, err)
+	}
+
+	if len(errs) > 0 {
+		return &ValidationError{Errors: errs}
+	}
+
+	return nil
+}

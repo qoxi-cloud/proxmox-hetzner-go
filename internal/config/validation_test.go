@@ -729,3 +729,206 @@ func TestValidateSubnet(t *testing.T) {
 		})
 	}
 }
+
+// Config.Validate tests
+
+func TestConfig_Validate_ValidConfig(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.System.RootPassword = "securepassword"
+	cfg.System.SSHPublicKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI user@host"
+
+	err := cfg.Validate()
+
+	assert.NoError(t, err)
+}
+
+func TestConfig_Validate_EmptyConfig_AllErrors(t *testing.T) {
+	cfg := &Config{}
+
+	err := cfg.Validate()
+
+	require.Error(t, err)
+
+	var valErr *ValidationError
+	require.True(t, errors.As(err, &valErr))
+
+	// Should have errors for: hostname, email, password, ssh key,
+	// timezone, bridge mode, subnet, zfs raid
+	assert.Len(t, valErr.Errors, 8)
+}
+
+func TestConfig_Validate_ReturnsValidationError(t *testing.T) {
+	cfg := &Config{}
+
+	err := cfg.Validate()
+
+	require.Error(t, err)
+
+	var valErr *ValidationError
+	require.True(t, errors.As(err, &valErr))
+	assert.True(t, valErr.HasErrors())
+}
+
+func TestConfig_Validate_PartialErrors_System(t *testing.T) {
+	cfg := DefaultConfig()
+	// Missing required fields: RootPassword and SSHPublicKey
+
+	err := cfg.Validate()
+
+	require.Error(t, err)
+
+	var valErr *ValidationError
+	require.True(t, errors.As(err, &valErr))
+
+	// Should have 2 errors: password and SSH key
+	assert.Len(t, valErr.Errors, 2)
+	assert.Contains(t, valErr.Error(), ErrPasswordEmpty.Error())
+	assert.Contains(t, valErr.Error(), ErrSSHKeyEmpty.Error())
+}
+
+func TestConfig_Validate_InvalidHostname(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.System.Hostname = "-invalid-hostname"
+	cfg.System.RootPassword = "securepassword"
+	cfg.System.SSHPublicKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI user@host"
+
+	err := cfg.Validate()
+
+	require.Error(t, err)
+
+	var valErr *ValidationError
+	require.True(t, errors.As(err, &valErr))
+	assert.Len(t, valErr.Errors, 1)
+	assert.True(t, errors.Is(valErr.Unwrap(), ErrHostnameStartsWithHyphen))
+}
+
+func TestConfig_Validate_InvalidEmail(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.System.Email = "invalid-email"
+	cfg.System.RootPassword = "securepassword"
+	cfg.System.SSHPublicKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI user@host"
+
+	err := cfg.Validate()
+
+	require.Error(t, err)
+
+	var valErr *ValidationError
+	require.True(t, errors.As(err, &valErr))
+	assert.Len(t, valErr.Errors, 1)
+	assert.True(t, errors.Is(valErr.Unwrap(), ErrEmailInvalid))
+}
+
+func TestConfig_Validate_InvalidTimezone(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.System.Timezone = "Invalid/Timezone"
+	cfg.System.RootPassword = "securepassword"
+	cfg.System.SSHPublicKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI user@host"
+
+	err := cfg.Validate()
+
+	require.Error(t, err)
+
+	var valErr *ValidationError
+	require.True(t, errors.As(err, &valErr))
+	assert.Len(t, valErr.Errors, 1)
+	assert.True(t, errors.Is(valErr.Unwrap(), ErrTimezoneInvalid))
+}
+
+func TestConfig_Validate_InvalidBridgeMode(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Network.BridgeMode = BridgeMode("invalid")
+	cfg.System.RootPassword = "securepassword"
+	cfg.System.SSHPublicKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI user@host"
+
+	err := cfg.Validate()
+
+	require.Error(t, err)
+
+	var valErr *ValidationError
+	require.True(t, errors.As(err, &valErr))
+	assert.Len(t, valErr.Errors, 1)
+	assert.True(t, errors.Is(valErr.Unwrap(), ErrBridgeModeInvalid))
+}
+
+func TestConfig_Validate_InvalidSubnet(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Network.PrivateSubnet = "invalid-subnet"
+	cfg.System.RootPassword = "securepassword"
+	cfg.System.SSHPublicKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI user@host"
+
+	err := cfg.Validate()
+
+	require.Error(t, err)
+
+	var valErr *ValidationError
+	require.True(t, errors.As(err, &valErr))
+	assert.Len(t, valErr.Errors, 1)
+	assert.True(t, errors.Is(valErr.Unwrap(), ErrSubnetInvalid))
+}
+
+func TestConfig_Validate_InvalidZFSRaid(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Storage.ZFSRaid = ZFSRaid("invalid")
+	cfg.System.RootPassword = "securepassword"
+	cfg.System.SSHPublicKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI user@host"
+
+	err := cfg.Validate()
+
+	require.Error(t, err)
+
+	var valErr *ValidationError
+	require.True(t, errors.As(err, &valErr))
+	assert.Len(t, valErr.Errors, 1)
+	assert.True(t, errors.Is(valErr.Unwrap(), ErrZFSRaidInvalid))
+}
+
+func TestConfig_Validate_MultipleErrors_AllCategories(t *testing.T) {
+	cfg := &Config{
+		System: SystemConfig{
+			Hostname:     "-invalid",     // Invalid: starts with hyphen
+			Email:        "not-an-email", // Invalid: no @ symbol
+			Timezone:     "Bad/Zone",     // Invalid: not in IANA database
+			RootPassword: "short",        // Invalid: too short
+			SSHPublicKey: "not-a-key",    // Invalid: no valid prefix
+		},
+		Network: NetworkConfig{
+			BridgeMode:    BridgeMode("nat"), // Invalid: not internal/external/both
+			PrivateSubnet: "not-a-subnet",    // Invalid: not CIDR
+		},
+		Storage: StorageConfig{
+			ZFSRaid: ZFSRaid("raid5"), // Invalid: not single/raid0/raid1
+		},
+	}
+
+	err := cfg.Validate()
+
+	require.Error(t, err)
+
+	var valErr *ValidationError
+	require.True(t, errors.As(err, &valErr))
+
+	// All 8 fields should have errors
+	assert.Len(t, valErr.Errors, 8)
+
+	// Check error message contains all errors
+	errMsg := valErr.Error()
+	assert.Contains(t, errMsg, ErrHostnameStartsWithHyphen.Error())
+	assert.Contains(t, errMsg, ErrEmailInvalid.Error())
+	assert.Contains(t, errMsg, ErrPasswordTooShort.Error())
+	assert.Contains(t, errMsg, ErrSSHKeyInvalidPrefix.Error())
+	assert.Contains(t, errMsg, ErrTimezoneInvalid.Error())
+	assert.Contains(t, errMsg, ErrBridgeModeInvalid.Error())
+	assert.Contains(t, errMsg, ErrSubnetInvalid.Error())
+	assert.Contains(t, errMsg, ErrZFSRaidInvalid.Error())
+}
+
+func TestConfig_Validate_ErrorMessageFormat(t *testing.T) {
+	cfg := DefaultConfig()
+	// Leave RootPassword and SSHPublicKey empty to trigger 2 errors
+
+	err := cfg.Validate()
+
+	require.Error(t, err)
+	// Errors should be joined by "; "
+	assert.Contains(t, err.Error(), "; ")
+}
