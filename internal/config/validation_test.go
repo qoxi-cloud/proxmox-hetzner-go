@@ -540,9 +540,8 @@ func TestValidateTimezone(t *testing.T) {
 		// Invalid - random strings
 		{"invalid random string", "not-a-timezone", ErrTimezoneInvalid},
 		{"invalid numbers only", "12345", ErrTimezoneInvalid},
-		// Case sensitivity - "utc" is actually valid (IANA treats it as UTC)
-		{"valid lowercase utc alias", "utc", nil},
-		// Invalid - "local" lowercase is not valid (only "Local")
+		// Case sensitivity - "local" lowercase is not valid (only "Local")
+		// Note: "utc" behavior varies by platform (valid on macOS, invalid on Linux)
 		{"invalid lowercase local", "local", ErrTimezoneInvalid},
 	}
 
