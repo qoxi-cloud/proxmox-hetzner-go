@@ -736,6 +736,59 @@ Configuration is in a separate file: `.mcp.json`
 | MCP Server | Description |
 |------------|-------------|
 | **sonarcloud** | Static code analysis, security scanning, code quality metrics |
+| **coderabbitai** | AI-powered code review for GitHub pull requests |
+
+**CodeRabbit AI Tools:**
+
+- `get_coderabbit_reviews` - Get all CodeRabbit reviews for a GitHub PR
+- `get_review_details` - Get detailed information about a specific review
+- `get_review_comments` - Get all individual line comments from CodeRabbit reviews
+- `get_comment_details` - Get detailed information about a specific comment (includes AI prompts)
+- `resolve_comment` - Mark a CodeRabbit comment as resolved or addressed
+- `resolve_conversation` - Resolve or unresolve a CodeRabbit review conversation in GitHub
+
+**CodeRabbit AI Usage Examples:**
+
+```bash
+# Get all CodeRabbit reviews for a PR
+mcp__coderabbitai__get_coderabbit_reviews(
+  owner: "qoxi-cloud",
+  repo: "proxmox-hetzner-go",
+  pullNumber: 117
+)
+
+# Get detailed review information
+mcp__coderabbitai__get_review_details(
+  owner: "qoxi-cloud",
+  repo: "proxmox-hetzner-go",
+  pullNumber: 117,
+  reviewId: 12345
+)
+
+# Get all review comments for a PR
+mcp__coderabbitai__get_review_comments(
+  owner: "qoxi-cloud",
+  repo: "proxmox-hetzner-go",
+  pullNumber: 117
+)
+
+# Mark a comment as resolved
+mcp__coderabbitai__resolve_comment(
+  owner: "qoxi-cloud",
+  repo: "proxmox-hetzner-go",
+  commentId: 67890,
+  resolution: "addressed",
+  note: "Fixed in latest commit"
+)
+```
+
+**Resolution Types:**
+
+| Resolution | Description |
+|------------|-------------|
+| `addressed` | Issue has been fixed |
+| `wont_fix` | Intentionally not fixing |
+| `not_applicable` | Comment not applicable to this context |
 
 **SonarCloud Tools:**
 
@@ -802,4 +855,6 @@ mcp__sonarcloud__show_rule(key: "go:S1192")
 | Save context | memory |
 | Code quality issues | sonarcloud |
 | Security scanning | sonarcloud |
-| PR code review | sonarcloud |
+| PR code review | sonarcloud, coderabbitai |
+| Review comments | coderabbitai |
+| Resolve review feedback | coderabbitai |
