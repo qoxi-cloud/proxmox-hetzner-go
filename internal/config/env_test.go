@@ -336,22 +336,28 @@ func TestLoadFromEnvModifiesOriginalConfig(t *testing.T) {
 	}
 }
 
-func TestLoadFromEnvPreservesNonEnvFields(t *testing.T) {
+func TestLoadFromEnvPreservesUnsetFields(t *testing.T) {
 	cfg := DefaultConfig()
 	originalZFSRaid := cfg.Storage.ZFSRaid
 	originalTailscaleEnabled := cfg.Tailscale.Enabled
+	originalTailscaleSSH := cfg.Tailscale.SSH
 	testPreserve := "preserve-test"
 
+	// Only set hostname - other env vars should preserve their defaults
 	t.Setenv("PVE_HOSTNAME", testPreserve)
 	LoadFromEnv(cfg)
 
-	// Verify non-env fields are untouched
+	// Verify unset env vars don't change config
 	if cfg.Storage.ZFSRaid != originalZFSRaid {
 		t.Errorf("Storage.ZFSRaid changed unexpectedly: got %v, want %v", cfg.Storage.ZFSRaid, originalZFSRaid)
 	}
 
 	if cfg.Tailscale.Enabled != originalTailscaleEnabled {
 		t.Errorf("Tailscale.Enabled changed unexpectedly: got %v, want %v", cfg.Tailscale.Enabled, originalTailscaleEnabled)
+	}
+
+	if cfg.Tailscale.SSH != originalTailscaleSSH {
+		t.Errorf("Tailscale.SSH changed unexpectedly: got %v, want %v", cfg.Tailscale.SSH, originalTailscaleSSH)
 	}
 }
 
@@ -662,4 +668,290 @@ func TestLoadFromEnvStorageMultipleFields(t *testing.T) {
 	}
 
 	assertDisksEqual(t, cfg.Storage.Disks, []string{testDiskSda, testDiskSdb, testDiskSdc})
+}
+
+// Tailscale configuration tests
+
+// Error format strings for Tailscale tests.
+const (
+	errFmtTailscaleEnabled = "Tailscale.Enabled = %v, want %v"
+	errFmtTailscaleSSH     = "Tailscale.SSH = %v, want %v"
+	errFmtTailscaleWebUI   = "Tailscale.WebUI = %v, want %v"
+	errFmtTailscaleAuthKey = "Tailscale.AuthKey = %q, want %q"
+)
+
+func TestLoadFromEnvTailscaleEnabledTrue(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+	}{
+		{"true lowercase", "true"},
+		{"yes lowercase", "yes"},
+		{"one", "1"},
+		{"TRUE uppercase", "TRUE"},
+		{"Yes mixed case", "Yes"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := DefaultConfig()
+			cfg.Tailscale.Enabled = false // Ensure it's false initially
+
+			t.Setenv("INSTALL_TAILSCALE", tt.input)
+			LoadFromEnv(cfg)
+
+			if !cfg.Tailscale.Enabled {
+				t.Errorf(errFmtTailscaleEnabled, cfg.Tailscale.Enabled, true)
+			}
+		})
+	}
+}
+
+func TestLoadFromEnvTailscaleEnabledFalse(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+	}{
+		{"false lowercase", "false"},
+		{"no lowercase", "no"},
+		{"zero", "0"},
+		{"FALSE uppercase", "FALSE"},
+		{"No mixed case", "No"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := DefaultConfig()
+			cfg.Tailscale.Enabled = true // Ensure it's true initially
+
+			t.Setenv("INSTALL_TAILSCALE", tt.input)
+			LoadFromEnv(cfg)
+
+			if cfg.Tailscale.Enabled {
+				t.Errorf(errFmtTailscaleEnabled, cfg.Tailscale.Enabled, false)
+			}
+		})
+	}
+}
+
+func TestLoadFromEnvTailscaleEnabledUnsetPreservesDefault(t *testing.T) {
+	cfg := DefaultConfig()
+	original := cfg.Tailscale.Enabled
+
+	// Do NOT set INSTALL_TAILSCALE - should preserve default
+	LoadFromEnv(cfg)
+
+	if cfg.Tailscale.Enabled != original {
+		t.Errorf("Unset INSTALL_TAILSCALE changed config: got %v, want %v", cfg.Tailscale.Enabled, original)
+	}
+}
+
+func TestLoadFromEnvTailscaleAuthKeyWithValue(t *testing.T) {
+	cfg := DefaultConfig()
+	testKey := "tskey-auth-xxxx-xxxxxxxxxxxxxxxxx" // NOSONAR(go:S2068) test value, not a real key
+
+	t.Setenv("TAILSCALE_AUTH_KEY", testKey)
+	LoadFromEnv(cfg)
+
+	if cfg.Tailscale.AuthKey != testKey {
+		t.Errorf(errFmtTailscaleAuthKey, cfg.Tailscale.AuthKey, testKey)
+	}
+}
+
+func TestLoadFromEnvTailscaleAuthKeyEmptyPreservesOriginal(t *testing.T) {
+	cfg := DefaultConfig()
+	original := "existing-key" // NOSONAR(go:S2068) test value, not a real key
+	cfg.Tailscale.AuthKey = original
+
+	t.Setenv("TAILSCALE_AUTH_KEY", "")
+	LoadFromEnv(cfg)
+
+	if cfg.Tailscale.AuthKey != original {
+		t.Errorf("Empty TAILSCALE_AUTH_KEY changed config: got %q, want %q", cfg.Tailscale.AuthKey, original)
+	}
+}
+
+func TestLoadFromEnvTailscaleSSHTrue(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+	}{
+		{"true lowercase", "true"},
+		{"yes lowercase", "yes"},
+		{"one", "1"},
+		{"TRUE uppercase", "TRUE"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := DefaultConfig()
+			cfg.Tailscale.SSH = false // Ensure it's false initially
+
+			t.Setenv("TAILSCALE_SSH", tt.input)
+			LoadFromEnv(cfg)
+
+			if !cfg.Tailscale.SSH {
+				t.Errorf(errFmtTailscaleSSH, cfg.Tailscale.SSH, true)
+			}
+		})
+	}
+}
+
+func TestLoadFromEnvTailscaleSSHFalse(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+	}{
+		{"false lowercase", "false"},
+		{"no lowercase", "no"},
+		{"zero", "0"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := DefaultConfig()
+			cfg.Tailscale.SSH = true // Ensure it's true initially (default)
+
+			t.Setenv("TAILSCALE_SSH", tt.input)
+			LoadFromEnv(cfg)
+
+			if cfg.Tailscale.SSH {
+				t.Errorf(errFmtTailscaleSSH, cfg.Tailscale.SSH, false)
+			}
+		})
+	}
+}
+
+func TestLoadFromEnvTailscaleSSHUnsetPreservesDefault(t *testing.T) {
+	cfg := DefaultConfig()
+	original := cfg.Tailscale.SSH
+
+	// Do NOT set TAILSCALE_SSH - should preserve default
+	LoadFromEnv(cfg)
+
+	if cfg.Tailscale.SSH != original {
+		t.Errorf("Unset TAILSCALE_SSH changed config: got %v, want %v", cfg.Tailscale.SSH, original)
+	}
+}
+
+func TestLoadFromEnvTailscaleWebUITrue(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+	}{
+		{"true lowercase", "true"},
+		{"yes lowercase", "yes"},
+		{"one", "1"},
+		{"TRUE uppercase", "TRUE"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := DefaultConfig()
+			cfg.Tailscale.WebUI = false // Ensure it's false initially (default)
+
+			t.Setenv("TAILSCALE_WEBUI", tt.input)
+			LoadFromEnv(cfg)
+
+			if !cfg.Tailscale.WebUI {
+				t.Errorf(errFmtTailscaleWebUI, cfg.Tailscale.WebUI, true)
+			}
+		})
+	}
+}
+
+func TestLoadFromEnvTailscaleWebUIFalse(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+	}{
+		{"false lowercase", "false"},
+		{"no lowercase", "no"},
+		{"zero", "0"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := DefaultConfig()
+			cfg.Tailscale.WebUI = true // Ensure it's true initially
+
+			t.Setenv("TAILSCALE_WEBUI", tt.input)
+			LoadFromEnv(cfg)
+
+			if cfg.Tailscale.WebUI {
+				t.Errorf(errFmtTailscaleWebUI, cfg.Tailscale.WebUI, false)
+			}
+		})
+	}
+}
+
+func TestLoadFromEnvTailscaleWebUIUnsetPreservesDefault(t *testing.T) {
+	cfg := DefaultConfig()
+	original := cfg.Tailscale.WebUI
+
+	// Do NOT set TAILSCALE_WEBUI - should preserve default
+	LoadFromEnv(cfg)
+
+	if cfg.Tailscale.WebUI != original {
+		t.Errorf("Unset TAILSCALE_WEBUI changed config: got %v, want %v", cfg.Tailscale.WebUI, original)
+	}
+}
+
+func TestLoadFromEnvTailscaleMultipleFields(t *testing.T) {
+	cfg := DefaultConfig()
+	testKey := "tskey-auth-multi-test" // NOSONAR(go:S2068) test value, not a real key
+
+	t.Setenv("INSTALL_TAILSCALE", "true")
+	t.Setenv("TAILSCALE_AUTH_KEY", testKey)
+	t.Setenv("TAILSCALE_SSH", "false")
+	t.Setenv("TAILSCALE_WEBUI", "true")
+
+	LoadFromEnv(cfg)
+
+	if !cfg.Tailscale.Enabled {
+		t.Errorf(errFmtTailscaleEnabled, cfg.Tailscale.Enabled, true)
+	}
+
+	if cfg.Tailscale.AuthKey != testKey {
+		t.Errorf(errFmtTailscaleAuthKey, cfg.Tailscale.AuthKey, testKey)
+	}
+
+	if cfg.Tailscale.SSH {
+		t.Errorf(errFmtTailscaleSSH, cfg.Tailscale.SSH, false)
+	}
+
+	if !cfg.Tailscale.WebUI {
+		t.Errorf(errFmtTailscaleWebUI, cfg.Tailscale.WebUI, true)
+	}
+}
+
+func TestLoadFromEnvTailscaleBooleanCaseInsensitive(t *testing.T) {
+	tests := []struct {
+		name     string
+		envName  string
+		input    string
+		getField func(*Config) bool
+		want     bool
+	}{
+		{"INSTALL_TAILSCALE True", "INSTALL_TAILSCALE", "True", func(c *Config) bool { return c.Tailscale.Enabled }, true},
+		{"INSTALL_TAILSCALE TRUE", "INSTALL_TAILSCALE", "TRUE", func(c *Config) bool { return c.Tailscale.Enabled }, true},
+		{"INSTALL_TAILSCALE yEs", "INSTALL_TAILSCALE", "yEs", func(c *Config) bool { return c.Tailscale.Enabled }, true},
+		{"INSTALL_TAILSCALE YES", "INSTALL_TAILSCALE", "YES", func(c *Config) bool { return c.Tailscale.Enabled }, true},
+		{"TAILSCALE_SSH TrUe", "TAILSCALE_SSH", "TrUe", func(c *Config) bool { return c.Tailscale.SSH }, true},
+		{"TAILSCALE_WEBUI TRUE", "TAILSCALE_WEBUI", "TRUE", func(c *Config) bool { return c.Tailscale.WebUI }, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := DefaultConfig()
+
+			t.Setenv(tt.envName, tt.input)
+			LoadFromEnv(cfg)
+
+			got := tt.getField(cfg)
+			if got != tt.want {
+				t.Errorf("%s with value %q: got %v, want %v", tt.envName, tt.input, got, tt.want)
+			}
+		})
+	}
 }
