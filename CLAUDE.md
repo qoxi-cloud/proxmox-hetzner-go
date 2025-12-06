@@ -257,13 +257,28 @@ All depend on [exec, logging]:
    // ✅ Good
    type PreflightStep struct {}
    func (s *PreflightStep) Execute(ctx context.Context) error
-   
+
    // ❌ Bad
    type Step struct {}
    func (s *Step) Do() error
    ```
 
-3. **Comments**: Document exported types and functions
+3. **Function Names**: Use CamelCase only, no underscores (SonarCloud rule)
+   ```go
+   // ✅ Good - CamelCase without underscores
+   func TestSaveToFileExcludesSensitiveFields(t *testing.T)
+   func TestLoadFromFileFullConfig(t *testing.T)
+   func validateHostname(s string) error
+
+   // ❌ Bad - underscores in function names
+   func TestSaveToFile_ExcludesSensitiveFields(t *testing.T)
+   func Test_LoadFromFile_FullConfig(t *testing.T)
+   func validate_hostname(s string) error
+   ```
+
+   > **Note**: Function names must match `^(_|[a-zA-Z0-9]+)$` regex.
+
+4. **Comments**: Document exported types and functions
    ```go
    // Config holds all installation configuration.
    // It can be loaded from YAML files or environment variables.
@@ -273,7 +288,7 @@ All depend on [exec, logging]:
    }
    ```
 
-4. **Step Interface**: All installer steps implement this interface
+5. **Step Interface**: All installer steps implement this interface
    ```go
    type Step interface {
        Name() string
