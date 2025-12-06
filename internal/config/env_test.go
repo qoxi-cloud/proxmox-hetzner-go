@@ -147,6 +147,7 @@ const (
 	testMultiSSHKey   = "ssh-rsa AAAAB3..."
 	testPartial       = "partial-test"
 	testModify        = "modify-test"
+	testEnvLocal      = "env.local"
 
 	// Network test constants.
 	testInterfaceEth0       = "eth0"
@@ -155,9 +156,11 @@ const (
 	testPrivateSubnetSecond = "172.16.0.0/16"    // NOSONAR(go:S1313) RFC 1918 test value
 
 	// Storage test constants.
-	testDiskSda = "/dev/sda"
-	testDiskSdb = "/dev/sdb"
-	testDiskSdc = "/dev/sdc"
+	testDiskSda   = "/dev/sda"
+	testDiskSdb   = "/dev/sdb"
+	testDiskSdc   = "/dev/sdc"
+	testDiskNvme0 = "/dev/nvme0n1"
+	testDiskNvme1 = "/dev/nvme1n1"
 
 	// Error format strings.
 	errFmtHostname      = "Hostname = %q, want %q"
@@ -173,6 +176,22 @@ const (
 	testCaseYesLowercase   = "yes lowercase"
 	testCaseFalseLowercase = "false lowercase"
 	testCaseNoLowercase    = "no lowercase"
+
+	// Field name constants for assertions.
+	fieldSystemHostname     = "System.Hostname"
+	fieldSystemDomainSuffix = "System.DomainSuffix"
+	fieldSystemTimezone     = "System.Timezone"
+	fieldSystemEmail        = "System.Email"
+	fieldSystemRootPassword = "System.RootPassword"
+	fieldSystemSSHPublicKey = "System.SSHPublicKey"
+	fieldNetworkInterface   = "Network.InterfaceName"
+	fieldNetworkBridgeMode  = "Network.BridgeMode"
+	fieldNetworkSubnet      = "Network.PrivateSubnet"
+	fieldStorageZFSRaid     = "Storage.ZFSRaid"
+	fieldTailscaleEnabled   = "Tailscale.Enabled"
+	fieldTailscaleAuthKey   = "Tailscale.AuthKey"
+	fieldTailscaleSSH       = "Tailscale.SSH"
+	fieldTailscaleWebUI     = "Tailscale.WebUI"
 )
 
 func TestLoadFromEnvNilConfig(t *testing.T) {
@@ -182,76 +201,29 @@ func TestLoadFromEnvNilConfig(t *testing.T) {
 	t.Log("LoadFromEnv(nil) completed without panic")
 }
 
-func TestLoadFromEnvHostname(t *testing.T) {
-	cfg := DefaultConfig()
-	original := cfg.System.Hostname
-
-	t.Setenv("PVE_HOSTNAME", testHostname)
-	LoadFromEnv(cfg)
-
-	if cfg.System.Hostname != testHostname {
-		t.Errorf(errFmtHostname, cfg.System.Hostname, testHostname)
+func TestLoadFromEnvSystemFields(t *testing.T) {
+	testPassword := "supersecret" // NOSONAR(go:S2068) test value
+	tests := []struct {
+		envName  string
+		value    string
+		getField func(*Config) string
+	}{
+		{"PVE_HOSTNAME", testHostname, func(c *Config) string { return c.System.Hostname }},
+		{"PVE_DOMAIN_SUFFIX", testDomain, func(c *Config) string { return c.System.DomainSuffix }},
+		{"PVE_TIMEZONE", testTimezone, func(c *Config) string { return c.System.Timezone }},
+		{"PVE_EMAIL", testEmail, func(c *Config) string { return c.System.Email }},
+		{"PVE_ROOT_PASSWORD", testPassword, func(c *Config) string { return c.System.RootPassword }},
+		{"PVE_SSH_PUBLIC_KEY", testSSHKey, func(c *Config) string { return c.System.SSHPublicKey }},
 	}
-
-	// Verify original was different
-	if original == testHostname {
-		t.Error("Default hostname should not be 'test-server'")
-	}
-}
-
-func TestLoadFromEnvDomainSuffix(t *testing.T) {
-	cfg := DefaultConfig()
-
-	t.Setenv("PVE_DOMAIN_SUFFIX", testDomain)
-	LoadFromEnv(cfg)
-
-	if cfg.System.DomainSuffix != testDomain {
-		t.Errorf("DomainSuffix = %q, want %q", cfg.System.DomainSuffix, testDomain)
-	}
-}
-
-func TestLoadFromEnvTimezone(t *testing.T) {
-	cfg := DefaultConfig()
-
-	t.Setenv("PVE_TIMEZONE", testTimezone)
-	LoadFromEnv(cfg)
-
-	if cfg.System.Timezone != testTimezone {
-		t.Errorf("Timezone = %q, want %q", cfg.System.Timezone, testTimezone)
-	}
-}
-
-func TestLoadFromEnvEmail(t *testing.T) {
-	cfg := DefaultConfig()
-
-	t.Setenv("PVE_EMAIL", testEmail)
-	LoadFromEnv(cfg)
-
-	if cfg.System.Email != testEmail {
-		t.Errorf("Email = %q, want %q", cfg.System.Email, testEmail)
-	}
-}
-
-func TestLoadFromEnvRootPassword(t *testing.T) {
-	cfg := DefaultConfig()
-	testValue := "supersecret" // NOSONAR(go:S2068) test value, not a real credential
-
-	t.Setenv("PVE_ROOT_PASSWORD", testValue)
-	LoadFromEnv(cfg)
-
-	if cfg.System.RootPassword != testValue {
-		t.Errorf("RootPassword = %q, want %q", cfg.System.RootPassword, testValue)
-	}
-}
-
-func TestLoadFromEnvSSHPublicKey(t *testing.T) {
-	cfg := DefaultConfig()
-
-	t.Setenv("PVE_SSH_PUBLIC_KEY", testSSHKey)
-	LoadFromEnv(cfg)
-
-	if cfg.System.SSHPublicKey != testSSHKey {
-		t.Errorf("SSHPublicKey = %q, want %q", cfg.System.SSHPublicKey, testSSHKey)
+	for _, tt := range tests {
+		t.Run(tt.envName, func(t *testing.T) {
+			cfg := DefaultConfig()
+			t.Setenv(tt.envName, tt.value)
+			LoadFromEnv(cfg)
+			if got := tt.getField(cfg); got != tt.value {
+				t.Errorf("%s = %q, want %q", tt.envName, got, tt.value)
+			}
+		})
 	}
 }
 
@@ -368,84 +340,34 @@ func TestLoadFromEnvPreservesUnsetFields(t *testing.T) {
 
 // Network configuration tests
 
-func TestLoadFromEnvInterfaceNameEth0(t *testing.T) {
-	cfg := DefaultConfig()
-
-	t.Setenv("INTERFACE_NAME", testInterfaceEth0)
-	LoadFromEnv(cfg)
-
-	if cfg.Network.InterfaceName != testInterfaceEth0 {
-		t.Errorf(errFmtInterfaceName, cfg.Network.InterfaceName, testInterfaceEth0)
+func TestLoadFromEnvInterfaceNameValues(t *testing.T) {
+	for _, iface := range []string{testInterfaceEth0, testInterfaceEnp} {
+		t.Run(iface, func(t *testing.T) {
+			cfg := DefaultConfig()
+			t.Setenv("INTERFACE_NAME", iface)
+			LoadFromEnv(cfg)
+			if cfg.Network.InterfaceName != iface {
+				t.Errorf(errFmtInterfaceName, cfg.Network.InterfaceName, iface)
+			}
+		})
 	}
 }
 
-func TestLoadFromEnvInterfaceNameEnp(t *testing.T) {
-	cfg := DefaultConfig()
-
-	t.Setenv("INTERFACE_NAME", testInterfaceEnp)
-	LoadFromEnv(cfg)
-
-	if cfg.Network.InterfaceName != testInterfaceEnp {
-		t.Errorf(errFmtInterfaceName, cfg.Network.InterfaceName, testInterfaceEnp)
-	}
-}
-
-func TestLoadFromEnvBridgeModeInternal(t *testing.T) {
-	cfg := DefaultConfig()
-	cfg.Network.BridgeMode = BridgeModeExternal // Set to different value first
-
-	t.Setenv("BRIDGE_MODE", "internal")
-	LoadFromEnv(cfg)
-
-	if cfg.Network.BridgeMode != BridgeModeInternal {
-		t.Errorf(errFmtBridgeMode, cfg.Network.BridgeMode, BridgeModeInternal)
-	}
-}
-
-func TestLoadFromEnvBridgeModeExternal(t *testing.T) {
-	cfg := DefaultConfig()
-
-	t.Setenv("BRIDGE_MODE", "external")
-	LoadFromEnv(cfg)
-
-	if cfg.Network.BridgeMode != BridgeModeExternal {
-		t.Errorf(errFmtBridgeMode, cfg.Network.BridgeMode, BridgeModeExternal)
-	}
-}
-
-func TestLoadFromEnvBridgeModeBoth(t *testing.T) {
-	cfg := DefaultConfig()
-
-	t.Setenv("BRIDGE_MODE", "both")
-	LoadFromEnv(cfg)
-
-	if cfg.Network.BridgeMode != BridgeModeBoth {
-		t.Errorf(errFmtBridgeMode, cfg.Network.BridgeMode, BridgeModeBoth)
-	}
-}
-
-func TestLoadFromEnvBridgeModeCaseInsensitive(t *testing.T) {
+func TestLoadFromEnvBridgeModeValues(t *testing.T) {
 	tests := []struct {
-		name  string
 		input string
 		want  BridgeMode
 	}{
-		{"uppercase INTERNAL", "INTERNAL", BridgeModeInternal},
-		{"mixed case Internal", "Internal", BridgeModeInternal},
-		{"uppercase EXTERNAL", "EXTERNAL", BridgeModeExternal},
-		{"mixed case External", "External", BridgeModeExternal},
-		{"uppercase BOTH", "BOTH", BridgeModeBoth},
-		{"mixed case Both", "Both", BridgeModeBoth},
+		{"internal", BridgeModeInternal}, {"Internal", BridgeModeInternal}, {"INTERNAL", BridgeModeInternal},
+		{"external", BridgeModeExternal}, {"External", BridgeModeExternal}, {"EXTERNAL", BridgeModeExternal},
+		{"both", BridgeModeBoth}, {"Both", BridgeModeBoth}, {"BOTH", BridgeModeBoth},
 	}
-
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		t.Run(tt.input, func(t *testing.T) {
 			cfg := DefaultConfig()
-			cfg.Network.BridgeMode = "" // Clear default
-
+			cfg.Network.BridgeMode = ""
 			t.Setenv("BRIDGE_MODE", tt.input)
 			LoadFromEnv(cfg)
-
 			if cfg.Network.BridgeMode != tt.want {
 				t.Errorf(errFmtBridgeMode, cfg.Network.BridgeMode, tt.want)
 			}
@@ -453,86 +375,68 @@ func TestLoadFromEnvBridgeModeCaseInsensitive(t *testing.T) {
 	}
 }
 
-func TestLoadFromEnvBridgeModeInvalidKeepsOriginal(t *testing.T) {
-	cfg := DefaultConfig()
-	original := cfg.Network.BridgeMode
-
-	// Set to an invalid value - should NOT change the config
-	t.Setenv("BRIDGE_MODE", "invalid")
-	LoadFromEnv(cfg)
-
-	if cfg.Network.BridgeMode != original {
-		t.Errorf("Invalid BRIDGE_MODE changed config: got %q, want %q", cfg.Network.BridgeMode, original)
-	}
-}
-
-func TestLoadFromEnvBridgeModeEmptyKeepsOriginal(t *testing.T) {
-	cfg := DefaultConfig()
-	original := cfg.Network.BridgeMode
-
-	// Set to empty value - should NOT change the config
-	t.Setenv("BRIDGE_MODE", "")
-	LoadFromEnv(cfg)
-
-	if cfg.Network.BridgeMode != original {
-		t.Errorf("Empty BRIDGE_MODE changed config: got %q, want %q", cfg.Network.BridgeMode, original)
+func TestLoadFromEnvBridgeModeInvalidEmptyPreserves(t *testing.T) {
+	for _, v := range []string{"invalid", ""} {
+		t.Run(v, func(t *testing.T) {
+			cfg := DefaultConfig()
+			original := cfg.Network.BridgeMode
+			t.Setenv("BRIDGE_MODE", v)
+			LoadFromEnv(cfg)
+			if cfg.Network.BridgeMode != original {
+				t.Errorf("BRIDGE_MODE=%q changed config: got %q, want %q", v, cfg.Network.BridgeMode, original)
+			}
+		})
 	}
 }
 
 func TestLoadFromEnvPrivateSubnet(t *testing.T) {
 	cfg := DefaultConfig()
-
 	t.Setenv("PRIVATE_SUBNET", testPrivateSubnet)
 	LoadFromEnv(cfg)
-
 	if cfg.Network.PrivateSubnet != testPrivateSubnet {
 		t.Errorf(errFmtPrivateSubnet, cfg.Network.PrivateSubnet, testPrivateSubnet)
 	}
 }
 
-func TestLoadFromEnvPrivateSubnetEmptyKeepsOriginal(t *testing.T) {
-	cfg := DefaultConfig()
-	original := cfg.Network.PrivateSubnet
-
-	t.Setenv("PRIVATE_SUBNET", "")
-	LoadFromEnv(cfg)
-
-	if cfg.Network.PrivateSubnet != original {
-		t.Errorf("Empty PRIVATE_SUBNET changed config: got %q, want %q", cfg.Network.PrivateSubnet, original)
+func TestLoadFromEnvNetworkEmptyPreservesOriginal(t *testing.T) {
+	tests := []struct {
+		envName string
+		setup   func(*Config)
+		check   func(*Config) bool
+	}{
+		{"PRIVATE_SUBNET", nil, func(c *Config) bool { return c.Network.PrivateSubnet != "" }},
+		{"INTERFACE_NAME", func(c *Config) { c.Network.InterfaceName = testInterfaceEnp },
+			func(c *Config) bool { return c.Network.InterfaceName == testInterfaceEnp }},
+	}
+	for _, tt := range tests {
+		t.Run(tt.envName, func(t *testing.T) {
+			cfg := DefaultConfig()
+			if tt.setup != nil {
+				tt.setup(cfg)
+			}
+			t.Setenv(tt.envName, "")
+			LoadFromEnv(cfg)
+			if !tt.check(cfg) {
+				t.Errorf("Empty %s changed config unexpectedly", tt.envName)
+			}
+		})
 	}
 }
 
 func TestLoadFromEnvNetworkMultipleFields(t *testing.T) {
 	cfg := DefaultConfig()
-
 	t.Setenv("INTERFACE_NAME", testInterfaceEth0)
 	t.Setenv("BRIDGE_MODE", "external")
 	t.Setenv("PRIVATE_SUBNET", testPrivateSubnetSecond)
-
 	LoadFromEnv(cfg)
-
 	if cfg.Network.InterfaceName != testInterfaceEth0 {
 		t.Errorf(errFmtInterfaceName, cfg.Network.InterfaceName, testInterfaceEth0)
 	}
-
 	if cfg.Network.BridgeMode != BridgeModeExternal {
 		t.Errorf(errFmtBridgeMode, cfg.Network.BridgeMode, BridgeModeExternal)
 	}
-
 	if cfg.Network.PrivateSubnet != testPrivateSubnetSecond {
 		t.Errorf(errFmtPrivateSubnet, cfg.Network.PrivateSubnet, testPrivateSubnetSecond)
-	}
-}
-
-func TestLoadFromEnvInterfaceNameEmptyKeepsOriginal(t *testing.T) {
-	cfg := DefaultConfig()
-	cfg.Network.InterfaceName = testInterfaceEnp // Set initial value
-
-	t.Setenv("INTERFACE_NAME", "")
-	LoadFromEnv(cfg)
-
-	if cfg.Network.InterfaceName != testInterfaceEnp {
-		t.Errorf("Empty INTERFACE_NAME changed config: got %q, want %q", cfg.Network.InterfaceName, testInterfaceEnp)
 	}
 }
 
@@ -550,6 +454,22 @@ func assertDisksEqual(t *testing.T, got, want []string) {
 		if got[i] != w {
 			t.Errorf("Disks[%d] = %q, want %q", i, got[i], w)
 		}
+	}
+}
+
+// assertStringField is a test helper that verifies a string field value.
+func assertStringField(t *testing.T, name, got, want string) {
+	t.Helper()
+	if got != want {
+		t.Errorf("%s = %q, want %q", name, got, want)
+	}
+}
+
+// assertBoolField is a test helper that verifies a boolean field value.
+func assertBoolField(t *testing.T, name string, got, want bool) {
+	t.Helper()
+	if got != want {
+		t.Errorf("%s = %v, want %v", name, got, want)
 	}
 }
 
@@ -612,50 +532,57 @@ func TestLoadFromEnvZFSRaidInvalidKeepsOriginal(t *testing.T) {
 }
 
 func TestLoadFromEnvDisksValues(t *testing.T) {
+	twoDisks := []string{testDiskSda, testDiskSdb}
+	nvmeDisks := []string{testDiskNvme0, testDiskNvme1}
 	tests := []struct {
 		name  string
 		input string
 		want  []string
 	}{
 		{"single disk", testDiskSda, []string{testDiskSda}},
-		{"two disks", testDiskSda + "," + testDiskSdb, []string{testDiskSda, testDiskSdb}},
+		{"two disks", testDiskSda + "," + testDiskSdb, twoDisks},
 		{"three disks", testDiskSda + "," + testDiskSdb + "," + testDiskSdc, []string{testDiskSda, testDiskSdb, testDiskSdc}},
-		{"with spaces", testDiskSda + " , " + testDiskSdb, []string{testDiskSda, testDiskSdb}},
-		{"trailing comma", testDiskSda + "," + testDiskSdb + ",", []string{testDiskSda, testDiskSdb}},
-		{"leading comma", "," + testDiskSda + "," + testDiskSdb, []string{testDiskSda, testDiskSdb}},
+		{"nvme disks", testDiskNvme0 + "," + testDiskNvme1, nvmeDisks},
+		{"mixed types", testDiskSda + "," + testDiskNvme0 + ",/dev/vda", []string{testDiskSda, testDiskNvme0, "/dev/vda"}},
+		{"with spaces", testDiskSda + " , " + testDiskSdb, twoDisks},
+		{"tabs and spaces", testDiskSda + "\t,\t" + testDiskSdb, twoDisks},
+		{"leading whitespace", "  " + testDiskSda + "," + testDiskSdb, twoDisks},
+		{"trailing whitespace", testDiskSda + "," + testDiskSdb + "  ", twoDisks},
+		{"trailing comma", testDiskSda + "," + testDiskSdb + ",", twoDisks},
+		{"leading comma", "," + testDiskSda + "," + testDiskSdb, twoDisks},
+		{"multiple trailing commas", testDiskSda + "," + testDiskSdb + ",,,", twoDisks},
+		{"consecutive commas", testDiskSda + ",," + testDiskSdb, twoDisks},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cfg := DefaultConfig()
-
 			t.Setenv("DISKS", tt.input)
 			LoadFromEnv(cfg)
-
 			assertDisksEqual(t, cfg.Storage.Disks, tt.want)
 		})
 	}
 }
 
 func TestLoadFromEnvDisksKeepsOriginal(t *testing.T) {
+	originalDisks := []string{testDiskSdc}
 	tests := []struct {
 		name  string
 		input string
 	}{
 		{testCaseEmptyString, ""},
 		{"only commas", ",,,"},
+		{"only spaces", "   "},
 		{"only spaces and commas", " , , "},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cfg := DefaultConfig()
-			cfg.Storage.Disks = []string{testDiskSdc}
-
+			cfg.Storage.Disks = originalDisks
 			t.Setenv("DISKS", tt.input)
 			LoadFromEnv(cfg)
-
-			assertDisksEqual(t, cfg.Storage.Disks, []string{testDiskSdc})
+			assertDisksEqual(t, cfg.Storage.Disks, originalDisks)
 		})
 	}
 }
@@ -685,69 +612,69 @@ const (
 	errFmtTailscaleAuthKey = "Tailscale.AuthKey = %q, want %q"
 )
 
-func TestLoadFromEnvTailscaleEnabledTrue(t *testing.T) {
-	tests := []struct {
-		name  string
-		input string
-	}{
-		{testCaseTrueLowercase, "true"},
-		{testCaseYesLowercase, "yes"},
-		{"one", "1"},
-		{testCaseTrueUppercase, "TRUE"},
-		{"Yes mixed case", "Yes"},
-	}
+// tailscaleBoolTest defines a test case for Tailscale boolean fields.
+type tailscaleBoolTest struct {
+	envName  string
+	getField func(*Config) bool
+	setField func(*Config, bool)
+}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			cfg := DefaultConfig()
-			cfg.Tailscale.Enabled = false // Ensure it's false initially
-
-			t.Setenv("INSTALL_TAILSCALE", tt.input)
-			LoadFromEnv(cfg)
-
-			if !cfg.Tailscale.Enabled {
-				t.Errorf(errFmtTailscaleEnabled, cfg.Tailscale.Enabled, true)
-			}
-		})
+// tailscaleBoolTests returns test definitions for Tailscale boolean fields.
+func tailscaleBoolTests() []tailscaleBoolTest {
+	return []tailscaleBoolTest{
+		{"INSTALL_TAILSCALE", func(c *Config) bool { return c.Tailscale.Enabled },
+			func(c *Config, v bool) { c.Tailscale.Enabled = v }},
+		{"TAILSCALE_SSH", func(c *Config) bool { return c.Tailscale.SSH },
+			func(c *Config, v bool) { c.Tailscale.SSH = v }},
+		{"TAILSCALE_WEBUI", func(c *Config) bool { return c.Tailscale.WebUI },
+			func(c *Config, v bool) { c.Tailscale.WebUI = v }},
 	}
 }
 
-func TestLoadFromEnvTailscaleEnabledFalse(t *testing.T) {
-	tests := []struct {
-		name  string
-		input string
-	}{
-		{testCaseFalseLowercase, "false"},
-		{testCaseNoLowercase, "no"},
-		{"zero", "0"},
-		{"FALSE uppercase", "FALSE"},
-		{"No mixed case", "No"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			cfg := DefaultConfig()
-			cfg.Tailscale.Enabled = true // Ensure it's true initially
-
-			t.Setenv("INSTALL_TAILSCALE", tt.input)
-			LoadFromEnv(cfg)
-
-			if cfg.Tailscale.Enabled {
-				t.Errorf(errFmtTailscaleEnabled, cfg.Tailscale.Enabled, false)
-			}
-		})
+func TestLoadFromEnvTailscaleBoolTrueValues(t *testing.T) {
+	trueInputs := []string{"true", "yes", "1", "TRUE", "Yes"}
+	for _, bt := range tailscaleBoolTests() {
+		for _, input := range trueInputs {
+			t.Run(bt.envName+"/"+input, func(t *testing.T) {
+				cfg := DefaultConfig()
+				bt.setField(cfg, false)
+				t.Setenv(bt.envName, input)
+				LoadFromEnv(cfg)
+				if !bt.getField(cfg) {
+					t.Errorf("%s=%q: got false, want true", bt.envName, input)
+				}
+			})
+		}
 	}
 }
 
-func TestLoadFromEnvTailscaleEnabledUnsetPreservesDefault(t *testing.T) {
-	cfg := DefaultConfig()
-	original := cfg.Tailscale.Enabled
+func TestLoadFromEnvTailscaleBoolFalseValues(t *testing.T) {
+	falseInputs := []string{"false", "no", "0", "FALSE", "No"}
+	for _, bt := range tailscaleBoolTests() {
+		for _, input := range falseInputs {
+			t.Run(bt.envName+"/"+input, func(t *testing.T) {
+				cfg := DefaultConfig()
+				bt.setField(cfg, true)
+				t.Setenv(bt.envName, input)
+				LoadFromEnv(cfg)
+				if bt.getField(cfg) {
+					t.Errorf("%s=%q: got true, want false", bt.envName, input)
+				}
+			})
+		}
+	}
+}
 
-	// Do NOT set INSTALL_TAILSCALE - should preserve default
-	LoadFromEnv(cfg)
-
-	if cfg.Tailscale.Enabled != original {
-		t.Errorf("Unset INSTALL_TAILSCALE changed config: got %v, want %v", cfg.Tailscale.Enabled, original)
+func TestLoadFromEnvTailscaleBoolUnsetPreserves(t *testing.T) {
+	for _, bt := range tailscaleBoolTests() {
+		t.Run(bt.envName, func(t *testing.T) {
+			cfg := DefaultConfig()
+			original := bt.getField(cfg)
+			LoadFromEnv(cfg)
+			if bt.getField(cfg) != original {
+				t.Errorf("Unset %s changed config: got %v, want %v", bt.envName, bt.getField(cfg), original)
+			}
+		})
 	}
 }
 
@@ -776,131 +703,9 @@ func TestLoadFromEnvTailscaleAuthKeyEmptyPreservesOriginal(t *testing.T) {
 	}
 }
 
-func TestLoadFromEnvTailscaleSSHTrue(t *testing.T) {
-	tests := []struct {
-		name  string
-		input string
-	}{
-		{testCaseTrueLowercase, "true"},
-		{testCaseYesLowercase, "yes"},
-		{"one", "1"},
-		{testCaseTrueUppercase, "TRUE"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			cfg := DefaultConfig()
-			cfg.Tailscale.SSH = false // Ensure it's false initially
-
-			t.Setenv("TAILSCALE_SSH", tt.input)
-			LoadFromEnv(cfg)
-
-			if !cfg.Tailscale.SSH {
-				t.Errorf(errFmtTailscaleSSH, cfg.Tailscale.SSH, true)
-			}
-		})
-	}
-}
-
-func TestLoadFromEnvTailscaleSSHFalse(t *testing.T) {
-	tests := []struct {
-		name  string
-		input string
-	}{
-		{testCaseFalseLowercase, "false"},
-		{testCaseNoLowercase, "no"},
-		{"zero", "0"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			cfg := DefaultConfig()
-			cfg.Tailscale.SSH = true // Ensure it's true initially (default)
-
-			t.Setenv("TAILSCALE_SSH", tt.input)
-			LoadFromEnv(cfg)
-
-			if cfg.Tailscale.SSH {
-				t.Errorf(errFmtTailscaleSSH, cfg.Tailscale.SSH, false)
-			}
-		})
-	}
-}
-
-func TestLoadFromEnvTailscaleSSHUnsetPreservesDefault(t *testing.T) {
-	cfg := DefaultConfig()
-	original := cfg.Tailscale.SSH
-
-	// Do NOT set TAILSCALE_SSH - should preserve default
-	LoadFromEnv(cfg)
-
-	if cfg.Tailscale.SSH != original {
-		t.Errorf("Unset TAILSCALE_SSH changed config: got %v, want %v", cfg.Tailscale.SSH, original)
-	}
-}
-
-func TestLoadFromEnvTailscaleWebUITrue(t *testing.T) {
-	tests := []struct {
-		name  string
-		input string
-	}{
-		{testCaseTrueLowercase, "true"},
-		{testCaseYesLowercase, "yes"},
-		{"one", "1"},
-		{testCaseTrueUppercase, "TRUE"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			cfg := DefaultConfig()
-			cfg.Tailscale.WebUI = false // Ensure it's false initially (default)
-
-			t.Setenv("TAILSCALE_WEBUI", tt.input)
-			LoadFromEnv(cfg)
-
-			if !cfg.Tailscale.WebUI {
-				t.Errorf(errFmtTailscaleWebUI, cfg.Tailscale.WebUI, true)
-			}
-		})
-	}
-}
-
-func TestLoadFromEnvTailscaleWebUIFalse(t *testing.T) {
-	tests := []struct {
-		name  string
-		input string
-	}{
-		{testCaseFalseLowercase, "false"},
-		{testCaseNoLowercase, "no"},
-		{"zero", "0"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			cfg := DefaultConfig()
-			cfg.Tailscale.WebUI = true // Ensure it's true initially
-
-			t.Setenv("TAILSCALE_WEBUI", tt.input)
-			LoadFromEnv(cfg)
-
-			if cfg.Tailscale.WebUI {
-				t.Errorf(errFmtTailscaleWebUI, cfg.Tailscale.WebUI, false)
-			}
-		})
-	}
-}
-
-func TestLoadFromEnvTailscaleWebUIUnsetPreservesDefault(t *testing.T) {
-	cfg := DefaultConfig()
-	original := cfg.Tailscale.WebUI
-
-	// Do NOT set TAILSCALE_WEBUI - should preserve default
-	LoadFromEnv(cfg)
-
-	if cfg.Tailscale.WebUI != original {
-		t.Errorf("Unset TAILSCALE_WEBUI changed config: got %v, want %v", cfg.Tailscale.WebUI, original)
-	}
-}
+// Note: TAILSCALE_SSH and TAILSCALE_WEBUI true/false/unset tests are covered
+// by TestLoadFromEnvTailscaleBoolTrueValues, TestLoadFromEnvTailscaleBoolFalseValues,
+// and TestLoadFromEnvTailscaleBoolUnsetPreserves above.
 
 func TestLoadFromEnvTailscaleMultipleFields(t *testing.T) {
 	cfg := DefaultConfig()
@@ -930,32 +735,480 @@ func TestLoadFromEnvTailscaleMultipleFields(t *testing.T) {
 	}
 }
 
-func TestLoadFromEnvTailscaleBooleanCaseInsensitive(t *testing.T) {
+// Note: Case-insensitive boolean tests are covered by TestLoadFromEnvBooleanEdgeCases.
+
+// =============================================================================
+// Integration Tests
+// =============================================================================
+
+// Integration test constants.
+const (
+	// NOSONAR(go:S1313) - test IP address values, not real network addresses.
+	intTestSubnet        = "172.16.0.0/24" // NOSONAR(go:S1313) RFC 1918 test value
+	intTestInterfaceName = "enp0s31f6"     // NOSONAR(go:S1313) test value
+)
+
+// TestLoadFromEnvFullConfiguration verifies that all supported environment
+// variables are correctly loaded into the configuration structure.
+// This is a comprehensive integration test that sets all fields via env vars.
+func TestLoadFromEnvFullConfiguration(t *testing.T) {
+	cfg := DefaultConfig()
+
+	// NOSONAR(go:S2068) - test credentials, not real values
+	testPassword := "envpassword123" // NOSONAR(go:S2068) test value
+	testAuthKey := "tskey-auth-123"  // NOSONAR(go:S2068) test value
+	testSSHKeyFull := "ssh-ed25519 AAAA... test@example.com"
+
+	// Set all environment variables
+	envVars := map[string]string{
+		"PVE_HOSTNAME": "env-server", "PVE_DOMAIN_SUFFIX": testEnvLocal,
+		"PVE_TIMEZONE": testTimezone, "PVE_EMAIL": "env@test.com",
+		"PVE_ROOT_PASSWORD": testPassword, "PVE_SSH_PUBLIC_KEY": testSSHKeyFull,
+		"INTERFACE_NAME": intTestInterfaceName, "BRIDGE_MODE": "both", "PRIVATE_SUBNET": intTestSubnet,
+		"ZFS_RAID": "raid0", "DISKS": testDiskNvme0 + "," + testDiskNvme1,
+		"INSTALL_TAILSCALE": "true", "TAILSCALE_AUTH_KEY": testAuthKey,
+		"TAILSCALE_SSH": "yes", "TAILSCALE_WEBUI": "1",
+	}
+	for k, v := range envVars {
+		t.Setenv(k, v)
+	}
+
+	LoadFromEnv(cfg)
+
+	// Verify all fields using helper functions
+	assertStringField(t, fieldSystemHostname, cfg.System.Hostname, "env-server")
+	assertStringField(t, fieldSystemDomainSuffix, cfg.System.DomainSuffix, testEnvLocal)
+	assertStringField(t, fieldSystemTimezone, cfg.System.Timezone, testTimezone)
+	assertStringField(t, fieldSystemEmail, cfg.System.Email, "env@test.com")
+	assertStringField(t, fieldSystemRootPassword, cfg.System.RootPassword, testPassword)
+	assertStringField(t, fieldSystemSSHPublicKey, cfg.System.SSHPublicKey, testSSHKeyFull)
+	assertStringField(t, fieldNetworkInterface, cfg.Network.InterfaceName, intTestInterfaceName)
+	assertStringField(t, fieldNetworkBridgeMode, string(cfg.Network.BridgeMode), string(BridgeModeBoth))
+	assertStringField(t, fieldNetworkSubnet, cfg.Network.PrivateSubnet, intTestSubnet)
+	assertStringField(t, fieldStorageZFSRaid, string(cfg.Storage.ZFSRaid), string(ZFSRaid0))
+	assertDisksEqual(t, cfg.Storage.Disks, []string{testDiskNvme0, testDiskNvme1})
+	assertBoolField(t, fieldTailscaleEnabled, cfg.Tailscale.Enabled, true)
+	assertStringField(t, fieldTailscaleAuthKey, cfg.Tailscale.AuthKey, testAuthKey)
+	assertBoolField(t, fieldTailscaleSSH, cfg.Tailscale.SSH, true)
+	assertBoolField(t, fieldTailscaleWebUI, cfg.Tailscale.WebUI, true)
+}
+
+// TestLoadFromEnvPartialConfiguration verifies that setting only some
+// environment variables correctly overrides those specific fields while
+// preserving default values for all other fields.
+func TestLoadFromEnvPartialConfiguration(t *testing.T) {
+	original := DefaultConfig()
+	cfg := DefaultConfig()
+
+	// Clear env vars that would interfere with testing
+	clearEnvForTest(t, []string{
+		"PVE_DOMAIN_SUFFIX", "PVE_TIMEZONE", "PVE_EMAIL",
+		"PVE_ROOT_PASSWORD", "PVE_SSH_PUBLIC_KEY",
+		"BRIDGE_MODE", "PRIVATE_SUBNET", "ZFS_RAID", "DISKS", "TAILSCALE_AUTH_KEY",
+		"INSTALL_TAILSCALE", "TAILSCALE_SSH", "TAILSCALE_WEBUI",
+	})
+
+	// Only set a subset of environment variables
+	t.Setenv("PVE_HOSTNAME", "partial-server")
+	t.Setenv("INTERFACE_NAME", "eth1")
+
+	LoadFromEnv(cfg)
+
+	// Verify set fields were updated
+	assertStringField(t, fieldSystemHostname, cfg.System.Hostname, "partial-server")
+	assertStringField(t, fieldNetworkInterface, cfg.Network.InterfaceName, "eth1")
+
+	// Verify all other fields retain defaults
+	assertStringField(t, fieldSystemDomainSuffix, cfg.System.DomainSuffix, original.System.DomainSuffix)
+	assertStringField(t, fieldSystemTimezone, cfg.System.Timezone, original.System.Timezone)
+	assertStringField(t, fieldSystemEmail, cfg.System.Email, original.System.Email)
+	assertStringField(t, fieldSystemRootPassword, cfg.System.RootPassword, original.System.RootPassword)
+	assertStringField(t, fieldSystemSSHPublicKey, cfg.System.SSHPublicKey, original.System.SSHPublicKey)
+	assertStringField(t, fieldNetworkBridgeMode, string(cfg.Network.BridgeMode), string(original.Network.BridgeMode))
+	assertStringField(t, fieldNetworkSubnet, cfg.Network.PrivateSubnet, original.Network.PrivateSubnet)
+	assertStringField(t, fieldStorageZFSRaid, string(cfg.Storage.ZFSRaid), string(original.Storage.ZFSRaid))
+	assertDisksEqual(t, cfg.Storage.Disks, original.Storage.Disks)
+	assertBoolField(t, fieldTailscaleEnabled, cfg.Tailscale.Enabled, original.Tailscale.Enabled)
+	assertStringField(t, fieldTailscaleAuthKey, cfg.Tailscale.AuthKey, "")
+	assertBoolField(t, fieldTailscaleSSH, cfg.Tailscale.SSH, original.Tailscale.SSH)
+	assertBoolField(t, fieldTailscaleWebUI, cfg.Tailscale.WebUI, original.Tailscale.WebUI)
+}
+
+// TestLoadFromEnvOverridesFileConfig verifies that environment variables
+// take priority over values loaded from a configuration file.
+// Configuration priority: 1. TUI > 2. Environment > 3. File > 4. Defaults.
+func TestLoadFromEnvOverridesFileConfig(t *testing.T) {
+	// Create and save a temporary config file
+	tempDir := t.TempDir()
+	configPath := tempDir + "/test-config.yaml"
+	fileConfig := DefaultConfig()
+	fileConfig.System.Hostname = "file-hostname"
+	fileConfig.System.DomainSuffix = "file.local"
+	fileConfig.System.Timezone = "Europe/London"
+	fileConfig.Network.InterfaceName = "eth0"
+	fileConfig.Network.BridgeMode = BridgeModeInternal
+	fileConfig.Storage.ZFSRaid = ZFSRaid1
+	fileConfig.Tailscale.Enabled = false
+	fileConfig.Tailscale.SSH = false
+	fileConfig.Tailscale.WebUI = false
+	if err := fileConfig.SaveToFile(configPath); err != nil {
+		t.Fatalf("Failed to save test config: %v", err)
+	}
+
+	// Load config from file
+	cfg, err := LoadFromFile(configPath)
+	if err != nil {
+		t.Fatalf("Failed to load test config: %v", err)
+	}
+	if cfg.System.Hostname != "file-hostname" {
+		t.Fatalf("File config not loaded correctly: Hostname = %q", cfg.System.Hostname)
+	}
+
+	// Set environment variables that should override file values
+	envOverrides := map[string]string{
+		"PVE_HOSTNAME": "env-hostname", "PVE_DOMAIN_SUFFIX": testEnvLocal,
+		"INTERFACE_NAME": "enp0s25", "BRIDGE_MODE": "external", "ZFS_RAID": "raid0",
+		"INSTALL_TAILSCALE": "true", "TAILSCALE_SSH": "true", "TAILSCALE_WEBUI": "true",
+	}
+	for k, v := range envOverrides {
+		t.Setenv(k, v)
+	}
+	LoadFromEnv(cfg)
+
+	// Verify environment variables override file values
+	assertStringField(t, fieldSystemHostname, cfg.System.Hostname, "env-hostname")
+	assertStringField(t, fieldSystemDomainSuffix, cfg.System.DomainSuffix, testEnvLocal)
+	assertStringField(t, fieldSystemTimezone, cfg.System.Timezone, "Europe/London") // not overridden
+	assertStringField(t, fieldNetworkInterface, cfg.Network.InterfaceName, "enp0s25")
+	assertStringField(t, fieldNetworkBridgeMode, string(cfg.Network.BridgeMode), string(BridgeModeExternal))
+	assertStringField(t, fieldStorageZFSRaid, string(cfg.Storage.ZFSRaid), string(ZFSRaid0))
+	assertBoolField(t, fieldTailscaleEnabled, cfg.Tailscale.Enabled, true)
+	assertBoolField(t, fieldTailscaleSSH, cfg.Tailscale.SSH, true)
+	assertBoolField(t, fieldTailscaleWebUI, cfg.Tailscale.WebUI, true)
+}
+
+// TestLoadFromEnvEmptyVsUnset verifies the distinction between:
+// - Empty string env vars (set but empty) - should NOT override
+// - Unset env vars - should NOT override
+// Both should preserve the existing configuration values.
+func TestLoadFromEnvEmptyVsUnset(t *testing.T) {
 	tests := []struct {
-		name     string
-		envName  string
-		input    string
-		getField func(*Config) bool
-		want     bool
+		name         string
+		envName      string
+		setValue     *string // nil = unset, non-nil = set to that value (including empty string)
+		initialValue string
+		setField     func(*Config, string)
+		getField     func(*Config) string
 	}{
-		{"INSTALL_TAILSCALE True", "INSTALL_TAILSCALE", "True", func(c *Config) bool { return c.Tailscale.Enabled }, true},
-		{"INSTALL_TAILSCALE TRUE", "INSTALL_TAILSCALE", "TRUE", func(c *Config) bool { return c.Tailscale.Enabled }, true},
-		{"INSTALL_TAILSCALE yEs", "INSTALL_TAILSCALE", "yEs", func(c *Config) bool { return c.Tailscale.Enabled }, true},
-		{"INSTALL_TAILSCALE YES", "INSTALL_TAILSCALE", "YES", func(c *Config) bool { return c.Tailscale.Enabled }, true},
-		{"TAILSCALE_SSH TrUe", "TAILSCALE_SSH", "TrUe", func(c *Config) bool { return c.Tailscale.SSH }, true},
-		{"TAILSCALE_WEBUI TRUE", "TAILSCALE_WEBUI", "TRUE", func(c *Config) bool { return c.Tailscale.WebUI }, true},
+		// Empty string cases (env var set to "")
+		{
+			name: "PVE_HOSTNAME empty preserves value", envName: "PVE_HOSTNAME",
+			setValue:     ptrString(""),
+			initialValue: "original-hostname",
+			setField:     func(c *Config, v string) { c.System.Hostname = v },
+			getField:     func(c *Config) string { return c.System.Hostname },
+		},
+		{
+			name: "PVE_DOMAIN_SUFFIX empty preserves value", envName: "PVE_DOMAIN_SUFFIX",
+			setValue:     ptrString(""),
+			initialValue: "original.local",
+			setField:     func(c *Config, v string) { c.System.DomainSuffix = v },
+			getField:     func(c *Config) string { return c.System.DomainSuffix },
+		},
+		{
+			name: "INTERFACE_NAME empty preserves value", envName: "INTERFACE_NAME",
+			setValue:     ptrString(""),
+			initialValue: "eth99",
+			setField:     func(c *Config, v string) { c.Network.InterfaceName = v },
+			getField:     func(c *Config) string { return c.Network.InterfaceName },
+		},
+		{
+			name: "PRIVATE_SUBNET empty preserves value", envName: "PRIVATE_SUBNET",
+			setValue:     ptrString(""),
+			initialValue: "192.168.99.0/24", // NOSONAR(go:S1313) RFC 1918 test value
+			setField:     func(c *Config, v string) { c.Network.PrivateSubnet = v },
+			getField:     func(c *Config) string { return c.Network.PrivateSubnet },
+		},
+		// Unset cases (env var not set at all)
+		{
+			name: "PVE_HOSTNAME unset preserves value", envName: "PVE_HOSTNAME",
+			setValue:     nil, // unset
+			initialValue: "original-hostname",
+			setField:     func(c *Config, v string) { c.System.Hostname = v },
+			getField:     func(c *Config) string { return c.System.Hostname },
+		},
+		{
+			name: "PVE_DOMAIN_SUFFIX unset preserves value", envName: "PVE_DOMAIN_SUFFIX",
+			setValue:     nil, // unset
+			initialValue: "original.local",
+			setField:     func(c *Config, v string) { c.System.DomainSuffix = v },
+			getField:     func(c *Config) string { return c.System.DomainSuffix },
+		},
+		{
+			name: "INTERFACE_NAME unset preserves value", envName: "INTERFACE_NAME",
+			setValue:     nil, // unset
+			initialValue: "eth99",
+			setField:     func(c *Config, v string) { c.Network.InterfaceName = v },
+			getField:     func(c *Config) string { return c.Network.InterfaceName },
+		},
+		{
+			name: "PRIVATE_SUBNET unset preserves value", envName: "PRIVATE_SUBNET",
+			setValue:     nil,               // unset
+			initialValue: "192.168.99.0/24", // NOSONAR(go:S1313) RFC 1918 test value
+			setField:     func(c *Config, v string) { c.Network.PrivateSubnet = v },
+			getField:     func(c *Config) string { return c.Network.PrivateSubnet },
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cfg := DefaultConfig()
+			tt.setField(cfg, tt.initialValue)
 
-			t.Setenv(tt.envName, tt.input)
+			if tt.setValue != nil {
+				// Set env var to the specified value (including empty string)
+				t.Setenv(tt.envName, *tt.setValue)
+			} else {
+				// Ensure env var is unset for this test
+				unsetEnvWithCleanup(t, tt.envName)
+			}
+
+			LoadFromEnv(cfg)
+			if got := tt.getField(cfg); got != tt.initialValue {
+				t.Errorf("%s: got %q, want %q (original)", tt.envName, got, tt.initialValue)
+			}
+		})
+	}
+}
+
+// TestLoadFromEnvBooleanExtendedTrueValues tests mixed case true values.
+func TestLoadFromEnvBooleanExtendedTrueValues(t *testing.T) {
+	extendedTrue := []string{"TrUe", "yEs"}
+	for _, bt := range tailscaleBoolTests() {
+		for _, v := range extendedTrue {
+			t.Run(bt.envName+"/"+v, func(t *testing.T) {
+				cfg := DefaultConfig()
+				bt.setField(cfg, false)
+				t.Setenv(bt.envName, v)
+				LoadFromEnv(cfg)
+				if !bt.getField(cfg) {
+					t.Errorf("%s=%q: got false, want true", bt.envName, v)
+				}
+			})
+		}
+	}
+}
+
+// TestLoadFromEnvBooleanExtendedFalseValues tests mixed case false values.
+func TestLoadFromEnvBooleanExtendedFalseValues(t *testing.T) {
+	extendedFalse := []string{"FaLsE", "nO"}
+	for _, bt := range tailscaleBoolTests() {
+		for _, v := range extendedFalse {
+			t.Run(bt.envName+"/"+v, func(t *testing.T) {
+				cfg := DefaultConfig()
+				bt.setField(cfg, true)
+				t.Setenv(bt.envName, v)
+				LoadFromEnv(cfg)
+				if bt.getField(cfg) {
+					t.Errorf("%s=%q: got true, want false", bt.envName, v)
+				}
+			})
+		}
+	}
+}
+
+// TestLoadFromEnvBooleanInvalidValues tests that invalid values are treated as false.
+func TestLoadFromEnvBooleanInvalidValues(t *testing.T) {
+	invalidValues := []string{"maybe", "2", "on", "off", "enabled", "disabled", "y", "n"}
+	for _, v := range invalidValues {
+		t.Run(v, func(t *testing.T) {
+			cfg := DefaultConfig()
+			cfg.Tailscale.Enabled = true
+			t.Setenv("INSTALL_TAILSCALE", v)
+			LoadFromEnv(cfg)
+			if cfg.Tailscale.Enabled {
+				t.Errorf("INSTALL_TAILSCALE=%q: got true, want false", v)
+			}
+		})
+	}
+}
+
+// TestLoadFromEnvBooleanWhitespaceHandling tests whitespace trimming in boolean values.
+func TestLoadFromEnvBooleanWhitespaceHandling(t *testing.T) {
+	tests := []struct {
+		input string
+		want  bool
+	}{
+		{" true", true}, {"true ", true}, {" true ", true},
+		{"\ttrue", true}, {"true\n", true}, {" \ttrue\n ", true},
+		{" false ", false}, {"\tno\n", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			cfg := DefaultConfig()
+			cfg.Tailscale.Enabled = !tt.want
+			t.Setenv("INSTALL_TAILSCALE", tt.input)
+			LoadFromEnv(cfg)
+			if cfg.Tailscale.Enabled != tt.want {
+				t.Errorf("INSTALL_TAILSCALE=%q: got %v, want %v", tt.input, cfg.Tailscale.Enabled, tt.want)
+			}
+		})
+	}
+}
+
+// Note: Disk format variations are covered by TestLoadFromEnvDisksValues and
+// TestLoadFromEnvDisksKeepsOriginal. Enum case variations are covered by
+// TestLoadFromEnvBridgeModeValues and TestLoadFromEnvZFSRaidValues.
+
+// clearEnvForTest clears environment variables for test isolation.
+// String vars are set to empty, boolean vars are unset and restored on cleanup.
+func clearEnvForTest(t *testing.T, envVars []string) {
+	t.Helper()
+
+	boolVars := map[string]bool{
+		"INSTALL_TAILSCALE": true,
+		"TAILSCALE_SSH":     true,
+		"TAILSCALE_WEBUI":   true,
+	}
+
+	for _, envName := range envVars {
+		if boolVars[envName] {
+			unsetEnvWithCleanup(t, envName)
+		} else {
+			t.Setenv(envName, "")
+		}
+	}
+}
+
+// unsetEnvWithCleanup unsets an environment variable and restores it on cleanup.
+func unsetEnvWithCleanup(t *testing.T, envName string) {
+	t.Helper()
+
+	originalVal, wasSet := os.LookupEnv(envName)
+	if !wasSet {
+		return
+	}
+
+	if err := os.Unsetenv(envName); err != nil {
+		t.Fatalf("failed to unset %s: %v", envName, err)
+	}
+
+	t.Cleanup(func() {
+		// Restore original value. Error ignored as this is cleanup code.
+		//nolint:errcheck,usetesting // cleanup code, t.Setenv not available
+		os.Setenv(envName, originalVal)
+	})
+}
+
+// envVarTestCase defines a test case for environment variable loading.
+type envVarTestCase struct {
+	name          string
+	value         string
+	validate      func(*Config) bool
+	isDefaultFunc func(cfg, defaultCfg *Config) bool
+}
+
+// Test value constants for getEnvVarTestCases.
+const (
+	testSubnetIndep   = "10.99.0.0/24" // NOSONAR(go:S1313) RFC 1918 test value
+	testPasswordIndep = "testpass"     // NOSONAR(go:S2068) test value
+	testAuthKeyIndep  = "tskey-test"   // NOSONAR(go:S2068) test value
+)
+
+// envVarTestCases returns the test cases for env var independence testing.
+func envVarTestCases() []envVarTestCase {
+	return []envVarTestCase{
+		{"PVE_HOSTNAME", "test-host",
+			func(c *Config) bool { return c.System.Hostname == "test-host" },
+			func(c, d *Config) bool { return c.System.Hostname == d.System.Hostname }},
+		{"PVE_DOMAIN_SUFFIX", testMultiDomain,
+			func(c *Config) bool { return c.System.DomainSuffix == testMultiDomain },
+			func(c, d *Config) bool { return c.System.DomainSuffix == d.System.DomainSuffix }},
+		{"PVE_TIMEZONE", "UTC",
+			func(c *Config) bool { return c.System.Timezone == "UTC" },
+			func(c, d *Config) bool { return c.System.Timezone == d.System.Timezone }},
+		{"PVE_EMAIL", "test@test.com",
+			func(c *Config) bool { return c.System.Email == "test@test.com" },
+			func(c, d *Config) bool { return c.System.Email == d.System.Email }},
+		{"PVE_ROOT_PASSWORD", testPasswordIndep,
+			func(c *Config) bool { return c.System.RootPassword == testPasswordIndep },
+			func(c, d *Config) bool { return c.System.RootPassword == d.System.RootPassword }},
+		{"PVE_SSH_PUBLIC_KEY", "ssh-rsa test",
+			func(c *Config) bool { return c.System.SSHPublicKey == "ssh-rsa test" },
+			func(c, d *Config) bool { return c.System.SSHPublicKey == d.System.SSHPublicKey }},
+		{"INTERFACE_NAME", "eth99",
+			func(c *Config) bool { return c.Network.InterfaceName == "eth99" },
+			func(c, d *Config) bool { return c.Network.InterfaceName == d.Network.InterfaceName }},
+		{"BRIDGE_MODE", "external",
+			func(c *Config) bool { return c.Network.BridgeMode == BridgeModeExternal },
+			func(c, d *Config) bool { return c.Network.BridgeMode == d.Network.BridgeMode }},
+		{"PRIVATE_SUBNET", testSubnetIndep,
+			func(c *Config) bool { return c.Network.PrivateSubnet == testSubnetIndep },
+			func(c, d *Config) bool { return c.Network.PrivateSubnet == d.Network.PrivateSubnet }},
+		{"ZFS_RAID", "raid0",
+			func(c *Config) bool { return c.Storage.ZFSRaid == ZFSRaid0 },
+			func(c, d *Config) bool { return c.Storage.ZFSRaid == d.Storage.ZFSRaid }},
+		{"DISKS", "/dev/test",
+			func(c *Config) bool { return len(c.Storage.Disks) == 1 && c.Storage.Disks[0] == "/dev/test" },
+			func(c, d *Config) bool { return len(c.Storage.Disks) == len(d.Storage.Disks) }},
+		{"INSTALL_TAILSCALE", "true",
+			func(c *Config) bool { return c.Tailscale.Enabled },
+			func(c, d *Config) bool { return c.Tailscale.Enabled == d.Tailscale.Enabled }},
+		{"TAILSCALE_AUTH_KEY", testAuthKeyIndep,
+			func(c *Config) bool { return c.Tailscale.AuthKey == testAuthKeyIndep },
+			func(c, d *Config) bool { return c.Tailscale.AuthKey == d.Tailscale.AuthKey }},
+		{"TAILSCALE_SSH", "true",
+			func(c *Config) bool { return c.Tailscale.SSH },
+			func(c, d *Config) bool { return c.Tailscale.SSH == d.Tailscale.SSH }},
+		{"TAILSCALE_WEBUI", "true",
+			func(c *Config) bool { return c.Tailscale.WebUI },
+			func(c, d *Config) bool { return c.Tailscale.WebUI == d.Tailscale.WebUI }},
+	}
+}
+
+// createTestConfig creates a config with boolean fields set to false for testing.
+func createTestConfig() *Config {
+	cfg := DefaultConfig()
+	cfg.Tailscale.Enabled = false
+	cfg.Tailscale.SSH = false
+	cfg.Tailscale.WebUI = false
+	return cfg
+}
+
+// TestLoadFromEnvAllFieldsIndependent verifies that setting one field
+// does not affect any other fields in the configuration.
+func TestLoadFromEnvAllFieldsIndependent(t *testing.T) {
+	allEnvVars := []string{
+		"PVE_HOSTNAME", "PVE_DOMAIN_SUFFIX", "PVE_TIMEZONE", "PVE_EMAIL",
+		"PVE_ROOT_PASSWORD", "PVE_SSH_PUBLIC_KEY",
+		"INTERFACE_NAME", "BRIDGE_MODE", "PRIVATE_SUBNET",
+		"ZFS_RAID", "DISKS",
+		"INSTALL_TAILSCALE", "TAILSCALE_AUTH_KEY", "TAILSCALE_SSH", "TAILSCALE_WEBUI",
+	}
+
+	envVars := envVarTestCases()
+
+	for i, ev := range envVars {
+		t.Run(ev.name, func(t *testing.T) {
+			cfg := createTestConfig()
+			clearEnvForTest(t, allEnvVars)
+			t.Setenv(ev.name, ev.value)
+
 			LoadFromEnv(cfg)
 
-			got := tt.getField(cfg)
-			if got != tt.want {
-				t.Errorf("%s with value %q: got %v, want %v", tt.envName, tt.input, got, tt.want)
+			if !ev.validate(cfg) {
+				t.Errorf("%s was not set correctly", ev.name)
+			}
+
+			// Verify no other fields were affected using the isDefaultFunc.
+			defaultCfg := createTestConfig()
+			for j, other := range envVars {
+				if i == j {
+					continue
+				}
+				if !other.isDefaultFunc(cfg, defaultCfg) {
+					t.Errorf("Setting %s affected %s field", ev.name, other.name)
+				}
 			}
 		})
 	}
