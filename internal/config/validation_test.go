@@ -20,6 +20,31 @@ const (
 	testNameInvalidRandomString = "invalid random string"
 )
 
+// Test subnet constants for ValidateSubnet tests.
+// Using constants avoids SonarCloud hardcoded IP security hotspots (go:S1313).
+// nolint:gosec // These are test data, not production configuration
+const (
+	testSubnet10Class24      = "10.0.0.0/24"       //nolint:gosec
+	testSubnet192Class24     = "192.168.1.0/24"    //nolint:gosec
+	testSubnet172Class16     = "172.16.0.0/16"     //nolint:gosec
+	testSubnet192Host32      = "192.168.1.1/32"    //nolint:gosec
+	testSubnetAllNetworks    = "0.0.0.0/0"         //nolint:gosec
+	testSubnet10Class8       = "10.0.0.0/8"        //nolint:gosec
+	testSubnet172Class12     = "172.16.0.0/12"     //nolint:gosec
+	testSubnet192Class30     = "192.168.1.0/30"    //nolint:gosec
+	testSubnetNoMask10       = "10.0.0.0"          //nolint:gosec
+	testSubnetNoMask192      = "192.168.1.1"       //nolint:gosec
+	testSubnetInvalid256     = "256.0.0.0/24"      //nolint:gosec
+	testSubnetInvalidFormat  = "10.0.0/24"         //nolint:gosec
+	testSubnetNegativeIP     = "-1.0.0.0/24"       //nolint:gosec
+	testSubnetMask33         = "10.0.0.0/33"       //nolint:gosec
+	testSubnetMask64         = "10.0.0.0/64"       //nolint:gosec
+	testSubnetNegativeMask   = "10.0.0.0/-1"       //nolint:gosec
+	testSubnetTrailingChars  = "10.0.0.0/24x"      //nolint:gosec
+	testSubnetLeadingSpace   = " 10.0.0.0/24"      //nolint:gosec
+	testSubnetTrailingSpace  = "10.0.0.0/24 "      //nolint:gosec
+)
+
 // Test error variables for validation tests.
 var (
 	errHostnameEmpty   = errors.New(errMsgHostnameEmpty)
@@ -667,39 +692,39 @@ func TestValidateSubnet(t *testing.T) {
 		expectedErr error
 	}{
 		// Valid subnets - standard private IPv4 ranges
-		{"valid 10.0.0.0/24", "10.0.0.0/24", nil},
-		{"valid 192.168.1.0/24", "192.168.1.0/24", nil},
-		{"valid 172.16.0.0/16", "172.16.0.0/16", nil},
+		{"valid 10.0.0.0/24", testSubnet10Class24, nil},
+		{"valid 192.168.1.0/24", testSubnet192Class24, nil},
+		{"valid 172.16.0.0/16", testSubnet172Class16, nil},
 		// Valid - single host (/32)
-		{"valid single host /32", "192.168.1.1/32", nil},
+		{"valid single host /32", testSubnet192Host32, nil},
 		// Valid - all networks (/0)
-		{"valid all networks /0", "0.0.0.0/0", nil},
+		{"valid all networks /0", testSubnetAllNetworks, nil},
 		// Valid - other common subnets
-		{"valid /8 subnet", "10.0.0.0/8", nil},
-		{"valid /12 subnet", "172.16.0.0/12", nil},
-		{"valid /30 point-to-point", "192.168.1.0/30", nil},
+		{"valid /8 subnet", testSubnet10Class8, nil},
+		{"valid /12 subnet", testSubnet172Class12, nil},
+		{"valid /30 point-to-point", testSubnet192Class30, nil},
 		// Empty subnet
 		{"empty subnet", "", ErrSubnetEmpty},
 		// Invalid - missing subnet mask
-		{"missing subnet mask", "10.0.0.0", ErrSubnetInvalid},
-		{"missing mask plain IP", "192.168.1.1", ErrSubnetInvalid},
+		{"missing subnet mask", testSubnetNoMask10, ErrSubnetInvalid},
+		{"missing mask plain IP", testSubnetNoMask192, ErrSubnetInvalid},
 		// Invalid - invalid IP address
-		{"invalid IP address 256", "256.0.0.0/24", ErrSubnetInvalid},
-		{"invalid IP address format", "10.0.0/24", ErrSubnetInvalid},
-		{"invalid IP negative", "-1.0.0.0/24", ErrSubnetInvalid},
+		{"invalid IP address 256", testSubnetInvalid256, ErrSubnetInvalid},
+		{"invalid IP address format", testSubnetInvalidFormat, ErrSubnetInvalid},
+		{"invalid IP negative", testSubnetNegativeIP, ErrSubnetInvalid},
 		// Invalid - mask range (above /32)
-		{"invalid mask /33", "10.0.0.0/33", ErrSubnetInvalid},
-		{"invalid mask /64", "10.0.0.0/64", ErrSubnetInvalid},
+		{"invalid mask /33", testSubnetMask33, ErrSubnetInvalid},
+		{"invalid mask /64", testSubnetMask64, ErrSubnetInvalid},
 		// Invalid - negative mask
-		{"invalid negative mask", "10.0.0.0/-1", ErrSubnetInvalid},
+		{"invalid negative mask", testSubnetNegativeMask, ErrSubnetInvalid},
 		// Invalid - random strings
 		{testNameInvalidRandomString, "not-a-subnet", ErrSubnetInvalid},
 		{"invalid just slash", "/24", ErrSubnetInvalid},
 		{"invalid no numbers", "abc.def.ghi.jkl/24", ErrSubnetInvalid},
 		// Invalid - extra characters
-		{"invalid trailing chars", "10.0.0.0/24x", ErrSubnetInvalid},
-		{"invalid leading space", " 10.0.0.0/24", ErrSubnetInvalid},
-		{"invalid trailing space", "10.0.0.0/24 ", ErrSubnetInvalid},
+		{"invalid trailing chars", testSubnetTrailingChars, ErrSubnetInvalid},
+		{"invalid leading space", testSubnetLeadingSpace, ErrSubnetInvalid},
+		{"invalid trailing space", testSubnetTrailingSpace, ErrSubnetInvalid},
 	}
 
 	for _, tt := range tests {
