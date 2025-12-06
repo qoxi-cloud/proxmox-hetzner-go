@@ -27,6 +27,7 @@ const (
 	testTailscaleAuthKey  = "tskey-auth-secret123"   // NOSONAR(go:S1313) Test Tailscale key - not real
 	testTailscaleAuthKey2 = "tskey-auth-supersecret" // NOSONAR(go:S1313) Test Tailscale key - not real
 	testDefaultHostname   = "pve-qoxi-cloud"         // Default hostname per PRD specification
+	testHostnamePveServer = "pve-server"             // Common test hostname
 )
 
 func TestSystemConfig_SensitiveFieldsOmittedFromYAML(t *testing.T) {
@@ -39,7 +40,7 @@ func TestSystemConfig_SensitiveFieldsOmittedFromYAML(t *testing.T) {
 		{
 			name: "standard config with all fields",
 			cfg: SystemConfig{
-				Hostname:     "pve-server",
+				Hostname:     testHostnamePveServer,
 				DomainSuffix: "local",
 				Timezone:     testTimezoneKyiv,
 				Email:        "admin@example.com",
@@ -47,7 +48,7 @@ func TestSystemConfig_SensitiveFieldsOmittedFromYAML(t *testing.T) {
 				SSHPublicKey: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIG...",
 			},
 			shouldNotContain: []string{testPassword, "ssh-ed25519", "root_password", "ssh_public_key"},
-			shouldContain:    []string{"hostname: pve-server", "domain_suffix: local", "timezone: " + testTimezoneKyiv, "email: admin@example.com"},
+			shouldContain:    []string{"hostname: " + testHostnamePveServer, "domain_suffix: local", "timezone: " + testTimezoneKyiv, "email: admin@example.com"},
 		},
 		{
 			name: "config with special characters in sensitive fields",
@@ -1141,7 +1142,7 @@ func boolToStr(b bool) string {
 func TestConfig_NestedStructsSerializeCorrectly(t *testing.T) {
 	cfg := Config{
 		System: SystemConfig{
-			Hostname:     "pve-server",
+			Hostname:     testHostnamePveServer,
 			DomainSuffix: "local",
 			Timezone:     testTimezoneKyiv,
 			Email:        "admin@example.com",
@@ -1178,7 +1179,7 @@ func TestConfig_NestedStructsSerializeCorrectly(t *testing.T) {
 	assert.Contains(t, yamlStr, "tailscale:")
 
 	// Check nested values
-	assert.Contains(t, yamlStr, "hostname: pve-server")
+	assert.Contains(t, yamlStr, "hostname: "+testHostnamePveServer)
 	assert.Contains(t, yamlStr, "interface: eth0")
 	assert.Contains(t, yamlStr, "zfs_raid: raid1")
 	assert.Contains(t, yamlStr, "enabled: true")
@@ -1487,9 +1488,9 @@ func TestConfig_FQDN_WithHostnameAndDomainSuffix(t *testing.T) {
 	}{
 		{
 			name:         "standard local domain",
-			hostname:     "pve-server",
+			hostname:     testHostnamePveServer,
 			domainSuffix: "local",
-			expectedFQDN: "pve-server.local",
+			expectedFQDN: testHostnamePveServer + ".local",
 		},
 		{
 			name:         "example.com domain",
