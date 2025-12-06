@@ -417,3 +417,44 @@ func TestValidateHostname(t *testing.T) {
 		})
 	}
 }
+
+// ValidatePassword tests
+
+func TestValidatePassword(t *testing.T) {
+	tests := []struct {
+		name        string
+		password    string
+		expectedErr error
+	}{
+		// Valid passwords
+		{"valid 8 characters", "password", nil},
+		{"valid 9 characters", "password1", nil},
+		{"valid with special chars", "p@ssw0rd!", nil},
+		{"valid with spaces", "pass word", nil},
+		{"valid unicode characters", "пароль12", nil},
+		{"valid long password", "thisisaverylongpasswordthatshouldbefinebecauseitismorethan8characters", nil},
+		{"valid exactly 8 unicode", "парол123", nil},
+		{"valid mixed unicode and ascii", "päss🔒rd1", nil},
+		// Empty password
+		{"empty password", "", ErrPasswordEmpty},
+		// Too short passwords
+		{"too short 1 char", "a", ErrPasswordTooShort},
+		{"too short 7 chars", "passwor", ErrPasswordTooShort},
+		{"too short 7 unicode", "пароль1", ErrPasswordTooShort},
+		{"too short spaces only", "       ", ErrPasswordTooShort},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidatePassword(tt.password)
+
+			if tt.expectedErr == nil {
+				assert.NoError(t, err)
+			} else {
+				require.Error(t, err)
+				assert.Equal(t, tt.expectedErr, err)
+				assert.True(t, errors.Is(err, tt.expectedErr))
+			}
+		})
+	}
+}

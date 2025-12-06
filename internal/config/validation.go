@@ -36,6 +36,20 @@ var (
 	ErrEmailInvalid = errors.New("email format is invalid")
 )
 
+// Password validation constants.
+const (
+	// MinPasswordLength is the minimum allowed length for a password.
+	minPasswordLength = 8
+)
+
+// Password validation errors.
+var (
+	// ErrPasswordEmpty is returned when password is empty.
+	ErrPasswordEmpty = errors.New("password cannot be empty")
+	// ErrPasswordTooShort is returned when password is less than 8 characters.
+	ErrPasswordTooShort = errors.New("password must be at least 8 characters")
+)
+
 // hostnameRegex matches valid RFC 1123 hostname characters (alphanumeric and hyphens).
 var hostnameRegex = regexp.MustCompile(`^[a-zA-Z0-9-]+$`)
 
@@ -86,6 +100,25 @@ func ValidateEmail(email string) error {
 
 	if !emailRegex.MatchString(email) {
 		return ErrEmailInvalid
+	}
+
+	return nil
+}
+
+// ValidatePassword validates a password for Proxmox root user.
+// A valid password:
+//   - Must not be empty
+//   - Must be at least 8 characters long
+//
+// Note: No complexity rules (special characters, uppercase, numbers) are required.
+// The length is measured in runes to properly handle unicode characters.
+func ValidatePassword(password string) error {
+	if password == "" {
+		return ErrPasswordEmpty
+	}
+
+	if len([]rune(password)) < minPasswordLength {
+		return ErrPasswordTooShort
 	}
 
 	return nil
