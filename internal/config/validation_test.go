@@ -212,8 +212,9 @@ func TestValidationError_Add_PreservesOrder(t *testing.T) {
 	}
 
 	require.Len(t, ve.Errors, 4)
+
 	for i, err := range errs {
-		assert.Equal(t, err.Error(), ve.Errors[i].Error())
+		assert.Equal(t, err, ve.Errors[i])
 	}
 }
 

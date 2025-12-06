@@ -21,10 +21,12 @@ func (v *ValidationError) Error() string {
 	}
 
 	messages := make([]string, 0, len(v.Errors))
+
 	for _, err := range v.Errors {
 		if err == nil {
 			continue
 		}
+
 		messages = append(messages, err.Error())
 	}
 
