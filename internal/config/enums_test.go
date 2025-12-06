@@ -8,15 +8,22 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// Test case name constants to avoid duplication.
+const (
+	testNameInternalMode = "internal mode"
+	testNameExternalMode = "external mode"
+	testNameBothMode     = "both mode"
+)
+
 func TestBridgeMode_String(t *testing.T) {
 	tests := []struct {
 		name     string
 		mode     BridgeMode
 		expected string
 	}{
-		{"internal mode", BridgeModeInternal, "internal"},
-		{"external mode", BridgeModeExternal, "external"},
-		{"both mode", BridgeModeBoth, "both"},
+		{testNameInternalMode, BridgeModeInternal, "internal"},
+		{testNameExternalMode, BridgeModeExternal, "external"},
+		{testNameBothMode, BridgeModeBoth, "both"},
 		{"empty mode", BridgeMode(""), ""},
 		{"invalid mode", BridgeMode("invalid"), "invalid"},
 	}
@@ -99,9 +106,9 @@ func TestBridgeMode_MarshalYAML(t *testing.T) {
 		mode     BridgeMode
 		expected string
 	}{
-		{"internal mode", BridgeModeInternal, "internal\n"},
-		{"external mode", BridgeModeExternal, "external\n"},
-		{"both mode", BridgeModeBoth, "both\n"},
+		{testNameInternalMode, BridgeModeInternal, "internal\n"},
+		{testNameExternalMode, BridgeModeExternal, "external\n"},
+		{testNameBothMode, BridgeModeBoth, "both\n"},
 		{"empty mode", BridgeMode(""), "\"\"\n"},
 	}
 
@@ -122,9 +129,9 @@ func TestBridgeMode_UnmarshalYAML(t *testing.T) {
 		expectError bool
 		errorMsg    string
 	}{
-		{"internal mode", "internal", BridgeModeInternal, false, ""},
-		{"external mode", "external", BridgeModeExternal, false, ""},
-		{"both mode", "both", BridgeModeBoth, false, ""},
+		{testNameInternalMode, "internal", BridgeModeInternal, false, ""},
+		{testNameExternalMode, "external", BridgeModeExternal, false, ""},
+		{testNameBothMode, "both", BridgeModeBoth, false, ""},
 		{"empty string", "", BridgeMode(""), false, ""},
 		{"invalid mode", "invalid", BridgeMode(""), true, "invalid bridge mode"},
 		{"uppercase", "Internal", BridgeMode(""), true, "invalid bridge mode"},
