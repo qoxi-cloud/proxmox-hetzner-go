@@ -1258,6 +1258,15 @@ const (
 // Default -> File -> Environment -> TUI.
 // Each layer properly overrides the previous one.
 func TestConfigPriorityChain(t *testing.T) {
+	// Clear relevant env vars to ensure test isolation
+	clearEnvForTest(t, []string{
+		"PVE_HOSTNAME", "PVE_DOMAIN_SUFFIX", "PVE_TIMEZONE", "PVE_EMAIL",
+		"PVE_ROOT_PASSWORD", "PVE_SSH_PUBLIC_KEY",
+		"INTERFACE_NAME", "BRIDGE_MODE", "PRIVATE_SUBNET",
+		"ZFS_RAID", "DISKS",
+		"INSTALL_TAILSCALE", "TAILSCALE_AUTH_KEY", "TAILSCALE_SSH", "TAILSCALE_WEBUI",
+	})
+
 	// Step 1: Start with defaults
 	cfg := DefaultConfig()
 	assertStringField(t, "Step1 Hostname", cfg.System.Hostname, "pve-qoxi-cloud")
@@ -1535,6 +1544,10 @@ func TestPriorityChainSensitiveFields(t *testing.T) {
 	assertStringField(t, "TUI SSHPublicKey", cfg.System.SSHPublicKey, priorityTUISSHKey)
 	assertStringField(t, "TUI AuthKey", cfg.Tailscale.AuthKey, priorityTUIAuthKey)
 
+	// Also set some non-sensitive fields to verify round-trip persistence
+	cfg.System.Hostname = priorityTUIHostname
+	cfg.System.DomainSuffix = priorityEnvDomain
+
 	// Verify sensitive fields are excluded when saving to file
 	tmpDir := t.TempDir()
 	outputPath := tmpDir + "/output-config.yaml"
@@ -1552,6 +1565,10 @@ func TestPriorityChainSensitiveFields(t *testing.T) {
 	assertStringField(t, "Reloaded RootPassword", reloadedCfg.System.RootPassword, "")
 	assertStringField(t, "Reloaded SSHPublicKey", reloadedCfg.System.SSHPublicKey, "")
 	assertStringField(t, "Reloaded AuthKey", reloadedCfg.Tailscale.AuthKey, "")
+
+	// Non-sensitive fields should be preserved across round-trip
+	assertStringField(t, "Reloaded Hostname", reloadedCfg.System.Hostname, priorityTUIHostname)
+	assertStringField(t, "Reloaded DomainSuffix", reloadedCfg.System.DomainSuffix, priorityEnvDomain)
 }
 
 // TestPriorityChainEnumFields tests that enum fields (BridgeMode, ZFSRaid)
