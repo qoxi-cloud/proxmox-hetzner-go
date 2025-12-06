@@ -113,7 +113,9 @@ func TestEnvVarSet(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Ensure the variable is unset before the test
-			os.Unsetenv(tt.envName)
+			if err := os.Unsetenv(tt.envName); err != nil {
+				t.Fatalf("failed to unset env var %q: %v", tt.envName, err)
+			}
 
 			if tt.setValue != nil {
 				t.Setenv(tt.envName, *tt.setValue)
