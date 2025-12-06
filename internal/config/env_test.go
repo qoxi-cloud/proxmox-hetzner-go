@@ -161,13 +161,16 @@ const (
 	testDiskSdc   = "/dev/sdc"
 	testDiskNvme0 = "/dev/nvme0n1"
 	testDiskNvme1 = "/dev/nvme1n1"
+	testDiskVda   = "/dev/vda"
 
 	// Error format strings.
-	errFmtHostname      = "Hostname = %q, want %q"
-	errFmtInterfaceName = "InterfaceName = %q, want %q"
-	errFmtBridgeMode    = "BridgeMode = %q, want %q"
-	errFmtPrivateSubnet = "PrivateSubnet = %q, want %q"
-	errFmtZFSRaid       = "ZFSRaid = %q, want %q"
+	errFmtHostname         = "Hostname = %q, want %q"
+	errFmtWriteConfigFile  = "Failed to write config file: %v"
+	errFmtLoadFromFileFail = "LoadFromFile failed: %v"
+	errFmtInterfaceName    = "InterfaceName = %q, want %q"
+	errFmtBridgeMode       = "BridgeMode = %q, want %q"
+	errFmtPrivateSubnet    = "PrivateSubnet = %q, want %q"
+	errFmtZFSRaid          = "ZFSRaid = %q, want %q"
 
 	// Test case name constants.
 	testCaseEmptyString    = "empty string"
@@ -543,7 +546,7 @@ func TestLoadFromEnvDisksValues(t *testing.T) {
 		{"two disks", testDiskSda + "," + testDiskSdb, twoDisks},
 		{"three disks", testDiskSda + "," + testDiskSdb + "," + testDiskSdc, []string{testDiskSda, testDiskSdb, testDiskSdc}},
 		{"nvme disks", testDiskNvme0 + "," + testDiskNvme1, nvmeDisks},
-		{"mixed types", testDiskSda + "," + testDiskNvme0 + ",/dev/vda", []string{testDiskSda, testDiskNvme0, "/dev/vda"}},
+		{"mixed types", testDiskSda + "," + testDiskNvme0 + "," + testDiskVda, []string{testDiskSda, testDiskNvme0, testDiskVda}},
 		{"with spaces", testDiskSda + " , " + testDiskSdb, twoDisks},
 		{"tabs and spaces", testDiskSda + "\t,\t" + testDiskSdb, twoDisks},
 		{"leading whitespace", "  " + testDiskSda + "," + testDiskSdb, twoDisks},
@@ -761,7 +764,7 @@ func TestLoadFromEnvFullConfiguration(t *testing.T) {
 
 	// Set all environment variables
 	envVars := map[string]string{
-		"PVE_HOSTNAME": "env-server", "PVE_DOMAIN_SUFFIX": testEnvLocal,
+		"PVE_HOSTNAME": priorityEnvHostname, "PVE_DOMAIN_SUFFIX": testEnvLocal,
 		"PVE_TIMEZONE": testTimezone, "PVE_EMAIL": "env@test.com",
 		"PVE_ROOT_PASSWORD": testPassword, "PVE_SSH_PUBLIC_KEY": testSSHKeyFull,
 		"INTERFACE_NAME": intTestInterfaceName, "BRIDGE_MODE": "both", "PRIVATE_SUBNET": intTestSubnet,
@@ -776,7 +779,7 @@ func TestLoadFromEnvFullConfiguration(t *testing.T) {
 	LoadFromEnv(cfg)
 
 	// Verify all fields using helper functions
-	assertStringField(t, fieldSystemHostname, cfg.System.Hostname, "env-server")
+	assertStringField(t, fieldSystemHostname, cfg.System.Hostname, priorityEnvHostname)
 	assertStringField(t, fieldSystemDomainSuffix, cfg.System.DomainSuffix, testEnvLocal)
 	assertStringField(t, fieldSystemTimezone, cfg.System.Timezone, testTimezone)
 	assertStringField(t, fieldSystemEmail, cfg.System.Email, "env@test.com")
@@ -844,7 +847,7 @@ func TestLoadFromEnvOverridesFileConfig(t *testing.T) {
 	fileConfig := DefaultConfig()
 	fileConfig.System.Hostname = "file-hostname"
 	fileConfig.System.DomainSuffix = "file.local"
-	fileConfig.System.Timezone = "Europe/London"
+	fileConfig.System.Timezone = priorityFileTimezone
 	fileConfig.Network.InterfaceName = "eth0"
 	fileConfig.Network.BridgeMode = BridgeModeInternal
 	fileConfig.Storage.ZFSRaid = ZFSRaid1
@@ -878,7 +881,7 @@ func TestLoadFromEnvOverridesFileConfig(t *testing.T) {
 	// Verify environment variables override file values
 	assertStringField(t, fieldSystemHostname, cfg.System.Hostname, "env-hostname")
 	assertStringField(t, fieldSystemDomainSuffix, cfg.System.DomainSuffix, testEnvLocal)
-	assertStringField(t, fieldSystemTimezone, cfg.System.Timezone, "Europe/London") // not overridden
+	assertStringField(t, fieldSystemTimezone, cfg.System.Timezone, priorityFileTimezone) // not overridden
 	assertStringField(t, fieldNetworkInterface, cfg.Network.InterfaceName, "enp0s25")
 	assertStringField(t, fieldNetworkBridgeMode, string(cfg.Network.BridgeMode), string(BridgeModeExternal))
 	assertStringField(t, fieldStorageZFSRaid, string(cfg.Storage.ZFSRaid), string(ZFSRaid0))
@@ -1212,4 +1215,446 @@ func TestLoadFromEnvAllFieldsIndependent(t *testing.T) {
 			}
 		})
 	}
+}
+
+// =============================================================================
+// Configuration Priority Chain Tests
+// =============================================================================
+// These tests verify the documented priority order:
+// 1. User input in TUI (highest)
+// 2. Environment variables
+// 3. Config file values
+// 4. Default values (lowest)
+
+// Priority chain test constants.
+const (
+	priorityFileHostname  = "file-server"
+	priorityEnvHostname   = "env-server"
+	priorityTUIHostname   = "tui-server"
+	priorityFileDomain    = "file.local"
+	priorityEnvDomain     = "env.local"
+	priorityTUIDomain     = "tui.local"
+	priorityFileTimezone  = "Europe/London"
+	priorityEnvTimezone   = "America/New_York"
+	priorityTUITimezone   = "Asia/Tokyo"
+	priorityFileSubnet    = "192.168.1.0/24" // NOSONAR(go:S1313) RFC 1918 test value
+	priorityEnvSubnet     = "172.16.0.0/24"  // NOSONAR(go:S1313) RFC 1918 test value
+	priorityTUISubnet     = "10.10.0.0/24"   // NOSONAR(go:S1313) RFC 1918 test value
+	priorityFileInterface = "eth0"
+	priorityEnvInterface  = "enp0s25"
+	priorityTUIInterface  = "enp3s0f0"
+	priorityFileAuthKey   = "tskey-file-xxx" // NOSONAR(go:S2068) test value
+	priorityEnvAuthKey    = "tskey-env-xxx"  // NOSONAR(go:S2068) test value
+	priorityTUIAuthKey    = "tskey-tui-xxx"  // NOSONAR(go:S2068) test value
+	priorityFilePassword  = "file-pass"      // NOSONAR(go:S2068) test value
+	priorityEnvPassword   = "env-pass"       // NOSONAR(go:S2068) test value
+	priorityTUIPassword   = "tui-pass"       // NOSONAR(go:S2068) test value
+	priorityFileSSHKey    = "ssh-ed25519 AAAA... file@example.com"
+	priorityEnvSSHKey     = "ssh-ed25519 AAAA... env@example.com"
+	priorityTUISSHKey     = "ssh-ed25519 AAAA... tui@example.com"
+)
+
+// TestConfigPriorityChain demonstrates the complete configuration priority chain:
+// Default -> File -> Environment -> TUI.
+// Each layer properly overrides the previous one.
+func TestConfigPriorityChain(t *testing.T) {
+	// Clear relevant env vars to ensure test isolation
+	clearEnvForTest(t, []string{
+		"PVE_HOSTNAME", "PVE_DOMAIN_SUFFIX", "PVE_TIMEZONE", "PVE_EMAIL",
+		"PVE_ROOT_PASSWORD", "PVE_SSH_PUBLIC_KEY",
+		"INTERFACE_NAME", "BRIDGE_MODE", "PRIVATE_SUBNET",
+		"ZFS_RAID", "DISKS",
+		"INSTALL_TAILSCALE", "TAILSCALE_AUTH_KEY", "TAILSCALE_SSH", "TAILSCALE_WEBUI",
+	})
+
+	// Step 1: Start with defaults
+	cfg := DefaultConfig()
+	assertStringField(t, "Step1 Hostname", cfg.System.Hostname, "pve-qoxi-cloud")
+	assertStringField(t, "Step1 DomainSuffix", cfg.System.DomainSuffix, "local")
+	assertStringField(t, "Step1 Timezone", cfg.System.Timezone, "Europe/Kyiv")
+
+	// Step 2: Create temp file with different values
+	tmpDir := t.TempDir()
+	filePath := tmpDir + "/config.yaml"
+
+	// Create a file config that overrides some defaults
+	fileContent := `system:
+  hostname: ` + priorityFileHostname + `
+  domain_suffix: ` + priorityFileDomain + `
+  timezone: ` + priorityFileTimezone + `
+network:
+  interface: ` + priorityFileInterface + `
+  bridge_mode: external
+  private_subnet: ` + priorityFileSubnet + `
+storage:
+  zfs_raid: raid0
+tailscale:
+  enabled: true
+  ssh: false
+  webui: true
+`
+	if err := os.WriteFile(filePath, []byte(fileContent), 0o600); err != nil {
+		t.Fatalf(errFmtWriteConfigFile, err)
+	}
+
+	// Step 3: Load from file (overrides defaults)
+	cfg, err := LoadFromFile(filePath)
+	if err != nil {
+		t.Fatalf(errFmtLoadFromFileFail, err)
+	}
+	assertStringField(t, "Step3 Hostname", cfg.System.Hostname, priorityFileHostname)
+	assertStringField(t, "Step3 DomainSuffix", cfg.System.DomainSuffix, priorityFileDomain)
+	assertStringField(t, "Step3 Timezone", cfg.System.Timezone, priorityFileTimezone)
+	assertStringField(t, "Step3 InterfaceName", cfg.Network.InterfaceName, priorityFileInterface)
+	assertStringField(t, "Step3 BridgeMode", string(cfg.Network.BridgeMode), string(BridgeModeExternal))
+	assertStringField(t, "Step3 PrivateSubnet", cfg.Network.PrivateSubnet, priorityFileSubnet)
+	assertStringField(t, "Step3 ZFSRaid", string(cfg.Storage.ZFSRaid), string(ZFSRaid0))
+	assertBoolField(t, "Step3 Tailscale.Enabled", cfg.Tailscale.Enabled, true)
+	assertBoolField(t, "Step3 Tailscale.SSH", cfg.Tailscale.SSH, false)
+	assertBoolField(t, "Step3 Tailscale.WebUI", cfg.Tailscale.WebUI, true)
+
+	// Step 4: Set environment variables
+	t.Setenv("PVE_HOSTNAME", priorityEnvHostname)
+	t.Setenv("PVE_DOMAIN_SUFFIX", priorityEnvDomain)
+	// Note: timezone is NOT set via env, should retain file value
+
+	// Step 5: Load from env (overrides file)
+	LoadFromEnv(cfg)
+	assertStringField(t, "Step5 Hostname", cfg.System.Hostname, priorityEnvHostname)
+	assertStringField(t, "Step5 DomainSuffix", cfg.System.DomainSuffix, priorityEnvDomain)
+	assertStringField(t, "Step5 Timezone", cfg.System.Timezone, priorityFileTimezone) // unchanged
+
+	// Step 6: Simulate TUI input (would override env)
+	cfg.System.Hostname = priorityTUIHostname
+	assertStringField(t, "Step6 Hostname", cfg.System.Hostname, priorityTUIHostname)
+	// Other fields remain at their env/file values
+	assertStringField(t, "Step6 DomainSuffix", cfg.System.DomainSuffix, priorityEnvDomain)
+	assertStringField(t, "Step6 Timezone", cfg.System.Timezone, priorityFileTimezone)
+}
+
+// TestPriorityChainPartialOverride verifies that fields not overridden at each
+// level retain their values from the previous level in the priority chain.
+func TestPriorityChainPartialOverride(t *testing.T) {
+	// Create temp file with partial config
+	tmpDir := t.TempDir()
+	filePath := tmpDir + "/partial-config.yaml"
+
+	// File only sets hostname, domain and timezone
+	fileContent := `system:
+  hostname: ` + priorityFileHostname + `
+  domain_suffix: ` + priorityFileDomain + `
+  timezone: ` + priorityFileTimezone + `
+`
+	if err := os.WriteFile(filePath, []byte(fileContent), 0o600); err != nil {
+		t.Fatalf(errFmtWriteConfigFile, err)
+	}
+
+	// Load from file
+	cfg, err := LoadFromFile(filePath)
+	if err != nil {
+		t.Fatalf(errFmtLoadFromFileFail, err)
+	}
+
+	// Verify file values were applied
+	assertStringField(t, "File Hostname", cfg.System.Hostname, priorityFileHostname)
+	assertStringField(t, "File DomainSuffix", cfg.System.DomainSuffix, priorityFileDomain)
+	assertStringField(t, "File Timezone", cfg.System.Timezone, priorityFileTimezone)
+
+	// Verify defaults are retained for unspecified fields
+	defaultCfg := DefaultConfig()
+	assertStringField(t, "Default Email", cfg.System.Email, defaultCfg.System.Email)
+	assertStringField(t, "Default BridgeMode", string(cfg.Network.BridgeMode), string(defaultCfg.Network.BridgeMode))
+	assertStringField(t, "Default PrivateSubnet", cfg.Network.PrivateSubnet, defaultCfg.Network.PrivateSubnet)
+	assertStringField(t, "Default ZFSRaid", string(cfg.Storage.ZFSRaid), string(defaultCfg.Storage.ZFSRaid))
+
+	// Clear env vars that would interfere
+	clearEnvForTest(t, []string{
+		"PVE_HOSTNAME", "PVE_DOMAIN_SUFFIX", "PVE_TIMEZONE",
+		"PVE_EMAIL", "INTERFACE_NAME", "BRIDGE_MODE", "PRIVATE_SUBNET",
+		"ZFS_RAID", "DISKS", "INSTALL_TAILSCALE", "TAILSCALE_SSH", "TAILSCALE_WEBUI",
+	})
+
+	// Set only hostname via env
+	t.Setenv("PVE_HOSTNAME", priorityEnvHostname)
+
+	// Load from env
+	LoadFromEnv(cfg)
+
+	// Verify env overrode file for hostname
+	assertStringField(t, "Env Hostname", cfg.System.Hostname, priorityEnvHostname)
+
+	// Verify file values are retained for fields not set in env
+	assertStringField(t, "Retained DomainSuffix", cfg.System.DomainSuffix, priorityFileDomain)
+	assertStringField(t, "Retained Timezone", cfg.System.Timezone, priorityFileTimezone)
+
+	// Verify defaults are still retained for unspecified fields
+	assertStringField(t, "Still Default Email", cfg.System.Email, defaultCfg.System.Email)
+	assertStringField(t, "Still Default BridgeMode", string(cfg.Network.BridgeMode), string(defaultCfg.Network.BridgeMode))
+}
+
+// TestPriorityChainBooleanFields verifies that boolean fields follow the same
+// priority chain as string fields.
+func TestPriorityChainBooleanFields(t *testing.T) {
+	// Create temp file with boolean fields
+	tmpDir := t.TempDir()
+	filePath := tmpDir + "/bool-config.yaml"
+
+	// File sets specific boolean values
+	fileContent := `tailscale:
+  enabled: true
+  ssh: false
+  webui: true
+`
+	if err := os.WriteFile(filePath, []byte(fileContent), 0o600); err != nil {
+		t.Fatalf(errFmtWriteConfigFile, err)
+	}
+
+	// Load from file
+	cfg, err := LoadFromFile(filePath)
+	if err != nil {
+		t.Fatalf(errFmtLoadFromFileFail, err)
+	}
+
+	// Verify file values
+	assertBoolField(t, "File Tailscale.Enabled", cfg.Tailscale.Enabled, true)
+	assertBoolField(t, "File Tailscale.SSH", cfg.Tailscale.SSH, false)
+	assertBoolField(t, "File Tailscale.WebUI", cfg.Tailscale.WebUI, true)
+
+	// Clear env vars to start fresh
+	unsetEnvWithCleanup(t, "INSTALL_TAILSCALE")
+	unsetEnvWithCleanup(t, "TAILSCALE_SSH")
+	unsetEnvWithCleanup(t, "TAILSCALE_WEBUI")
+
+	// Set only SSH via env (flip it)
+	t.Setenv("TAILSCALE_SSH", "true")
+
+	// Load from env
+	LoadFromEnv(cfg)
+
+	// Verify env overrode file for SSH
+	assertBoolField(t, "Env Tailscale.SSH", cfg.Tailscale.SSH, true)
+
+	// Verify file values are retained for fields not set in env
+	assertBoolField(t, "Retained Tailscale.Enabled", cfg.Tailscale.Enabled, true)
+	assertBoolField(t, "Retained Tailscale.WebUI", cfg.Tailscale.WebUI, true)
+
+	// Simulate TUI input (direct assignment) overriding env
+	cfg.Tailscale.SSH = false
+	cfg.Tailscale.WebUI = false
+	assertBoolField(t, "TUI Tailscale.SSH", cfg.Tailscale.SSH, false)
+	assertBoolField(t, "TUI Tailscale.WebUI", cfg.Tailscale.WebUI, false)
+}
+
+// TestPriorityChainMixedScenario tests a mixed scenario where some fields come
+// from file, others from env, and others remain at defaults.
+func TestPriorityChainMixedScenario(t *testing.T) {
+	// Create temp file with partial config
+	tmpDir := t.TempDir()
+	filePath := tmpDir + "/mixed-config.yaml"
+
+	// File sets hostname, network interface, and ZFS raid
+	fileContent := `system:
+  hostname: ` + priorityFileHostname + `
+  domain_suffix: ` + priorityFileDomain + `
+network:
+  interface: ` + priorityFileInterface + `
+  bridge_mode: internal
+storage:
+  zfs_raid: raid1
+`
+	if err := os.WriteFile(filePath, []byte(fileContent), 0o600); err != nil {
+		t.Fatalf(errFmtWriteConfigFile, err)
+	}
+
+	// Load from file
+	cfg, err := LoadFromFile(filePath)
+	if err != nil {
+		t.Fatalf(errFmtLoadFromFileFail, err)
+	}
+
+	// Clear interfering env vars
+	clearEnvForTest(t, []string{
+		"PVE_HOSTNAME", "PVE_DOMAIN_SUFFIX", "PVE_TIMEZONE", "PVE_EMAIL",
+		"PVE_ROOT_PASSWORD", "PVE_SSH_PUBLIC_KEY",
+		"INTERFACE_NAME", "BRIDGE_MODE", "PRIVATE_SUBNET",
+		"ZFS_RAID", "DISKS",
+		"INSTALL_TAILSCALE", "TAILSCALE_AUTH_KEY", "TAILSCALE_SSH", "TAILSCALE_WEBUI",
+	})
+
+	// Set some env vars (timezone, private subnet, tailscale)
+	t.Setenv("PVE_TIMEZONE", priorityEnvTimezone)
+	t.Setenv("PRIVATE_SUBNET", priorityEnvSubnet)
+	t.Setenv("INSTALL_TAILSCALE", "true")
+
+	// Load from env
+	LoadFromEnv(cfg)
+
+	// Create expected values map for clarity
+	expected := map[string]string{
+		"Hostname":      priorityFileHostname, // from file (not overridden by env)
+		"DomainSuffix":  priorityFileDomain,   // from file (not overridden by env)
+		"Timezone":      priorityEnvTimezone,  // from env (overrides default)
+		"InterfaceName": priorityFileInterface,
+		"BridgeMode":    string(BridgeModeInternal),
+		"PrivateSubnet": priorityEnvSubnet, // from env (overrides default)
+		"ZFSRaid":       string(ZFSRaid1),  // from file
+	}
+
+	// Verify the mixed scenario results
+	assertStringField(t, "Mixed Hostname", cfg.System.Hostname, expected["Hostname"])
+	assertStringField(t, "Mixed DomainSuffix", cfg.System.DomainSuffix, expected["DomainSuffix"])
+	assertStringField(t, "Mixed Timezone", cfg.System.Timezone, expected["Timezone"])
+	assertStringField(t, "Mixed InterfaceName", cfg.Network.InterfaceName, expected["InterfaceName"])
+	assertStringField(t, "Mixed BridgeMode", string(cfg.Network.BridgeMode), expected["BridgeMode"])
+	assertStringField(t, "Mixed PrivateSubnet", cfg.Network.PrivateSubnet, expected["PrivateSubnet"])
+	assertStringField(t, "Mixed ZFSRaid", string(cfg.Storage.ZFSRaid), expected["ZFSRaid"])
+	assertBoolField(t, "Mixed Tailscale.Enabled", cfg.Tailscale.Enabled, true)
+
+	// Email should still be default since not in file or env
+	assertStringField(t, "Mixed Email", cfg.System.Email, DefaultConfig().System.Email)
+}
+
+// TestPriorityChainSensitiveFields tests that sensitive fields (password, SSH key,
+// auth key) follow the priority chain correctly and are not persisted to file.
+func TestPriorityChainSensitiveFields(t *testing.T) {
+	// Start with defaults (sensitive fields are empty)
+	cfg := DefaultConfig()
+	assertStringField(t, "Default RootPassword", cfg.System.RootPassword, "")
+	assertStringField(t, "Default SSHPublicKey", cfg.System.SSHPublicKey, "")
+	assertStringField(t, "Default AuthKey", cfg.Tailscale.AuthKey, "")
+
+	// Set sensitive fields via env
+	t.Setenv("PVE_ROOT_PASSWORD", priorityEnvPassword)
+	t.Setenv("PVE_SSH_PUBLIC_KEY", priorityEnvSSHKey)
+	t.Setenv("TAILSCALE_AUTH_KEY", priorityEnvAuthKey)
+
+	LoadFromEnv(cfg)
+
+	// Verify env values are loaded
+	assertStringField(t, "Env RootPassword", cfg.System.RootPassword, priorityEnvPassword)
+	assertStringField(t, "Env SSHPublicKey", cfg.System.SSHPublicKey, priorityEnvSSHKey)
+	assertStringField(t, "Env AuthKey", cfg.Tailscale.AuthKey, priorityEnvAuthKey)
+
+	// Simulate TUI input overriding env
+	cfg.System.RootPassword = priorityTUIPassword
+	cfg.System.SSHPublicKey = priorityTUISSHKey
+	cfg.Tailscale.AuthKey = priorityTUIAuthKey
+
+	assertStringField(t, "TUI RootPassword", cfg.System.RootPassword, priorityTUIPassword)
+	assertStringField(t, "TUI SSHPublicKey", cfg.System.SSHPublicKey, priorityTUISSHKey)
+	assertStringField(t, "TUI AuthKey", cfg.Tailscale.AuthKey, priorityTUIAuthKey)
+
+	// Also set some non-sensitive fields to verify round-trip persistence
+	cfg.System.Hostname = priorityTUIHostname
+	cfg.System.DomainSuffix = priorityEnvDomain
+
+	// Verify sensitive fields are excluded when saving to file
+	tmpDir := t.TempDir()
+	outputPath := tmpDir + "/output-config.yaml"
+	if err := cfg.SaveToFile(outputPath); err != nil {
+		t.Fatalf("SaveToFile failed: %v", err)
+	}
+
+	// Reload the file and verify sensitive fields are empty
+	reloadedCfg, err := LoadFromFile(outputPath)
+	if err != nil {
+		t.Fatalf(errFmtLoadFromFileFail, err)
+	}
+
+	// Sensitive fields should be empty in reloaded config (not persisted)
+	assertStringField(t, "Reloaded RootPassword", reloadedCfg.System.RootPassword, "")
+	assertStringField(t, "Reloaded SSHPublicKey", reloadedCfg.System.SSHPublicKey, "")
+	assertStringField(t, "Reloaded AuthKey", reloadedCfg.Tailscale.AuthKey, "")
+
+	// Non-sensitive fields should be preserved across round-trip
+	assertStringField(t, "Reloaded Hostname", reloadedCfg.System.Hostname, priorityTUIHostname)
+	assertStringField(t, "Reloaded DomainSuffix", reloadedCfg.System.DomainSuffix, priorityEnvDomain)
+}
+
+// TestPriorityChainEnumFields tests that enum fields (BridgeMode, ZFSRaid)
+// follow the priority chain correctly.
+func TestPriorityChainEnumFields(t *testing.T) {
+	// Create temp file with enum values
+	tmpDir := t.TempDir()
+	filePath := tmpDir + "/enum-config.yaml"
+
+	fileContent := `network:
+  bridge_mode: internal
+storage:
+  zfs_raid: single
+`
+	if err := os.WriteFile(filePath, []byte(fileContent), 0o600); err != nil {
+		t.Fatalf(errFmtWriteConfigFile, err)
+	}
+
+	// Load from file
+	cfg, err := LoadFromFile(filePath)
+	if err != nil {
+		t.Fatalf(errFmtLoadFromFileFail, err)
+	}
+
+	// Verify file values
+	assertStringField(t, "File BridgeMode", string(cfg.Network.BridgeMode), string(BridgeModeInternal))
+	assertStringField(t, "File ZFSRaid", string(cfg.Storage.ZFSRaid), string(ZFSRaidSingle))
+
+	// Clear env vars
+	clearEnvForTest(t, []string{"BRIDGE_MODE", "ZFS_RAID"})
+
+	// Set env vars to different enum values
+	t.Setenv("BRIDGE_MODE", "external")
+	t.Setenv("ZFS_RAID", "raid0")
+
+	LoadFromEnv(cfg)
+
+	// Verify env overrode file
+	assertStringField(t, "Env BridgeMode", string(cfg.Network.BridgeMode), string(BridgeModeExternal))
+	assertStringField(t, "Env ZFSRaid", string(cfg.Storage.ZFSRaid), string(ZFSRaid0))
+
+	// Simulate TUI input
+	cfg.Network.BridgeMode = BridgeModeBoth
+	cfg.Storage.ZFSRaid = ZFSRaid1
+
+	assertStringField(t, "TUI BridgeMode", string(cfg.Network.BridgeMode), string(BridgeModeBoth))
+	assertStringField(t, "TUI ZFSRaid", string(cfg.Storage.ZFSRaid), string(ZFSRaid1))
+}
+
+// TestPriorityChainDisksSlice tests that the Disks slice field follows
+// the priority chain correctly.
+func TestPriorityChainDisksSlice(t *testing.T) {
+	// Create temp file with disks
+	tmpDir := t.TempDir()
+	filePath := tmpDir + "/disks-config.yaml"
+
+	fileContent := `storage:
+  disks:
+    - /dev/sda
+    - /dev/sdb
+`
+	if err := os.WriteFile(filePath, []byte(fileContent), 0o600); err != nil {
+		t.Fatalf(errFmtWriteConfigFile, err)
+	}
+
+	// Load from file
+	cfg, err := LoadFromFile(filePath)
+	if err != nil {
+		t.Fatalf(errFmtLoadFromFileFail, err)
+	}
+
+	// Verify file values
+	assertDisksEqual(t, cfg.Storage.Disks, []string{"/dev/sda", "/dev/sdb"})
+
+	// Clear DISKS env var
+	clearEnvForTest(t, []string{"DISKS"})
+
+	// Set env var to different disks
+	t.Setenv("DISKS", "/dev/nvme0n1,/dev/nvme1n1")
+
+	LoadFromEnv(cfg)
+
+	// Verify env overrode file
+	assertDisksEqual(t, cfg.Storage.Disks, []string{"/dev/nvme0n1", "/dev/nvme1n1"})
+
+	// Simulate TUI input
+	cfg.Storage.Disks = []string{testDiskVda}
+	assertDisksEqual(t, cfg.Storage.Disks, []string{testDiskVda})
 }
