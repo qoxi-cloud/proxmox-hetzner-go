@@ -16,6 +16,7 @@ const (
 	errMsgFailedParseYAML   = "failed to parse YAML"
 	errMsgFailedWriteConfig = "failed to write config file"
 	errMsgFailedCreateDir   = "failed to create directory"
+	skipMsgRootPermissionNA = "Skipping permission test when running as root"
 )
 
 func TestSaveToFileSuccessfulSave(t *testing.T) {
@@ -122,6 +123,11 @@ func TestSaveToFileCreatesNestedDirectories(t *testing.T) {
 }
 
 func TestSaveToFileFilePermissions(t *testing.T) {
+	// Skip permission tests when running as root (permissions don't apply)
+	if os.Getuid() == 0 {
+		t.Skip(skipMsgRootPermissionNA)
+	}
+
 	cfg := DefaultConfig()
 
 	tmpDir := t.TempDir()
@@ -277,6 +283,11 @@ func TestSaveToFileValidYAMLOutput(t *testing.T) {
 }
 
 func TestSaveToFileDirectoryPermissions(t *testing.T) {
+	// Skip permission tests when running as root (permissions don't apply)
+	if os.Getuid() == 0 {
+		t.Skip(skipMsgRootPermissionNA)
+	}
+
 	cfg := DefaultConfig()
 
 	tmpDir := t.TempDir()
@@ -344,6 +355,7 @@ func TestSaveToFileErrorCases(t *testing.T) {
 		setupFunc   func(t *testing.T) (cfg *Config, path string)
 		wantErr     bool
 		errContains string
+		skipIfRoot  bool // Skip test when running as root (permissions don't apply)
 	}{
 		{
 			name: "nil config pointer",
@@ -392,6 +404,7 @@ func TestSaveToFileErrorCases(t *testing.T) {
 			},
 			wantErr:     true,
 			errContains: errMsgFailedCreateDir,
+			skipIfRoot:  true,
 		},
 		{
 			name: "file in read-only directory",
@@ -407,11 +420,16 @@ func TestSaveToFileErrorCases(t *testing.T) {
 			},
 			wantErr:     true,
 			errContains: errMsgFailedWriteConfig,
+			skipIfRoot:  true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			if tt.skipIfRoot && os.Getuid() == 0 {
+				t.Skip(skipMsgRootPermissionNA)
+			}
+
 			cfg, path := tt.setupFunc(t)
 
 			var err error
@@ -600,6 +618,11 @@ func TestLoadFromFileRoundTrip(t *testing.T) {
 }
 
 func TestLoadFromFilePermissionDenied(t *testing.T) {
+	// Skip permission tests when running as root (permissions don't apply)
+	if os.Getuid() == 0 {
+		t.Skip(skipMsgRootPermissionNA)
+	}
+
 	tmpDir := t.TempDir()
 	filePath := filepath.Join(tmpDir, testConfigFileName)
 
