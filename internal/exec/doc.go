@@ -6,13 +6,15 @@
 //
 // Usage:
 //
-//	// Production code
-//	executor := exec.NewRealExecutor()
+//	// Production code - use interface type to reinforce the abstraction
+//	ctx := context.Background()
+//	var executor exec.Executor = exec.NewRealExecutor()
 //	output, err := executor.RunWithOutput(ctx, "ls", "-la")
 //
 //	// Test code
 //	// Note: SetOutput key is constructed by joining command and args with spaces.
 //	// For RunWithOutput(ctx, "ls", "-la"), the key is "ls -la".
+//	ctx := context.Background()
 //	mock := exec.NewMockExecutor()
 //	mock.SetOutput("ls -la", "file1\nfile2")
 //	output, err := mock.RunWithOutput(ctx, "ls", "-la")
