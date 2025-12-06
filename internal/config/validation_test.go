@@ -22,6 +22,16 @@ const (
 	testNameInvalidTrailingSpace = "invalid trailing space"
 )
 
+// Test data constants to avoid duplication.
+const (
+	testValidSSHKey     = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI user@host"
+	testValidPassword   = "securepassword"
+	testInvalidHostname = "-invalid-hostname"
+	testInvalidEmail    = "invalid-email"
+	testInvalidTimezone = "Invalid/Timezone"
+	testInvalidSubnet   = "invalid-subnet"
+)
+
 // buildSubnet constructs a subnet string from octets and mask.
 // This helper function avoids SonarCloud hardcoded IP security hotspots (go:S1313).
 func buildSubnet(a, b, c, d, mask int) string {
@@ -734,8 +744,8 @@ func TestValidateSubnet(t *testing.T) {
 
 func TestConfig_Validate_ValidConfig(t *testing.T) {
 	cfg := DefaultConfig()
-	cfg.System.RootPassword = "securepassword"
-	cfg.System.SSHPublicKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI user@host"
+	cfg.System.RootPassword = testValidPassword
+	cfg.System.SSHPublicKey = testValidSSHKey
 
 	err := cfg.Validate()
 
@@ -788,9 +798,9 @@ func TestConfig_Validate_PartialErrors_System(t *testing.T) {
 
 func TestConfig_Validate_InvalidHostname(t *testing.T) {
 	cfg := DefaultConfig()
-	cfg.System.Hostname = "-invalid-hostname"
-	cfg.System.RootPassword = "securepassword"
-	cfg.System.SSHPublicKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI user@host"
+	cfg.System.Hostname = testInvalidHostname
+	cfg.System.RootPassword = testValidPassword
+	cfg.System.SSHPublicKey = testValidSSHKey
 
 	err := cfg.Validate()
 
@@ -804,9 +814,9 @@ func TestConfig_Validate_InvalidHostname(t *testing.T) {
 
 func TestConfig_Validate_InvalidEmail(t *testing.T) {
 	cfg := DefaultConfig()
-	cfg.System.Email = "invalid-email"
-	cfg.System.RootPassword = "securepassword"
-	cfg.System.SSHPublicKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI user@host"
+	cfg.System.Email = testInvalidEmail
+	cfg.System.RootPassword = testValidPassword
+	cfg.System.SSHPublicKey = testValidSSHKey
 
 	err := cfg.Validate()
 
@@ -820,9 +830,9 @@ func TestConfig_Validate_InvalidEmail(t *testing.T) {
 
 func TestConfig_Validate_InvalidTimezone(t *testing.T) {
 	cfg := DefaultConfig()
-	cfg.System.Timezone = "Invalid/Timezone"
-	cfg.System.RootPassword = "securepassword"
-	cfg.System.SSHPublicKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI user@host"
+	cfg.System.Timezone = testInvalidTimezone
+	cfg.System.RootPassword = testValidPassword
+	cfg.System.SSHPublicKey = testValidSSHKey
 
 	err := cfg.Validate()
 
@@ -837,8 +847,8 @@ func TestConfig_Validate_InvalidTimezone(t *testing.T) {
 func TestConfig_Validate_InvalidBridgeMode(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.Network.BridgeMode = BridgeMode("invalid")
-	cfg.System.RootPassword = "securepassword"
-	cfg.System.SSHPublicKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI user@host"
+	cfg.System.RootPassword = testValidPassword
+	cfg.System.SSHPublicKey = testValidSSHKey
 
 	err := cfg.Validate()
 
@@ -852,9 +862,9 @@ func TestConfig_Validate_InvalidBridgeMode(t *testing.T) {
 
 func TestConfig_Validate_InvalidSubnet(t *testing.T) {
 	cfg := DefaultConfig()
-	cfg.Network.PrivateSubnet = "invalid-subnet"
-	cfg.System.RootPassword = "securepassword"
-	cfg.System.SSHPublicKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI user@host"
+	cfg.Network.PrivateSubnet = testInvalidSubnet
+	cfg.System.RootPassword = testValidPassword
+	cfg.System.SSHPublicKey = testValidSSHKey
 
 	err := cfg.Validate()
 
@@ -869,8 +879,8 @@ func TestConfig_Validate_InvalidSubnet(t *testing.T) {
 func TestConfig_Validate_InvalidZFSRaid(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.Storage.ZFSRaid = ZFSRaid("invalid")
-	cfg.System.RootPassword = "securepassword"
-	cfg.System.SSHPublicKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI user@host"
+	cfg.System.RootPassword = testValidPassword
+	cfg.System.SSHPublicKey = testValidSSHKey
 
 	err := cfg.Validate()
 
