@@ -741,3 +741,108 @@ func TestLoadFromFileDirectoryPath(t *testing.T) {
 	require.Nil(t, cfg)
 	assert.Contains(t, err.Error(), "failed to read config file")
 }
+
+// Tests for Sensitive Field Exclusion (Issue #86)
+
+// TestSaveToFile_ExcludesSensitiveFields verifies that sensitive credentials
+// (RootPassword, SSHPublicKey, TailscaleAuthKey) are NOT written to disk.
+func TestSaveToFile_ExcludesSensitiveFields(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.System.RootPassword = "supersecretpassword123"
+	cfg.System.SSHPublicKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIExampleKeyData"
+	cfg.Tailscale.AuthKey = "tskey-auth-examplekey123"
+
+	tmpDir := t.TempDir()
+	filePath := filepath.Join(tmpDir, testConfigFileName)
+
+	err := cfg.SaveToFile(filePath)
+	require.NoError(t, err)
+
+	// Read file content as raw string
+	data, err := os.ReadFile(filePath) //nolint:gosec // test file path is controlled
+	require.NoError(t, err)
+	content := string(data)
+
+	// Verify sensitive VALUES are not in the file
+	assert.NotContains(t, content, "supersecretpassword123",
+		"RootPassword value should not appear in saved file")
+	assert.NotContains(t, content, "ssh-ed25519",
+		"SSHPublicKey value should not appear in saved file")
+	assert.NotContains(t, content, "tskey-auth",
+		"TailscaleAuthKey value should not appear in saved file")
+
+	// Verify sensitive FIELD NAMES with values are not in the file
+	assert.NotContains(t, content, "root_password:",
+		"root_password field should not appear in saved file")
+	assert.NotContains(t, content, "ssh_public_key:",
+		"ssh_public_key field should not appear in saved file")
+	assert.NotContains(t, content, "auth_key:",
+		"auth_key field should not appear in saved file")
+}
+
+// TestSaveToFile_DoesNotModifyOriginal confirms that the original Config
+// object retains all sensitive values after SaveToFile is called.
+func TestSaveToFile_DoesNotModifyOriginal(t *testing.T) {
+	const (
+		testPassword     = "original-super-secret-password"
+		testSSHKey       = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOriginalSSHKey"
+		testTailscaleKey = "tskey-auth-original-tailscale-key"
+	)
+
+	cfg := DefaultConfig()
+	cfg.System.RootPassword = testPassword
+	cfg.System.SSHPublicKey = testSSHKey
+	cfg.Tailscale.AuthKey = testTailscaleKey
+
+	tmpDir := t.TempDir()
+	filePath := filepath.Join(tmpDir, testConfigFileName)
+
+	err := cfg.SaveToFile(filePath)
+	require.NoError(t, err)
+
+	// Verify the ORIGINAL config object is NOT modified
+	assert.Equal(t, testPassword, cfg.System.RootPassword,
+		"Original RootPassword should be preserved after SaveToFile")
+	assert.Equal(t, testSSHKey, cfg.System.SSHPublicKey,
+		"Original SSHPublicKey should be preserved after SaveToFile")
+	assert.Equal(t, testTailscaleKey, cfg.Tailscale.AuthKey,
+		"Original TailscaleAuthKey should be preserved after SaveToFile")
+}
+
+// TestSaveToFile_LoadedConfigHasEmptySensitiveFields validates that when
+// a saved config is reloaded, all sensitive fields are empty.
+func TestSaveToFile_LoadedConfigHasEmptySensitiveFields(t *testing.T) {
+	// Create config with sensitive data
+	cfg := DefaultConfig()
+	cfg.System.Hostname = "test-server"
+	cfg.System.RootPassword = "supersecretpassword123"
+	cfg.System.SSHPublicKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAISensitiveKey"
+	cfg.Tailscale.Enabled = true
+	cfg.Tailscale.AuthKey = "tskey-auth-sensitive123"
+
+	tmpDir := t.TempDir()
+	filePath := filepath.Join(tmpDir, testConfigFileName)
+
+	// Save to file
+	err := cfg.SaveToFile(filePath)
+	require.NoError(t, err)
+
+	// Reload from file
+	loaded, err := LoadFromFile(filePath)
+	require.NoError(t, err)
+	require.NotNil(t, loaded)
+
+	// Verify non-sensitive fields are preserved
+	assert.Equal(t, "test-server", loaded.System.Hostname,
+		"Non-sensitive Hostname should be preserved")
+	assert.True(t, loaded.Tailscale.Enabled,
+		"Non-sensitive Tailscale.Enabled should be preserved")
+
+	// Verify ALL sensitive fields are empty after reload
+	assert.Empty(t, loaded.System.RootPassword,
+		"RootPassword should be empty after reload")
+	assert.Empty(t, loaded.System.SSHPublicKey,
+		"SSHPublicKey should be empty after reload")
+	assert.Empty(t, loaded.Tailscale.AuthKey,
+		"TailscaleAuthKey should be empty after reload")
+}
