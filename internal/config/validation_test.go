@@ -15,6 +15,11 @@ const (
 	errMsgPasswordTooWeak = "password must be at least 8 characters"
 )
 
+// Test name constants to avoid duplication.
+const (
+	testNameInvalidRandomString = "invalid random string"
+)
+
 // Test error variables for validation tests.
 var (
 	errHostnameEmpty   = errors.New(errMsgHostnameEmpty)
@@ -538,7 +543,7 @@ func TestValidateTimezone(t *testing.T) {
 		{"invalid non-existent Mars/Olympus", "Mars/Olympus", ErrTimezoneInvalid},
 		{"invalid non-existent Antarctica/NonExistent", "Antarctica/NonExistent", ErrTimezoneInvalid},
 		// Invalid - random strings
-		{"invalid random string", "not-a-timezone", ErrTimezoneInvalid},
+		{testNameInvalidRandomString, "not-a-timezone", ErrTimezoneInvalid},
 		{"invalid numbers only", "12345", ErrTimezoneInvalid},
 		// Case sensitivity - "local" lowercase is not valid (only "Local")
 		// Note: "utc" behavior varies by platform (valid on macOS, invalid on Linux)
@@ -580,7 +585,7 @@ func TestValidateBridgeMode(t *testing.T) {
 		{"invalid uppercase INTERNAL", BridgeMode("INTERNAL"), ErrBridgeModeInvalid},
 		{"invalid uppercase External", BridgeMode("External"), ErrBridgeModeInvalid},
 		{"invalid uppercase Both", BridgeMode("Both"), ErrBridgeModeInvalid},
-		{"invalid random string", BridgeMode("random"), ErrBridgeModeInvalid},
+		{testNameInvalidRandomString, BridgeMode("random"), ErrBridgeModeInvalid},
 		{"invalid partial match intern", BridgeMode("intern"), ErrBridgeModeInvalid},
 		{"invalid partial match extern", BridgeMode("extern"), ErrBridgeModeInvalid},
 		{"invalid with spaces", BridgeMode(" internal"), ErrBridgeModeInvalid},
@@ -590,6 +595,57 @@ func TestValidateBridgeMode(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := ValidateBridgeMode(tt.mode)
+
+			if tt.expectedErr == nil {
+				assert.NoError(t, err)
+			} else {
+				require.Error(t, err)
+				assert.Equal(t, tt.expectedErr, err)
+				assert.True(t, errors.Is(err, tt.expectedErr))
+			}
+		})
+	}
+}
+
+// ValidateZFSRaid tests
+
+func TestValidateZFSRaid(t *testing.T) {
+	tests := []struct {
+		name        string
+		raid        ZFSRaid
+		expectedErr error
+	}{
+		// Valid ZFS RAID levels
+		{"valid single", ZFSRaidSingle, nil},
+		{"valid raid0", ZFSRaid0, nil},
+		{"valid raid1", ZFSRaid1, nil},
+		// Empty RAID level
+		{"empty raid level", ZFSRaid(""), ErrZFSRaidEmpty},
+		// Invalid - unsupported RAID levels
+		{"invalid raid5", ZFSRaid("raid5"), ErrZFSRaidInvalid},
+		{"invalid raid6", ZFSRaid("raid6"), ErrZFSRaidInvalid},
+		{"invalid raidz", ZFSRaid("raidz"), ErrZFSRaidInvalid},
+		{"invalid raidz2", ZFSRaid("raidz2"), ErrZFSRaidInvalid},
+		// Invalid - case sensitivity
+		{"invalid uppercase SINGLE", ZFSRaid("SINGLE"), ErrZFSRaidInvalid},
+		{"invalid uppercase Single", ZFSRaid("Single"), ErrZFSRaidInvalid},
+		{"invalid uppercase RAID0", ZFSRaid("RAID0"), ErrZFSRaidInvalid},
+		{"invalid uppercase Raid0", ZFSRaid("Raid0"), ErrZFSRaidInvalid},
+		{"invalid uppercase RAID1", ZFSRaid("RAID1"), ErrZFSRaidInvalid},
+		// Invalid - random strings
+		{testNameInvalidRandomString, ZFSRaid("random"), ErrZFSRaidInvalid},
+		{"invalid numeric only", ZFSRaid("123"), ErrZFSRaidInvalid},
+		// Invalid - partial matches
+		{"invalid partial raid", ZFSRaid("raid"), ErrZFSRaidInvalid},
+		{"invalid partial sing", ZFSRaid("sing"), ErrZFSRaidInvalid},
+		// Invalid - with spaces
+		{"invalid leading space", ZFSRaid(" single"), ErrZFSRaidInvalid},
+		{"invalid trailing space", ZFSRaid("raid0 "), ErrZFSRaidInvalid},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateZFSRaid(tt.raid)
 
 			if tt.expectedErr == nil {
 				assert.NoError(t, err)
