@@ -7,10 +7,12 @@
 // Usage:
 //
 //	// Production code
-//	exec := exec.NewRealExecutor()
-//	output, err := exec.RunWithOutput(ctx, "ls", "-la")
+//	executor := exec.NewRealExecutor()
+//	output, err := executor.RunWithOutput(ctx, "ls", "-la")
 //
 //	// Test code
+//	// Note: SetOutput key is constructed by joining command and args with spaces.
+//	// For RunWithOutput(ctx, "ls", "-la"), the key is "ls -la".
 //	mock := exec.NewMockExecutor()
 //	mock.SetOutput("ls -la", "file1\nfile2")
 //	output, err := mock.RunWithOutput(ctx, "ls", "-la")
