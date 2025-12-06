@@ -161,13 +161,16 @@ const (
 	testDiskSdc   = "/dev/sdc"
 	testDiskNvme0 = "/dev/nvme0n1"
 	testDiskNvme1 = "/dev/nvme1n1"
+	testDiskVda   = "/dev/vda"
 
 	// Error format strings.
-	errFmtHostname      = "Hostname = %q, want %q"
-	errFmtInterfaceName = "InterfaceName = %q, want %q"
-	errFmtBridgeMode    = "BridgeMode = %q, want %q"
-	errFmtPrivateSubnet = "PrivateSubnet = %q, want %q"
-	errFmtZFSRaid       = "ZFSRaid = %q, want %q"
+	errFmtHostname         = "Hostname = %q, want %q"
+	errFmtWriteConfigFile  = "Failed to write config file: %v"
+	errFmtLoadFromFileFail = "LoadFromFile failed: %v"
+	errFmtInterfaceName    = "InterfaceName = %q, want %q"
+	errFmtBridgeMode       = "BridgeMode = %q, want %q"
+	errFmtPrivateSubnet    = "PrivateSubnet = %q, want %q"
+	errFmtZFSRaid          = "ZFSRaid = %q, want %q"
 
 	// Test case name constants.
 	testCaseEmptyString    = "empty string"
@@ -543,7 +546,7 @@ func TestLoadFromEnvDisksValues(t *testing.T) {
 		{"two disks", testDiskSda + "," + testDiskSdb, twoDisks},
 		{"three disks", testDiskSda + "," + testDiskSdb + "," + testDiskSdc, []string{testDiskSda, testDiskSdb, testDiskSdc}},
 		{"nvme disks", testDiskNvme0 + "," + testDiskNvme1, nvmeDisks},
-		{"mixed types", testDiskSda + "," + testDiskNvme0 + ",/dev/vda", []string{testDiskSda, testDiskNvme0, "/dev/vda"}},
+		{"mixed types", testDiskSda + "," + testDiskNvme0 + "," + testDiskVda, []string{testDiskSda, testDiskNvme0, testDiskVda}},
 		{"with spaces", testDiskSda + " , " + testDiskSdb, twoDisks},
 		{"tabs and spaces", testDiskSda + "\t,\t" + testDiskSdb, twoDisks},
 		{"leading whitespace", "  " + testDiskSda + "," + testDiskSdb, twoDisks},
@@ -761,7 +764,7 @@ func TestLoadFromEnvFullConfiguration(t *testing.T) {
 
 	// Set all environment variables
 	envVars := map[string]string{
-		"PVE_HOSTNAME": "env-server", "PVE_DOMAIN_SUFFIX": testEnvLocal,
+		"PVE_HOSTNAME": priorityEnvHostname, "PVE_DOMAIN_SUFFIX": testEnvLocal,
 		"PVE_TIMEZONE": testTimezone, "PVE_EMAIL": "env@test.com",
 		"PVE_ROOT_PASSWORD": testPassword, "PVE_SSH_PUBLIC_KEY": testSSHKeyFull,
 		"INTERFACE_NAME": intTestInterfaceName, "BRIDGE_MODE": "both", "PRIVATE_SUBNET": intTestSubnet,
@@ -776,7 +779,7 @@ func TestLoadFromEnvFullConfiguration(t *testing.T) {
 	LoadFromEnv(cfg)
 
 	// Verify all fields using helper functions
-	assertStringField(t, fieldSystemHostname, cfg.System.Hostname, "env-server")
+	assertStringField(t, fieldSystemHostname, cfg.System.Hostname, priorityEnvHostname)
 	assertStringField(t, fieldSystemDomainSuffix, cfg.System.DomainSuffix, testEnvLocal)
 	assertStringField(t, fieldSystemTimezone, cfg.System.Timezone, testTimezone)
 	assertStringField(t, fieldSystemEmail, cfg.System.Email, "env@test.com")
@@ -844,7 +847,7 @@ func TestLoadFromEnvOverridesFileConfig(t *testing.T) {
 	fileConfig := DefaultConfig()
 	fileConfig.System.Hostname = "file-hostname"
 	fileConfig.System.DomainSuffix = "file.local"
-	fileConfig.System.Timezone = "Europe/London"
+	fileConfig.System.Timezone = priorityFileTimezone
 	fileConfig.Network.InterfaceName = "eth0"
 	fileConfig.Network.BridgeMode = BridgeModeInternal
 	fileConfig.Storage.ZFSRaid = ZFSRaid1
@@ -878,7 +881,7 @@ func TestLoadFromEnvOverridesFileConfig(t *testing.T) {
 	// Verify environment variables override file values
 	assertStringField(t, fieldSystemHostname, cfg.System.Hostname, "env-hostname")
 	assertStringField(t, fieldSystemDomainSuffix, cfg.System.DomainSuffix, testEnvLocal)
-	assertStringField(t, fieldSystemTimezone, cfg.System.Timezone, "Europe/London") // not overridden
+	assertStringField(t, fieldSystemTimezone, cfg.System.Timezone, priorityFileTimezone) // not overridden
 	assertStringField(t, fieldNetworkInterface, cfg.Network.InterfaceName, "enp0s25")
 	assertStringField(t, fieldNetworkBridgeMode, string(cfg.Network.BridgeMode), string(BridgeModeExternal))
 	assertStringField(t, fieldStorageZFSRaid, string(cfg.Storage.ZFSRaid), string(ZFSRaid0))
@@ -1282,13 +1285,13 @@ tailscale:
   webui: true
 `
 	if err := os.WriteFile(filePath, []byte(fileContent), 0o600); err != nil {
-		t.Fatalf("Failed to write config file: %v", err)
+		t.Fatalf(errFmtWriteConfigFile, err)
 	}
 
 	// Step 3: Load from file (overrides defaults)
 	cfg, err := LoadFromFile(filePath)
 	if err != nil {
-		t.Fatalf("LoadFromFile failed: %v", err)
+		t.Fatalf(errFmtLoadFromFileFail, err)
 	}
 	assertStringField(t, "Step3 Hostname", cfg.System.Hostname, priorityFileHostname)
 	assertStringField(t, "Step3 DomainSuffix", cfg.System.DomainSuffix, priorityFileDomain)
@@ -1334,13 +1337,13 @@ func TestPriorityChainPartialOverride(t *testing.T) {
   timezone: ` + priorityFileTimezone + `
 `
 	if err := os.WriteFile(filePath, []byte(fileContent), 0o600); err != nil {
-		t.Fatalf("Failed to write config file: %v", err)
+		t.Fatalf(errFmtWriteConfigFile, err)
 	}
 
 	// Load from file
 	cfg, err := LoadFromFile(filePath)
 	if err != nil {
-		t.Fatalf("LoadFromFile failed: %v", err)
+		t.Fatalf(errFmtLoadFromFileFail, err)
 	}
 
 	// Verify file values were applied
@@ -1394,13 +1397,13 @@ func TestPriorityChainBooleanFields(t *testing.T) {
   webui: true
 `
 	if err := os.WriteFile(filePath, []byte(fileContent), 0o600); err != nil {
-		t.Fatalf("Failed to write config file: %v", err)
+		t.Fatalf(errFmtWriteConfigFile, err)
 	}
 
 	// Load from file
 	cfg, err := LoadFromFile(filePath)
 	if err != nil {
-		t.Fatalf("LoadFromFile failed: %v", err)
+		t.Fatalf(errFmtLoadFromFileFail, err)
 	}
 
 	// Verify file values
@@ -1451,13 +1454,13 @@ storage:
   zfs_raid: raid1
 `
 	if err := os.WriteFile(filePath, []byte(fileContent), 0o600); err != nil {
-		t.Fatalf("Failed to write config file: %v", err)
+		t.Fatalf(errFmtWriteConfigFile, err)
 	}
 
 	// Load from file
 	cfg, err := LoadFromFile(filePath)
 	if err != nil {
-		t.Fatalf("LoadFromFile failed: %v", err)
+		t.Fatalf(errFmtLoadFromFileFail, err)
 	}
 
 	// Clear interfering env vars
@@ -1542,7 +1545,7 @@ func TestPriorityChainSensitiveFields(t *testing.T) {
 	// Reload the file and verify sensitive fields are empty
 	reloadedCfg, err := LoadFromFile(outputPath)
 	if err != nil {
-		t.Fatalf("LoadFromFile failed: %v", err)
+		t.Fatalf(errFmtLoadFromFileFail, err)
 	}
 
 	// Sensitive fields should be empty in reloaded config (not persisted)
@@ -1564,13 +1567,13 @@ storage:
   zfs_raid: single
 `
 	if err := os.WriteFile(filePath, []byte(fileContent), 0o600); err != nil {
-		t.Fatalf("Failed to write config file: %v", err)
+		t.Fatalf(errFmtWriteConfigFile, err)
 	}
 
 	// Load from file
 	cfg, err := LoadFromFile(filePath)
 	if err != nil {
-		t.Fatalf("LoadFromFile failed: %v", err)
+		t.Fatalf(errFmtLoadFromFileFail, err)
 	}
 
 	// Verify file values
@@ -1611,13 +1614,13 @@ func TestPriorityChainDisksSlice(t *testing.T) {
     - /dev/sdb
 `
 	if err := os.WriteFile(filePath, []byte(fileContent), 0o600); err != nil {
-		t.Fatalf("Failed to write config file: %v", err)
+		t.Fatalf(errFmtWriteConfigFile, err)
 	}
 
 	// Load from file
 	cfg, err := LoadFromFile(filePath)
 	if err != nil {
-		t.Fatalf("LoadFromFile failed: %v", err)
+		t.Fatalf(errFmtLoadFromFileFail, err)
 	}
 
 	// Verify file values
@@ -1635,6 +1638,6 @@ func TestPriorityChainDisksSlice(t *testing.T) {
 	assertDisksEqual(t, cfg.Storage.Disks, []string{"/dev/nvme0n1", "/dev/nvme1n1"})
 
 	// Simulate TUI input
-	cfg.Storage.Disks = []string{"/dev/vda"}
-	assertDisksEqual(t, cfg.Storage.Disks, []string{"/dev/vda"})
+	cfg.Storage.Disks = []string{testDiskVda}
+	assertDisksEqual(t, cfg.Storage.Disks, []string{testDiskVda})
 }
