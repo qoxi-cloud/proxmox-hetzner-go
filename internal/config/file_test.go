@@ -17,6 +17,11 @@ const (
 	errMsgFailedWriteConfig = "failed to write config file"
 	errMsgFailedCreateDir   = "failed to create directory"
 	skipMsgRootPermissionNA = "Skipping permission test when running as root"
+
+	// Test device paths.
+	testDeviceSDA = "/dev/sda"
+	testDeviceSDB = "/dev/sdb"
+	testDeviceSDC = "/dev/sdc"
 )
 
 func TestSaveToFileSuccessfulSave(t *testing.T) {
@@ -199,7 +204,7 @@ func TestSaveToFilePreservesAllNonSensitiveFields(t *testing.T) {
 		},
 		Storage: StorageConfig{
 			ZFSRaid: ZFSRaid0,
-			Disks:   []string{"/dev/sda", "/dev/sdb"},
+			Disks:   []string{testDeviceSDA, testDeviceSDB},
 		},
 		Tailscale: TailscaleConfig{
 			Enabled: true,
@@ -664,7 +669,7 @@ storage:
 	cfg, err := LoadFromFile(filePath)
 	require.NoError(t, err)
 
-	assert.Equal(t, []string{"/dev/sda", "/dev/sdb", "/dev/sdc"}, cfg.Storage.Disks)
+	assert.Equal(t, []string{testDeviceSDA, testDeviceSDB, testDeviceSDC}, cfg.Storage.Disks)
 }
 
 // TestLoadFromFileErrorCases uses table-driven tests to verify error handling
@@ -783,7 +788,7 @@ func TestLoadFromFileExampleYAML(t *testing.T) {
 	assert.Equal(t, "10.0.0.0/24", cfg.Network.PrivateSubnet) // NOSONAR(go:S1313) Class A private range - test data
 
 	assert.Equal(t, ZFSRaid1, cfg.Storage.ZFSRaid)
-	assert.Equal(t, []string{"/dev/sda"}, cfg.Storage.Disks)
+	assert.Equal(t, []string{testDeviceSDA}, cfg.Storage.Disks)
 
 	assert.False(t, cfg.Tailscale.Enabled)
 	assert.True(t, cfg.Tailscale.SSH)
