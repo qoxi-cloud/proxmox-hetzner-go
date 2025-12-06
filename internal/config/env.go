@@ -21,6 +21,31 @@ func EnvVarSet(name string) bool {
 	return exists
 }
 
+// parseDisksEnv parses a comma-separated list of disk paths from an environment variable.
+// It trims whitespace from each element and filters out empty strings.
+// Returns nil if no valid disk paths remain after filtering.
+func parseDisksEnv(v string) []string {
+	disks := strings.Split(v, ",")
+
+	for i := range disks {
+		disks[i] = strings.TrimSpace(disks[i])
+	}
+
+	filtered := make([]string, 0, len(disks))
+
+	for _, d := range disks {
+		if d != "" {
+			filtered = append(filtered, d)
+		}
+	}
+
+	if len(filtered) == 0 {
+		return nil
+	}
+
+	return filtered
+}
+
 // LoadFromEnv loads configuration values from environment variables into cfg.
 // Only non-empty environment variable values override existing configuration;
 // empty or unset variables leave the current values unchanged.
@@ -31,7 +56,13 @@ func LoadFromEnv(cfg *Config) {
 		return
 	}
 
-	// System configuration
+	loadSystemEnv(cfg)
+	loadNetworkEnv(cfg)
+	loadStorageEnv(cfg)
+}
+
+// loadSystemEnv loads system configuration from environment variables.
+func loadSystemEnv(cfg *Config) {
 	if v := os.Getenv("PVE_HOSTNAME"); v != "" {
 		cfg.System.Hostname = v
 	}
@@ -55,8 +86,10 @@ func LoadFromEnv(cfg *Config) {
 	if v := os.Getenv("PVE_SSH_PUBLIC_KEY"); v != "" {
 		cfg.System.SSHPublicKey = v
 	}
+}
 
-	// Network configuration
+// loadNetworkEnv loads network configuration from environment variables.
+func loadNetworkEnv(cfg *Config) {
 	if v := os.Getenv("INTERFACE_NAME"); v != "" {
 		cfg.Network.InterfaceName = v
 	}
@@ -70,5 +103,21 @@ func LoadFromEnv(cfg *Config) {
 
 	if v := os.Getenv("PRIVATE_SUBNET"); v != "" {
 		cfg.Network.PrivateSubnet = v
+	}
+}
+
+// loadStorageEnv loads storage configuration from environment variables.
+func loadStorageEnv(cfg *Config) {
+	if v := os.Getenv("ZFS_RAID"); v != "" {
+		raid := ZFSRaid(strings.ToLower(v))
+		if raid.IsValid() {
+			cfg.Storage.ZFSRaid = raid
+		}
+	}
+
+	if v := os.Getenv("DISKS"); v != "" {
+		if disks := parseDisksEnv(v); disks != nil {
+			cfg.Storage.Disks = disks
+		}
 	}
 }
