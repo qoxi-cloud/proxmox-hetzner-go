@@ -82,7 +82,7 @@ type Config struct {
 // Default configuration values per PRD specification.
 // These are intentionally hardcoded as sensible defaults for the installer.
 const (
-	// defaultPrivateSubnet is the default NAT network subnet (RFC 1918 Class A private range).
+	// DefaultPrivateSubnet is the default NAT network subnet (RFC 1918 Class A private range).
 	defaultPrivateSubnet = "10.0.0.0/24" // NOSONAR(go:S1313) RFC 1918 private range - default config value
 )
 
