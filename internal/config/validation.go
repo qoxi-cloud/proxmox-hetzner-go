@@ -67,6 +67,14 @@ var (
 	ErrTimezoneInvalid = errors.New("timezone not found in IANA timezone database")
 )
 
+// Bridge mode validation errors.
+var (
+	// ErrBridgeModeEmpty is returned when bridge mode is empty.
+	ErrBridgeModeEmpty = errors.New("bridge mode is required")
+	// ErrBridgeModeInvalid is returned when bridge mode is not a valid value.
+	ErrBridgeModeInvalid = errors.New("bridge mode must be one of: internal, external, both")
+)
+
 // hostnameRegex matches valid RFC 1123 hostname characters (alphanumeric and hyphens).
 var hostnameRegex = regexp.MustCompile(`^[a-zA-Z0-9-]+$`)
 
@@ -241,6 +249,24 @@ func ValidateTimezone(timezone string) error {
 	_, err := time.LoadLocation(timezone)
 	if err != nil {
 		return ErrTimezoneInvalid
+	}
+
+	return nil
+}
+
+// ValidateBridgeMode validates a network bridge mode.
+// A valid bridge mode:
+//   - Must not be empty
+//   - Must be one of: internal, external, both
+//
+// This function uses the BridgeMode.IsValid() method for validation.
+func ValidateBridgeMode(mode BridgeMode) error {
+	if mode == "" {
+		return ErrBridgeModeEmpty
+	}
+
+	if !mode.IsValid() {
+		return ErrBridgeModeInvalid
 	}
 
 	return nil

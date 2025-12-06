@@ -559,3 +559,45 @@ func TestValidateTimezone(t *testing.T) {
 		})
 	}
 }
+
+// ValidateBridgeMode tests
+
+func TestValidateBridgeMode(t *testing.T) {
+	tests := []struct {
+		name        string
+		mode        BridgeMode
+		expectedErr error
+	}{
+		// Valid bridge modes
+		{"valid internal mode", BridgeModeInternal, nil},
+		{"valid external mode", BridgeModeExternal, nil},
+		{"valid both mode", BridgeModeBoth, nil},
+		// Empty mode
+		{"empty mode", BridgeMode(""), ErrBridgeModeEmpty},
+		// Invalid modes
+		{"invalid nat mode", BridgeMode("nat"), ErrBridgeModeInvalid},
+		{"invalid uppercase Internal", BridgeMode("Internal"), ErrBridgeModeInvalid},
+		{"invalid uppercase INTERNAL", BridgeMode("INTERNAL"), ErrBridgeModeInvalid},
+		{"invalid uppercase External", BridgeMode("External"), ErrBridgeModeInvalid},
+		{"invalid uppercase Both", BridgeMode("Both"), ErrBridgeModeInvalid},
+		{"invalid random string", BridgeMode("random"), ErrBridgeModeInvalid},
+		{"invalid partial match intern", BridgeMode("intern"), ErrBridgeModeInvalid},
+		{"invalid partial match extern", BridgeMode("extern"), ErrBridgeModeInvalid},
+		{"invalid with spaces", BridgeMode(" internal"), ErrBridgeModeInvalid},
+		{"invalid trailing space", BridgeMode("external "), ErrBridgeModeInvalid},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateBridgeMode(tt.mode)
+
+			if tt.expectedErr == nil {
+				assert.NoError(t, err)
+			} else {
+				require.Error(t, err)
+				assert.Equal(t, tt.expectedErr, err)
+				assert.True(t, errors.Is(err, tt.expectedErr))
+			}
+		})
+	}
+}
