@@ -26,6 +26,7 @@ const (
 	testPassword          = "secret-password"        // NOSONAR(go:S1313) Test password - not real credential
 	testTailscaleAuthKey  = "tskey-auth-secret123"   // NOSONAR(go:S1313) Test Tailscale key - not real
 	testTailscaleAuthKey2 = "tskey-auth-supersecret" // NOSONAR(go:S1313) Test Tailscale key - not real
+	testDefaultHostname   = "pve-qoxi-cloud"         // Default hostname per PRD specification
 )
 
 func TestSystemConfig_SensitiveFieldsOmittedFromYAML(t *testing.T) {
@@ -1424,13 +1425,13 @@ func TestDefaultConfig_ReturnsNewInstanceEachCall(t *testing.T) {
 	// Modify cfg1 and verify cfg2 is not affected
 	cfg1.System.Hostname = "modified-hostname"
 	assert.NotEqual(t, cfg1.System.Hostname, cfg2.System.Hostname)
-	assert.Equal(t, "pve-qoxi-cloud", cfg2.System.Hostname)
+	assert.Equal(t, testDefaultHostname, cfg2.System.Hostname)
 }
 
 func TestDefaultConfig_SystemDefaults(t *testing.T) {
 	cfg := DefaultConfig()
 
-	assert.Equal(t, "pve-qoxi-cloud", cfg.System.Hostname)
+	assert.Equal(t, testDefaultHostname, cfg.System.Hostname)
 	assert.Equal(t, "local", cfg.System.DomainSuffix)
 	assert.Equal(t, testTimezoneKyiv, cfg.System.Timezone)
 	assert.Equal(t, "admin@qoxi.cloud", cfg.System.Email)
@@ -1484,7 +1485,7 @@ func TestDefaultConfig_AllDefaultsMatchPRDSpecification(t *testing.T) {
 		got      interface{}
 		expected interface{}
 	}{
-		{"Hostname", cfg.System.Hostname, "pve-qoxi-cloud"},
+		{"Hostname", cfg.System.Hostname, testDefaultHostname},
 		{"DomainSuffix", cfg.System.DomainSuffix, "local"},
 		{"Timezone", cfg.System.Timezone, "Europe/Kyiv"},
 		{"Email", cfg.System.Email, "admin@qoxi.cloud"},
