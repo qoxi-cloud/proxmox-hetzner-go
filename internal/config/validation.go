@@ -28,8 +28,20 @@ var (
 	ErrHostnameInvalidChars = errors.New("hostname can only contain alphanumeric characters and hyphens")
 )
 
+// Email validation errors.
+var (
+	// ErrEmailEmpty is returned when email is empty.
+	ErrEmailEmpty = errors.New("email is required")
+	// ErrEmailInvalid is returned when email format is invalid.
+	ErrEmailInvalid = errors.New("email format is invalid")
+)
+
 // hostnameRegex matches valid RFC 1123 hostname characters (alphanumeric and hyphens).
 var hostnameRegex = regexp.MustCompile(`^[a-zA-Z0-9-]+$`)
+
+// emailRegex provides basic email format validation.
+// This is intentionally simple - full RFC 5322 compliance is complex.
+var emailRegex = regexp.MustCompile(`^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$`)
 
 // ValidateHostname validates a hostname according to RFC 1123.
 // A valid hostname:
@@ -56,6 +68,24 @@ func ValidateHostname(hostname string) error {
 
 	if !hostnameRegex.MatchString(hostname) {
 		return ErrHostnameInvalidChars
+	}
+
+	return nil
+}
+
+// ValidateEmail validates an email address format.
+// A valid email:
+//   - Must not be empty
+//   - Must contain @ symbol
+//   - Must have valid local and domain parts
+//   - Domain must have a TLD of at least 2 characters
+func ValidateEmail(email string) error {
+	if email == "" {
+		return ErrEmailEmpty
+	}
+
+	if !emailRegex.MatchString(email) {
+		return ErrEmailInvalid
 	}
 
 	return nil
