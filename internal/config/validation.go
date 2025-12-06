@@ -6,6 +6,7 @@ import (
 	"errors"
 	"regexp"
 	"strings"
+	"time"
 )
 
 // Hostname validation constants.
@@ -56,6 +57,14 @@ var (
 	ErrSSHKeyEmpty = errors.New("SSH public key is required")
 	// ErrSSHKeyInvalidPrefix is returned when SSH key doesn't start with a valid prefix.
 	ErrSSHKeyInvalidPrefix = errors.New("SSH key must start with ssh-rsa, ssh-ed25519, ssh-ecdsa, or ecdsa-sha2-")
+)
+
+// Timezone validation errors.
+var (
+	// ErrTimezoneEmpty is returned when timezone is empty.
+	ErrTimezoneEmpty = errors.New("timezone is required")
+	// ErrTimezoneInvalid is returned when timezone is not in the IANA timezone database.
+	ErrTimezoneInvalid = errors.New("timezone not found in IANA timezone database")
 )
 
 // hostnameRegex matches valid RFC 1123 hostname characters (alphanumeric and hyphens).
@@ -217,4 +226,22 @@ func ValidateSSHKey(key string) error {
 	}
 
 	return ErrSSHKeyInvalidPrefix
+}
+
+// ValidateTimezone validates a timezone against the IANA timezone database.
+// A valid timezone:
+//   - Must not be empty
+//   - Must exist in the IANA timezone database (e.g., "UTC", "Europe/Kyiv", "America/New_York")
+//   - "Local" is a valid special case representing the system's local timezone
+func ValidateTimezone(timezone string) error {
+	if timezone == "" {
+		return ErrTimezoneEmpty
+	}
+
+	_, err := time.LoadLocation(timezone)
+	if err != nil {
+		return ErrTimezoneInvalid
+	}
+
+	return nil
 }
