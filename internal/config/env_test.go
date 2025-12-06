@@ -207,13 +207,13 @@ func TestLoadFromEnvEmail(t *testing.T) {
 
 func TestLoadFromEnvRootPassword(t *testing.T) {
 	cfg := DefaultConfig()
-	testPassword := "supersecret"
+	testValue := "supersecret" // NOSONAR(go:S2068) test value, not a real credential
 
-	t.Setenv("PVE_ROOT_PASSWORD", testPassword)
+	t.Setenv("PVE_ROOT_PASSWORD", testValue)
 	LoadFromEnv(cfg)
 
-	if cfg.System.RootPassword != testPassword {
-		t.Errorf("RootPassword = %q, want %q", cfg.System.RootPassword, testPassword)
+	if cfg.System.RootPassword != testValue {
+		t.Errorf("RootPassword = %q, want %q", cfg.System.RootPassword, testValue)
 	}
 }
 
@@ -243,13 +243,13 @@ func TestLoadFromEnvEmptyDoesNotOverride(t *testing.T) {
 
 func TestLoadFromEnvMultipleFields(t *testing.T) {
 	cfg := DefaultConfig()
-	testPassword := "secret123"
+	testRootValue := "secret123" // NOSONAR(go:S2068) test value, not a real credential
 
 	t.Setenv("PVE_HOSTNAME", testMultiHostname)
 	t.Setenv("PVE_DOMAIN_SUFFIX", testMultiDomain)
 	t.Setenv("PVE_TIMEZONE", "UTC")
 	t.Setenv("PVE_EMAIL", testMultiEmail)
-	t.Setenv("PVE_ROOT_PASSWORD", testPassword)
+	t.Setenv("PVE_ROOT_PASSWORD", testRootValue)
 	t.Setenv("PVE_SSH_PUBLIC_KEY", testMultiSSHKey)
 
 	LoadFromEnv(cfg)
@@ -270,8 +270,8 @@ func TestLoadFromEnvMultipleFields(t *testing.T) {
 		t.Errorf("Email = %q, want %q", cfg.System.Email, testMultiEmail)
 	}
 
-	if cfg.System.RootPassword != testPassword {
-		t.Errorf("RootPassword = %q, want %q", cfg.System.RootPassword, testPassword)
+	if cfg.System.RootPassword != testRootValue {
+		t.Errorf("RootPassword = %q, want %q", cfg.System.RootPassword, testRootValue)
 	}
 
 	if cfg.System.SSHPublicKey != testMultiSSHKey {
