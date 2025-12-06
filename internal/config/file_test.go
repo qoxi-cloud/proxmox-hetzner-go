@@ -17,6 +17,11 @@ const (
 	errMsgFailedWriteConfig = "failed to write config file"
 	errMsgFailedCreateDir   = "failed to create directory"
 	skipMsgRootPermissionNA = "Skipping permission test when running as root"
+
+	// Test device paths.
+	testDeviceSDA = "/dev/sda"
+	testDeviceSDB = "/dev/sdb"
+	testDeviceSDC = "/dev/sdc"
 )
 
 func TestSaveToFileSuccessfulSave(t *testing.T) {
@@ -199,7 +204,7 @@ func TestSaveToFilePreservesAllNonSensitiveFields(t *testing.T) {
 		},
 		Storage: StorageConfig{
 			ZFSRaid: ZFSRaid0,
-			Disks:   []string{"/dev/sda", "/dev/sdb"},
+			Disks:   []string{testDeviceSDA, testDeviceSDB},
 		},
 		Tailscale: TailscaleConfig{
 			Enabled: true,
@@ -664,7 +669,7 @@ storage:
 	cfg, err := LoadFromFile(filePath)
 	require.NoError(t, err)
 
-	assert.Equal(t, []string{"/dev/sda", "/dev/sdb", "/dev/sdc"}, cfg.Storage.Disks)
+	assert.Equal(t, []string{testDeviceSDA, testDeviceSDB, testDeviceSDC}, cfg.Storage.Disks)
 }
 
 // TestLoadFromFileErrorCases uses table-driven tests to verify error handling
@@ -763,6 +768,31 @@ func TestLoadFromFileDirectoryPath(t *testing.T) {
 	require.Error(t, err)
 	require.Nil(t, cfg)
 	assert.Contains(t, err.Error(), "failed to read config file")
+}
+
+// TestLoadFromFileExampleYAML verifies that configs/example.yaml loads without errors
+// and produces valid configuration values (Issue #88).
+func TestLoadFromFileExampleYAML(t *testing.T) {
+	cfg, err := LoadFromFile("../../configs/example.yaml")
+	require.NoError(t, err, "example.yaml should load without errors")
+	require.NotNil(t, cfg)
+
+	// Verify example.yaml values are loaded correctly
+	assert.Equal(t, "pve-server", cfg.System.Hostname)
+	assert.Equal(t, "local", cfg.System.DomainSuffix)
+	assert.Equal(t, "UTC", cfg.System.Timezone)
+	assert.Equal(t, "admin@example.com", cfg.System.Email)
+
+	assert.Equal(t, "eth0", cfg.Network.InterfaceName)
+	assert.Equal(t, BridgeModeInternal, cfg.Network.BridgeMode)
+	assert.Equal(t, "10.0.0.0/24", cfg.Network.PrivateSubnet) // NOSONAR(go:S1313) Class A private range - test data
+
+	assert.Equal(t, ZFSRaid1, cfg.Storage.ZFSRaid)
+	assert.Equal(t, []string{testDeviceSDA}, cfg.Storage.Disks)
+
+	assert.False(t, cfg.Tailscale.Enabled)
+	assert.True(t, cfg.Tailscale.SSH)
+	assert.False(t, cfg.Tailscale.WebUI)
 }
 
 // Tests for Sensitive Field Exclusion (Issue #86)
