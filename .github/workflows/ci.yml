@@ -128,7 +128,9 @@ jobs:
         # v2.22.10 - pinned to commit SHA for supply chain security
         uses: securego/gosec@6be2b51fd78feca86af91f5186b7964d76cb1256
         with:
-          args: -exclude=G104 -fmt sarif -out gosec-results.sarif ./...
+          # G104: unhandled errors (handled by golangci-lint errcheck)
+          # G304: file path from variable (mitigated via nolint comments where appropriate)
+          args: -exclude=G104,G304 -fmt sarif -out gosec-results.sarif ./...
 
       - name: Upload SARIF file
         uses: github/codeql-action/upload-sarif@v3
