@@ -150,9 +150,9 @@ const (
 
 	// Network test constants.
 	testInterfaceEth0       = "eth0"
-	testInterfaceEnp        = "enp0s31f6"
-	testPrivateSubnet       = "192.168.100.0/24"
-	testPrivateSubnetSecond = "172.16.0.0/16"
+	testInterfaceEnp        = "enp0s31f6"        // NOSONAR(go:S1313) test value
+	testPrivateSubnet       = "192.168.100.0/24" // NOSONAR(go:S1313) RFC 1918 test value
+	testPrivateSubnetSecond = "172.16.0.0/16"    // NOSONAR(go:S1313) RFC 1918 test value
 
 	// Error format strings.
 	errFmtHostname      = "Hostname = %q, want %q"
