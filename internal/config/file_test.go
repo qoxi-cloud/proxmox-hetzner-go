@@ -12,8 +12,10 @@ import (
 
 // Test constants to avoid duplication.
 const (
-	testConfigFileName    = "config.yaml"
-	errMsgFailedParseYAML = "failed to parse YAML"
+	testConfigFileName      = "config.yaml"
+	errMsgFailedParseYAML   = "failed to parse YAML"
+	errMsgFailedWriteConfig = "failed to write config file"
+	errMsgFailedCreateDir   = "failed to create directory"
 )
 
 func TestSaveToFileSuccessfulSave(t *testing.T) {
@@ -332,6 +334,101 @@ func TestSaveToFileNilReceiver(t *testing.T) {
 	err := cfg.SaveToFile("/tmp/config.yaml")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "config is nil")
+}
+
+// TestSaveToFileErrorCases uses table-driven tests to verify error handling
+// across multiple failure scenarios with descriptive error messages.
+func TestSaveToFileErrorCases(t *testing.T) {
+	tests := []struct {
+		name        string
+		setupFunc   func(t *testing.T) (cfg *Config, path string)
+		wantErr     bool
+		errContains string
+	}{
+		{
+			name: "nil config pointer",
+			setupFunc: func(t *testing.T) (*Config, string) {
+				return nil, filepath.Join(t.TempDir(), testConfigFileName)
+			},
+			wantErr:     true,
+			errContains: "config is nil",
+		},
+		{
+			name: "path with null byte",
+			setupFunc: func(_ *testing.T) (*Config, string) {
+				return DefaultConfig(), "/path/with/\x00/null/config.yaml"
+			},
+			wantErr:     true,
+			errContains: errMsgFailedCreateDir,
+		},
+		{
+			name: "empty path",
+			setupFunc: func(_ *testing.T) (*Config, string) {
+				return DefaultConfig(), ""
+			},
+			wantErr:     true,
+			errContains: errMsgFailedWriteConfig,
+		},
+		{
+			name: "path is existing directory",
+			setupFunc: func(t *testing.T) (*Config, string) {
+				dir := t.TempDir()
+				return DefaultConfig(), dir
+			},
+			wantErr:     true,
+			errContains: errMsgFailedWriteConfig,
+		},
+		{
+			name: "path inside read-only directory",
+			setupFunc: func(t *testing.T) (*Config, string) {
+				tmpDir := t.TempDir()
+				readOnlyDir := filepath.Join(tmpDir, "readonly")
+				require.NoError(t, os.MkdirAll(readOnlyDir, 0o500))
+				t.Cleanup(func() {
+					//nolint:errcheck,gosec // cleanup, restoring permissions
+					os.Chmod(readOnlyDir, 0o750)
+				})
+				return DefaultConfig(), filepath.Join(readOnlyDir, "subdir", testConfigFileName)
+			},
+			wantErr:     true,
+			errContains: errMsgFailedCreateDir,
+		},
+		{
+			name: "file in read-only directory",
+			setupFunc: func(t *testing.T) (*Config, string) {
+				tmpDir := t.TempDir()
+				readOnlyDir := filepath.Join(tmpDir, "readonly")
+				require.NoError(t, os.MkdirAll(readOnlyDir, 0o500))
+				t.Cleanup(func() {
+					//nolint:errcheck,gosec // cleanup, restoring permissions
+					os.Chmod(readOnlyDir, 0o750)
+				})
+				return DefaultConfig(), filepath.Join(readOnlyDir, testConfigFileName)
+			},
+			wantErr:     true,
+			errContains: errMsgFailedWriteConfig,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg, path := tt.setupFunc(t)
+
+			var err error
+			if cfg != nil {
+				err = cfg.SaveToFile(path)
+			} else {
+				err = (*Config)(nil).SaveToFile(path)
+			}
+
+			if !tt.wantErr {
+				require.NoError(t, err)
+				return
+			}
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), tt.errContains)
+		})
+	}
 }
 
 // LoadFromFile Success Tests (Issue #83)
