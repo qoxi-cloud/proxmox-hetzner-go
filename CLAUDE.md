@@ -537,6 +537,32 @@ These features are explicitly **NOT** included:
 3. Config file values
 4. Default values
 
+### Environment Variable Mapping
+
+All configuration fields can be set via environment variables. See `internal/config/env.go` for implementation.
+
+| Environment Variable | Config Field | Type | Notes |
+|---------------------|--------------|------|-------|
+| `PVE_HOSTNAME` | `System.Hostname` | string | RFC 1123 compliant |
+| `PVE_DOMAIN_SUFFIX` | `System.DomainSuffix` | string | e.g., "local" |
+| `PVE_TIMEZONE` | `System.Timezone` | string | e.g., "Europe/Kyiv" |
+| `PVE_EMAIL` | `System.Email` | string | Admin email |
+| `PVE_ROOT_PASSWORD` | `System.RootPassword` | string | Sensitive |
+| `PVE_SSH_PUBLIC_KEY` | `System.SSHPublicKey` | string | Sensitive |
+| `INTERFACE_NAME` | `Network.InterfaceName` | string | e.g., "eth0" |
+| `BRIDGE_MODE` | `Network.BridgeMode` | BridgeMode | internal/external/both |
+| `PRIVATE_SUBNET` | `Network.PrivateSubnet` | string | e.g., "10.0.0.0/24" |
+| `ZFS_RAID` | `Storage.ZFSRaid` | ZFSRaid | single/raid0/raid1 |
+| `DISKS` | `Storage.Disks` | []string | Comma-separated |
+| `INSTALL_TAILSCALE` | `Tailscale.Enabled` | bool | true/false/yes/no/1/0 |
+| `TAILSCALE_AUTH_KEY` | `Tailscale.AuthKey` | string | Sensitive |
+| `TAILSCALE_SSH` | `Tailscale.SSH` | bool | true/false |
+| `TAILSCALE_WEBUI` | `Tailscale.WebUI` | bool | true/false |
+
+**Boolean Parsing:** Accepts `true`, `yes`, `1` (case-insensitive) as true; all other values are false.
+
+**DISKS Format:** Comma-separated list of disk paths (e.g., `/dev/sda,/dev/sdb`).
+
 ### Sensitive Fields (never saved to file)
 - `RootPassword`
 - `SSHPublicKey`
