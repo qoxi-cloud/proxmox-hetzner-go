@@ -506,3 +506,57 @@ func TestValidateSSHKey(t *testing.T) {
 		})
 	}
 }
+
+// ValidateTimezone tests
+
+func TestValidateTimezone(t *testing.T) {
+	tests := []struct {
+		name        string
+		timezone    string
+		expectedErr error
+	}{
+		// Valid timezones
+		{"valid UTC", "UTC", nil},
+		{"valid Europe/Kyiv", "Europe/Kyiv", nil},
+		{"valid America/New_York", "America/New_York", nil},
+		{"valid Asia/Tokyo", "Asia/Tokyo", nil},
+		{"valid Local", "Local", nil},
+		{"valid multi-level America/Argentina/Buenos_Aires", "America/Argentina/Buenos_Aires", nil},
+		{"valid Pacific/Honolulu", "Pacific/Honolulu", nil},
+		{"valid Australia/Sydney", "Australia/Sydney", nil},
+		{"valid Etc/GMT", "Etc/GMT", nil},
+		{"valid Etc/GMT+12", "Etc/GMT+12", nil},
+		// Empty timezone
+		{"empty timezone", "", ErrTimezoneEmpty},
+		// Invalid - typo in timezone
+		{"invalid typo Europe/Kyivv", "Europe/Kyivv", ErrTimezoneInvalid},
+		{"invalid typo Amerika/New_York", "Amerika/New_York", ErrTimezoneInvalid},
+		// Invalid - partial path
+		{"invalid partial Europe", "Europe", ErrTimezoneInvalid},
+		{"invalid partial America", "America", ErrTimezoneInvalid},
+		// Invalid - non-existent zones
+		{"invalid non-existent Mars/Olympus", "Mars/Olympus", ErrTimezoneInvalid},
+		{"invalid non-existent Antarctica/NonExistent", "Antarctica/NonExistent", ErrTimezoneInvalid},
+		// Invalid - random strings
+		{"invalid random string", "not-a-timezone", ErrTimezoneInvalid},
+		{"invalid numbers only", "12345", ErrTimezoneInvalid},
+		// Case sensitivity - "utc" is actually valid (IANA treats it as UTC)
+		{"valid lowercase utc alias", "utc", nil},
+		// Invalid - "local" lowercase is not valid (only "Local")
+		{"invalid lowercase local", "local", ErrTimezoneInvalid},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateTimezone(tt.timezone)
+
+			if tt.expectedErr == nil {
+				assert.NoError(t, err)
+			} else {
+				require.Error(t, err)
+				assert.Equal(t, tt.expectedErr, err)
+				assert.True(t, errors.Is(err, tt.expectedErr))
+			}
+		})
+	}
+}
