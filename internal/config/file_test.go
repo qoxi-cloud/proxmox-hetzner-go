@@ -12,11 +12,11 @@ import (
 
 // Test constants to avoid duplication.
 const (
-	testConfigFileName       = "config.yaml"
-	errMsgFailedParseYAML    = "failed to parse YAML"
-	errMsgFailedWriteConfig  = "failed to write config file"
-	errMsgFailedCreateDir    = "failed to create directory"
-	skipMsgRootPermissionNA  = "Skipping permission test when running as root"
+	testConfigFileName      = "config.yaml"
+	errMsgFailedParseYAML   = "failed to parse YAML"
+	errMsgFailedWriteConfig = "failed to write config file"
+	errMsgFailedCreateDir   = "failed to create directory"
+	skipMsgRootPermissionNA = "Skipping permission test when running as root"
 )
 
 func TestSaveToFileSuccessfulSave(t *testing.T) {
