@@ -1,0 +1,66 @@
+# Sourcery AI Code Review Configuration
+# https://docs.sourcery.ai/
+
+review:
+  instructions: |
+    ## Project Context
+    This is a Go 1.24+ TUI application for installing Proxmox VE on Hetzner servers.
+    Framework: Bubbletea (charmbracelet). Architecture: Clean Architecture with Repository pattern.
+
+    ## Code Style Requirements
+    - All code, comments, and documentation MUST be in English only
+    - Function names: CamelCase only, no underscores (e.g., TestLoadFromFileFullConfig, not Test_Load_From_File)
+    - Always return errors, never panic
+    - Use context.Context for cancellation in long-running operations
+    - Use the Executor interface for system commands, never os/exec directly
+    - Document all exported types and functions
+
+    ## Error Handling
+    - Always wrap errors with context: fmt.Errorf("action failed: %w", err)
+    - Return all validation errors, not just the first one
+    - Never silently ignore errors
+
+    ## Testing Requirements
+    - Use table-driven tests with descriptive test case names
+    - Use MockExecutor for testing system commands
+    - Use testify/assert and testify/require for assertions
+    - Test files must be named *_test.go
+
+    ## Security Focus
+    - Flag any hardcoded credentials or secrets
+    - Validate all user input before use
+    - Check for command injection in shell commands
+    - Sensitive fields (passwords, keys) must never be logged or saved to files
+
+    ## Architecture Rules
+    - Internal packages go in internal/
+    - No circular dependencies between modules
+    - Follow dependency order: config -> exec -> installer -> tui
+    - Keep TUI logic separate from business logic
+
+    ## What NOT to flag
+    - Cross-compilation code (GOOS=linux builds)
+    - Platform-specific code paths (macOS vs Linux)
+    - MockExecutor usage in tests (it's intentional for testability)
+
+    ## Priorities
+    1. Security vulnerabilities (CRITICAL)
+    2. Error handling issues (HIGH)
+    3. Test coverage gaps (MEDIUM)
+    4. Code duplication (LOW)
+    5. Style/formatting (LOW - handled by gofmt)
+
+# Rule customization
+rules:
+  # Disable rules that conflict with Go idioms
+  - id: no-loop-in-tests
+    enabled: false
+  # Table-driven tests in Go use loops intentionally
+
+# File patterns to ignore
+ignore:
+  - "vendor/**"
+  - "**/*_generated.go"
+  - "**/*.pb.go"
+  - "build/**"
+  - "dist/**"
