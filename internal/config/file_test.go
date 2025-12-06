@@ -744,9 +744,9 @@ func TestLoadFromFileDirectoryPath(t *testing.T) {
 
 // Tests for Sensitive Field Exclusion (Issue #86)
 
-// TestSaveToFile_ExcludesSensitiveFields verifies that sensitive credentials
+// TestSaveToFileExcludesSensitiveFieldsIssue86 verifies that sensitive credentials
 // (RootPassword, SSHPublicKey, TailscaleAuthKey) are NOT written to disk.
-func TestSaveToFile_ExcludesSensitiveFields(t *testing.T) {
+func TestSaveToFileExcludesSensitiveFieldsIssue86(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.System.RootPassword = "supersecretpassword123"
 	cfg.System.SSHPublicKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIExampleKeyData"
@@ -780,9 +780,9 @@ func TestSaveToFile_ExcludesSensitiveFields(t *testing.T) {
 		"auth_key field should not appear in saved file")
 }
 
-// TestSaveToFile_DoesNotModifyOriginal confirms that the original Config
+// TestSaveToFileDoesNotModifyOriginalIssue86 confirms that the original Config
 // object retains all sensitive values after SaveToFile is called.
-func TestSaveToFile_DoesNotModifyOriginal(t *testing.T) {
+func TestSaveToFileDoesNotModifyOriginalIssue86(t *testing.T) {
 	const (
 		testPassword     = "original-super-secret-password"
 		testSSHKey       = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOriginalSSHKey"
@@ -809,9 +809,9 @@ func TestSaveToFile_DoesNotModifyOriginal(t *testing.T) {
 		"Original TailscaleAuthKey should be preserved after SaveToFile")
 }
 
-// TestSaveToFile_LoadedConfigHasEmptySensitiveFields validates that when
+// TestSaveToFileLoadedConfigHasEmptySensitiveFieldsIssue86 validates that when
 // a saved config is reloaded, all sensitive fields are empty.
-func TestSaveToFile_LoadedConfigHasEmptySensitiveFields(t *testing.T) {
+func TestSaveToFileLoadedConfigHasEmptySensitiveFieldsIssue86(t *testing.T) {
 	// Create config with sensitive data
 	cfg := DefaultConfig()
 	cfg.System.Hostname = "test-server"
