@@ -1,5 +1,9 @@
 package config
 
+import (
+	"fmt"
+)
+
 // BridgeMode defines the network bridge mode for VM networking.
 type BridgeMode string
 
@@ -27,6 +31,34 @@ func (b BridgeMode) IsValid() bool {
 	return false
 }
 
+// MarshalYAML implements the yaml.Marshaler interface.
+func (b BridgeMode) MarshalYAML() (interface{}, error) {
+	return b.String(), nil
+}
+
+// UnmarshalYAML implements the yaml.Unmarshaler interface.
+func (b *BridgeMode) UnmarshalYAML(unmarshal func(interface{}) error) error {
+	var s string
+	if err := unmarshal(&s); err != nil {
+		return err
+	}
+
+	if s == "" {
+		*b = ""
+
+		return nil
+	}
+
+	mode := BridgeMode(s)
+	if !mode.IsValid() {
+		return fmt.Errorf("invalid bridge mode %q: must be one of internal, external, both", s)
+	}
+
+	*b = mode
+
+	return nil
+}
+
 // ZFSRaid defines the ZFS RAID level.
 type ZFSRaid string
 
@@ -52,4 +84,32 @@ func (z ZFSRaid) IsValid() bool {
 	}
 
 	return false
+}
+
+// MarshalYAML implements the yaml.Marshaler interface.
+func (z ZFSRaid) MarshalYAML() (interface{}, error) {
+	return z.String(), nil
+}
+
+// UnmarshalYAML implements the yaml.Unmarshaler interface.
+func (z *ZFSRaid) UnmarshalYAML(unmarshal func(interface{}) error) error {
+	var s string
+	if err := unmarshal(&s); err != nil {
+		return err
+	}
+
+	if s == "" {
+		*z = ""
+
+		return nil
+	}
+
+	raid := ZFSRaid(s)
+	if !raid.IsValid() {
+		return fmt.Errorf("invalid ZFS raid level %q: must be one of single, raid0, raid1", s)
+	}
+
+	*z = raid
+
+	return nil
 }

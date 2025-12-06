@@ -356,25 +356,29 @@ func TestNetworkConfig_DeserializeFromYAML(t *testing.T) {
 
 func TestNetworkConfig_DeserializeInvalidBridgeMode(t *testing.T) {
 	tests := []struct {
-		name      string
-		yamlInput string
+		name        string
+		yamlInput   string
+		expectError bool
 	}{
 		{
 			name: "invalid bridge mode value",
 			yamlInput: `interface: eth0
 bridge_mode: invalid_mode
 private_subnet: "10.0.0.0/24"`,
+			expectError: true,
 		},
 		{
 			name: "empty bridge mode",
 			yamlInput: `interface: eth0
 bridge_mode: ""
 private_subnet: "10.0.0.0/24"`,
+			expectError: false,
 		},
 		{
 			name: "missing bridge mode",
 			yamlInput: `interface: eth0
 private_subnet: "10.0.0.0/24"`,
+			expectError: false,
 		},
 	}
 
@@ -382,10 +386,15 @@ private_subnet: "10.0.0.0/24"`,
 		t.Run(tt.name, func(t *testing.T) {
 			var cfg NetworkConfig
 			err := yaml.Unmarshal([]byte(tt.yamlInput), &cfg)
-			require.NoError(t, err)
 
-			// Invalid or missing values result in empty/default BridgeMode
-			assert.False(t, cfg.BridgeMode.IsValid())
+			if tt.expectError {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), "invalid bridge mode")
+			} else {
+				require.NoError(t, err)
+				// Empty or missing values result in empty/default BridgeMode
+				assert.False(t, cfg.BridgeMode.IsValid())
+			}
 		})
 	}
 }
@@ -645,25 +654,29 @@ disks: []`,
 
 func TestStorageConfig_DeserializeInvalidZFSRaid(t *testing.T) {
 	tests := []struct {
-		name      string
-		yamlInput string
+		name        string
+		yamlInput   string
+		expectError bool
 	}{
 		{
 			name: "invalid raid value",
 			yamlInput: `zfs_raid: invalid_raid
 disks:
   - /dev/sda`,
+			expectError: true,
 		},
 		{
 			name: "empty raid value",
 			yamlInput: `zfs_raid: ""
 disks:
   - /dev/sda`,
+			expectError: false,
 		},
 		{
 			name: "missing raid value",
 			yamlInput: `disks:
   - /dev/sda`,
+			expectError: false,
 		},
 	}
 
@@ -671,10 +684,15 @@ disks:
 		t.Run(tt.name, func(t *testing.T) {
 			var cfg StorageConfig
 			err := yaml.Unmarshal([]byte(tt.yamlInput), &cfg)
-			require.NoError(t, err)
 
-			// Invalid or missing values result in empty/default ZFSRaid
-			assert.False(t, cfg.ZFSRaid.IsValid())
+			if tt.expectError {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), "invalid ZFS raid level")
+			} else {
+				require.NoError(t, err)
+				// Empty or missing values result in empty/default ZFSRaid
+				assert.False(t, cfg.ZFSRaid.IsValid())
+			}
 		})
 	}
 }
