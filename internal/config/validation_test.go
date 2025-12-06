@@ -50,7 +50,7 @@ var (
 	errPasswordTooWeak = errors.New(errMsgPasswordTooWeak)
 )
 
-func TestValidationError_Error_Empty(t *testing.T) {
+func TestValidationErrorError_Empty(t *testing.T) {
 	ve := &ValidationError{}
 
 	result := ve.Error()
@@ -58,7 +58,7 @@ func TestValidationError_Error_Empty(t *testing.T) {
 	assert.Equal(t, "", result)
 }
 
-func TestValidationError_Error_SingleError(t *testing.T) {
+func TestValidationErrorError_SingleError(t *testing.T) {
 	ve := &ValidationError{
 		Errors: []error{errHostnameEmpty},
 	}
@@ -68,7 +68,7 @@ func TestValidationError_Error_SingleError(t *testing.T) {
 	assert.Equal(t, errMsgHostnameEmpty, result)
 }
 
-func TestValidationError_Error_MultipleErrors(t *testing.T) {
+func TestValidationErrorError_MultipleErrors(t *testing.T) {
 	ve := &ValidationError{
 		Errors: []error{
 			errHostnameEmpty,
@@ -82,7 +82,7 @@ func TestValidationError_Error_MultipleErrors(t *testing.T) {
 	assert.Equal(t, errMsgHostnameEmpty+"; "+errMsgEmailInvalid+"; "+errMsgPasswordTooWeak, result)
 }
 
-func TestValidationError_Error_TwoErrors(t *testing.T) {
+func TestValidationErrorError_TwoErrors(t *testing.T) {
 	ve := &ValidationError{
 		Errors: []error{
 			errHostnameEmpty,
@@ -95,13 +95,13 @@ func TestValidationError_Error_TwoErrors(t *testing.T) {
 	assert.Equal(t, errMsgHostnameEmpty+"; "+errMsgEmailInvalid, result)
 }
 
-func TestValidationError_HasErrors_Empty(t *testing.T) {
+func TestValidationErrorHasErrors_Empty(t *testing.T) {
 	ve := &ValidationError{}
 
 	assert.False(t, ve.HasErrors())
 }
 
-func TestValidationError_HasErrors_WithErrors(t *testing.T) {
+func TestValidationErrorHasErrors_WithErrors(t *testing.T) {
 	ve := &ValidationError{
 		Errors: []error{errHostnameEmpty},
 	}
@@ -109,7 +109,7 @@ func TestValidationError_HasErrors_WithErrors(t *testing.T) {
 	assert.True(t, ve.HasErrors())
 }
 
-func TestValidationError_HasErrors_MultipleErrors(t *testing.T) {
+func TestValidationErrorHasErrors_MultipleErrors(t *testing.T) {
 	ve := &ValidationError{
 		Errors: []error{
 			errHostnameEmpty,
@@ -120,7 +120,7 @@ func TestValidationError_HasErrors_MultipleErrors(t *testing.T) {
 	assert.True(t, ve.HasErrors())
 }
 
-func TestValidationError_Unwrap_Empty(t *testing.T) {
+func TestValidationErrorUnwrap_Empty(t *testing.T) {
 	ve := &ValidationError{}
 
 	result := ve.Unwrap()
@@ -128,7 +128,7 @@ func TestValidationError_Unwrap_Empty(t *testing.T) {
 	assert.Nil(t, result)
 }
 
-func TestValidationError_Unwrap_SingleError(t *testing.T) {
+func TestValidationErrorUnwrap_SingleError(t *testing.T) {
 	ve := &ValidationError{
 		Errors: []error{errHostnameEmpty},
 	}
@@ -138,7 +138,7 @@ func TestValidationError_Unwrap_SingleError(t *testing.T) {
 	assert.Equal(t, errHostnameEmpty, result)
 }
 
-func TestValidationError_Unwrap_MultipleErrors_ReturnsFirst(t *testing.T) {
+func TestValidationErrorUnwrap_MultipleErrors_ReturnsFirst(t *testing.T) {
 	ve := &ValidationError{
 		Errors: []error{
 			errHostnameEmpty,
@@ -152,7 +152,7 @@ func TestValidationError_Unwrap_MultipleErrors_ReturnsFirst(t *testing.T) {
 	assert.Equal(t, errHostnameEmpty, result)
 }
 
-func TestValidationError_Unwrap_WorksWithErrorsIs(t *testing.T) {
+func TestValidationErrorUnwrap_WorksWithErrorsIs(t *testing.T) {
 	ve := &ValidationError{
 		Errors: []error{errHostnameEmpty},
 	}
@@ -160,7 +160,7 @@ func TestValidationError_Unwrap_WorksWithErrorsIs(t *testing.T) {
 	assert.True(t, errors.Is(ve, errHostnameEmpty))
 }
 
-func TestValidationError_Unwrap_ErrorsIsWithMultiple(t *testing.T) {
+func TestValidationErrorUnwrap_ErrorsIsWithMultiple(t *testing.T) {
 	ve := &ValidationError{
 		Errors: []error{
 			errHostnameEmpty,
@@ -173,7 +173,7 @@ func TestValidationError_Unwrap_ErrorsIsWithMultiple(t *testing.T) {
 	assert.False(t, errors.Is(ve, errEmailInvalid))
 }
 
-func TestValidationError_ImplementsErrorInterface(t *testing.T) {
+func TestValidationErrorImplementsErrorInterface(t *testing.T) {
 	var err error = &ValidationError{
 		Errors: []error{errHostnameEmpty},
 	}
@@ -182,7 +182,7 @@ func TestValidationError_ImplementsErrorInterface(t *testing.T) {
 	assert.Equal(t, errMsgHostnameEmpty, err.Error())
 }
 
-func TestValidationError_Add_NilError(t *testing.T) {
+func TestValidationErrorAdd_NilError(t *testing.T) {
 	ve := &ValidationError{}
 
 	ve.Add(nil)
@@ -191,7 +191,7 @@ func TestValidationError_Add_NilError(t *testing.T) {
 	assert.Empty(t, ve.Errors)
 }
 
-func TestValidationError_Add_SingleError(t *testing.T) {
+func TestValidationErrorAdd_SingleError(t *testing.T) {
 	ve := &ValidationError{}
 
 	ve.Add(errHostnameEmpty)
@@ -200,7 +200,7 @@ func TestValidationError_Add_SingleError(t *testing.T) {
 	assert.Equal(t, errHostnameEmpty, ve.Errors[0])
 }
 
-func TestValidationError_Add_MultipleErrors(t *testing.T) {
+func TestValidationErrorAdd_MultipleErrors(t *testing.T) {
 	ve := &ValidationError{}
 
 	ve.Add(errHostnameEmpty)
@@ -213,7 +213,7 @@ func TestValidationError_Add_MultipleErrors(t *testing.T) {
 	assert.Equal(t, errPasswordTooWeak, ve.Errors[2])
 }
 
-func TestValidationError_Add_IgnoresNilBetweenErrors(t *testing.T) {
+func TestValidationErrorAdd_IgnoresNilBetweenErrors(t *testing.T) {
 	ve := &ValidationError{}
 
 	ve.Add(errHostnameEmpty)
@@ -226,7 +226,7 @@ func TestValidationError_Add_IgnoresNilBetweenErrors(t *testing.T) {
 	assert.Equal(t, errEmailInvalid, ve.Errors[1])
 }
 
-func TestValidationError_Add_PreservesOrder(t *testing.T) {
+func TestValidationErrorAdd_PreservesOrder(t *testing.T) {
 	ve := &ValidationError{}
 	errs := []error{
 		errors.New("first"),
@@ -246,7 +246,7 @@ func TestValidationError_Add_PreservesOrder(t *testing.T) {
 	}
 }
 
-func TestValidationError_ZeroValue(t *testing.T) {
+func TestValidationErrorZeroValue(t *testing.T) {
 	var ve ValidationError
 
 	assert.False(t, ve.HasErrors())
@@ -254,7 +254,7 @@ func TestValidationError_ZeroValue(t *testing.T) {
 	assert.Nil(t, ve.Unwrap())
 }
 
-func TestValidationError_NilReceiver(t *testing.T) {
+func TestValidationErrorNilReceiver(t *testing.T) {
 	var ve *ValidationError
 
 	assert.False(t, ve.HasErrors())
@@ -262,7 +262,7 @@ func TestValidationError_NilReceiver(t *testing.T) {
 	assert.Nil(t, ve.Unwrap())
 }
 
-func TestValidationError_NilElementsInSlice(t *testing.T) {
+func TestValidationErrorNilElementsInSlice(t *testing.T) {
 	ve := &ValidationError{
 		Errors: []error{nil, errHostnameEmpty, nil, errEmailInvalid, nil},
 	}
@@ -274,7 +274,7 @@ func TestValidationError_NilElementsInSlice(t *testing.T) {
 	assert.Equal(t, errHostnameEmpty, ve.Unwrap())
 }
 
-func TestValidationError_AllNilElements(t *testing.T) {
+func TestValidationErrorAllNilElements(t *testing.T) {
 	ve := &ValidationError{
 		Errors: []error{nil, nil, nil},
 	}
@@ -284,7 +284,7 @@ func TestValidationError_AllNilElements(t *testing.T) {
 	assert.Nil(t, ve.Unwrap())
 }
 
-func TestValidationError_TableDriven(t *testing.T) {
+func TestValidationErrorTableDriven(t *testing.T) {
 	tests := []struct {
 		name           string
 		errors         []error
@@ -742,7 +742,7 @@ func TestValidateSubnet(t *testing.T) {
 
 // Config.Validate tests
 
-func TestConfig_Validate_ValidConfig(t *testing.T) {
+func TestConfigValidateValidConfig(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.System.RootPassword = testValidPassword
 	cfg.System.SSHPublicKey = testValidSSHKey
@@ -752,7 +752,7 @@ func TestConfig_Validate_ValidConfig(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestConfig_Validate_EmptyConfig_AllErrors(t *testing.T) {
+func TestConfigValidateEmptyConfig_AllErrors(t *testing.T) {
 	cfg := &Config{}
 
 	err := cfg.Validate()
@@ -767,7 +767,7 @@ func TestConfig_Validate_EmptyConfig_AllErrors(t *testing.T) {
 	assert.Len(t, valErr.Errors, 8)
 }
 
-func TestConfig_Validate_ReturnsValidationError(t *testing.T) {
+func TestConfigValidateReturnsValidationError(t *testing.T) {
 	cfg := &Config{}
 
 	err := cfg.Validate()
@@ -779,7 +779,7 @@ func TestConfig_Validate_ReturnsValidationError(t *testing.T) {
 	assert.True(t, valErr.HasErrors())
 }
 
-func TestConfig_Validate_PartialErrors_System(t *testing.T) {
+func TestConfigValidatePartialErrors_System(t *testing.T) {
 	cfg := DefaultConfig()
 	// Missing required fields: RootPassword and SSHPublicKey
 
@@ -796,7 +796,7 @@ func TestConfig_Validate_PartialErrors_System(t *testing.T) {
 	assert.Contains(t, valErr.Error(), ErrSSHKeyEmpty.Error())
 }
 
-func TestConfig_Validate_InvalidHostname(t *testing.T) {
+func TestConfigValidateInvalidHostname(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.System.Hostname = testInvalidHostname
 	cfg.System.RootPassword = testValidPassword
@@ -812,7 +812,7 @@ func TestConfig_Validate_InvalidHostname(t *testing.T) {
 	assert.True(t, errors.Is(valErr.Unwrap(), ErrHostnameStartsWithHyphen))
 }
 
-func TestConfig_Validate_InvalidEmail(t *testing.T) {
+func TestConfigValidateInvalidEmail(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.System.Email = testInvalidEmail
 	cfg.System.RootPassword = testValidPassword
@@ -828,7 +828,7 @@ func TestConfig_Validate_InvalidEmail(t *testing.T) {
 	assert.True(t, errors.Is(valErr.Unwrap(), ErrEmailInvalid))
 }
 
-func TestConfig_Validate_InvalidTimezone(t *testing.T) {
+func TestConfigValidateInvalidTimezone(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.System.Timezone = testInvalidTimezone
 	cfg.System.RootPassword = testValidPassword
@@ -844,7 +844,7 @@ func TestConfig_Validate_InvalidTimezone(t *testing.T) {
 	assert.True(t, errors.Is(valErr.Unwrap(), ErrTimezoneInvalid))
 }
 
-func TestConfig_Validate_InvalidBridgeMode(t *testing.T) {
+func TestConfigValidateInvalidBridgeMode(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.Network.BridgeMode = BridgeMode("invalid")
 	cfg.System.RootPassword = testValidPassword
@@ -860,7 +860,7 @@ func TestConfig_Validate_InvalidBridgeMode(t *testing.T) {
 	assert.True(t, errors.Is(valErr.Unwrap(), ErrBridgeModeInvalid))
 }
 
-func TestConfig_Validate_InvalidSubnet(t *testing.T) {
+func TestConfigValidateInvalidSubnet(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.Network.PrivateSubnet = testInvalidSubnet
 	cfg.System.RootPassword = testValidPassword
@@ -876,7 +876,7 @@ func TestConfig_Validate_InvalidSubnet(t *testing.T) {
 	assert.True(t, errors.Is(valErr.Unwrap(), ErrSubnetInvalid))
 }
 
-func TestConfig_Validate_InvalidZFSRaid(t *testing.T) {
+func TestConfigValidateInvalidZFSRaid(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.Storage.ZFSRaid = ZFSRaid("invalid")
 	cfg.System.RootPassword = testValidPassword
@@ -892,7 +892,7 @@ func TestConfig_Validate_InvalidZFSRaid(t *testing.T) {
 	assert.True(t, errors.Is(valErr.Unwrap(), ErrZFSRaidInvalid))
 }
 
-func TestConfig_Validate_MultipleErrors_AllCategories(t *testing.T) {
+func TestConfigValidateMultipleErrors_AllCategories(t *testing.T) {
 	cfg := &Config{
 		System: SystemConfig{
 			Hostname:     "-invalid",     // Invalid: starts with hyphen
@@ -932,7 +932,7 @@ func TestConfig_Validate_MultipleErrors_AllCategories(t *testing.T) {
 	assert.Contains(t, errMsg, ErrZFSRaidInvalid.Error())
 }
 
-func TestConfig_Validate_ErrorMessageFormat(t *testing.T) {
+func TestConfigValidateErrorMessageFormat(t *testing.T) {
 	cfg := DefaultConfig()
 	// Leave RootPassword and SSHPublicKey empty to trigger 2 errors
 

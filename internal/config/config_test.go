@@ -32,7 +32,7 @@ const (
 	testDotLocal          = ".local"                 // Domain suffix with dot prefix for FQDN tests
 )
 
-func TestSystemConfig_SensitiveFieldsOmittedFromYAML(t *testing.T) {
+func TestSystemConfigSensitiveFieldsOmittedFromYAML(t *testing.T) {
 	tests := []struct {
 		name             string
 		cfg              SystemConfig
@@ -97,7 +97,7 @@ func TestSystemConfig_SensitiveFieldsOmittedFromYAML(t *testing.T) {
 	}
 }
 
-func TestSystemConfig_StandardFieldsSerializeCorrectly(t *testing.T) {
+func TestSystemConfigStandardFieldsSerializeCorrectly(t *testing.T) {
 	tests := []struct {
 		name string
 		cfg  SystemConfig
@@ -166,7 +166,7 @@ func TestSystemConfig_StandardFieldsSerializeCorrectly(t *testing.T) {
 	}
 }
 
-func TestSystemConfig_RoundTripMarshalUnmarshal(t *testing.T) {
+func TestSystemConfigRoundTripMarshalUnmarshal(t *testing.T) {
 	original := SystemConfig{
 		Hostname:     "production-pve",
 		DomainSuffix: "prod.example.com",
@@ -196,7 +196,7 @@ func TestSystemConfig_RoundTripMarshalUnmarshal(t *testing.T) {
 	assert.Empty(t, restored.SSHPublicKey)
 }
 
-func TestSystemConfig_EnvironmentVariableTagsPresent(t *testing.T) {
+func TestSystemConfigEnvironmentVariableTagsPresent(t *testing.T) {
 	expectedEnvTags := map[string]string{
 		"Hostname":     "PVE_HOSTNAME",
 		"DomainSuffix": "PVE_DOMAIN_SUFFIX",
@@ -217,7 +217,7 @@ func TestSystemConfig_EnvironmentVariableTagsPresent(t *testing.T) {
 	}
 }
 
-func TestSystemConfig_YAMLTagsPresent(t *testing.T) {
+func TestSystemConfigYAMLTagsPresent(t *testing.T) {
 	expectedYAMLTags := map[string]string{
 		"Hostname":     "hostname",
 		"DomainSuffix": "domain_suffix",
@@ -238,7 +238,7 @@ func TestSystemConfig_YAMLTagsPresent(t *testing.T) {
 	}
 }
 
-func TestSystemConfig_AllFieldsExist(t *testing.T) {
+func TestSystemConfigAllFieldsExist(t *testing.T) {
 	requiredFields := []string{
 		"Hostname",
 		"DomainSuffix",
@@ -261,7 +261,7 @@ func TestSystemConfig_AllFieldsExist(t *testing.T) {
 
 // NetworkConfig tests
 
-func TestNetworkConfig_BridgeModeSerializesToYAML(t *testing.T) {
+func TestNetworkConfigBridgeModeSerializesToYAML(t *testing.T) {
 	tests := []struct {
 		name         string
 		cfg          NetworkConfig
@@ -307,7 +307,7 @@ func TestNetworkConfig_BridgeModeSerializesToYAML(t *testing.T) {
 	}
 }
 
-func TestNetworkConfig_DeserializeFromYAML(t *testing.T) {
+func TestNetworkConfigDeserializeFromYAML(t *testing.T) {
 	tests := []struct {
 		name           string
 		yamlInput      string
@@ -354,7 +354,7 @@ func TestNetworkConfig_DeserializeFromYAML(t *testing.T) {
 	}
 }
 
-func TestNetworkConfig_DeserializeInvalidBridgeMode(t *testing.T) {
+func TestNetworkConfigDeserializeInvalidBridgeMode(t *testing.T) {
 	tests := []struct {
 		name        string
 		yamlInput   string
@@ -399,7 +399,7 @@ private_subnet: "10.0.0.0/24"`,
 	}
 }
 
-func TestNetworkConfig_EnvironmentVariableTagsPresent(t *testing.T) {
+func TestNetworkConfigEnvironmentVariableTagsPresent(t *testing.T) {
 	expectedEnvTags := map[string]string{
 		"InterfaceName": "INTERFACE_NAME",
 		"BridgeMode":    "BRIDGE_MODE",
@@ -417,7 +417,7 @@ func TestNetworkConfig_EnvironmentVariableTagsPresent(t *testing.T) {
 	}
 }
 
-func TestNetworkConfig_YAMLTagsPresent(t *testing.T) {
+func TestNetworkConfigYAMLTagsPresent(t *testing.T) {
 	expectedYAMLTags := map[string]string{
 		"InterfaceName": "interface",
 		"BridgeMode":    "bridge_mode",
@@ -435,7 +435,7 @@ func TestNetworkConfig_YAMLTagsPresent(t *testing.T) {
 	}
 }
 
-func TestNetworkConfig_AllFieldsExist(t *testing.T) {
+func TestNetworkConfigAllFieldsExist(t *testing.T) {
 	expectedFields := map[string]string{
 		"InterfaceName": "string",
 		"BridgeMode":    "BridgeMode",
@@ -452,7 +452,7 @@ func TestNetworkConfig_AllFieldsExist(t *testing.T) {
 	}
 }
 
-func TestNetworkConfig_RoundTripMarshalUnmarshal(t *testing.T) {
+func TestNetworkConfigRoundTripMarshalUnmarshal(t *testing.T) {
 	tests := []struct {
 		name string
 		cfg  NetworkConfig
@@ -501,7 +501,7 @@ func TestNetworkConfig_RoundTripMarshalUnmarshal(t *testing.T) {
 
 // StorageConfig tests
 
-func TestStorageConfig_ZFSRaidSerializesToYAML(t *testing.T) {
+func TestStorageConfigZFSRaidSerializesToYAML(t *testing.T) {
 	tests := []struct {
 		name         string
 		cfg          StorageConfig
@@ -544,7 +544,7 @@ func TestStorageConfig_ZFSRaidSerializesToYAML(t *testing.T) {
 	}
 }
 
-func TestStorageConfig_DisksArraySerializesToYAML(t *testing.T) {
+func TestStorageConfigDisksArraySerializesToYAML(t *testing.T) {
 	tests := []struct {
 		name      string
 		cfg       StorageConfig
@@ -598,7 +598,7 @@ func TestStorageConfig_DisksArraySerializesToYAML(t *testing.T) {
 	}
 }
 
-func TestStorageConfig_DeserializeFromYAML(t *testing.T) {
+func TestStorageConfigDeserializeFromYAML(t *testing.T) {
 	tests := []struct {
 		name          string
 		yamlInput     string
@@ -652,7 +652,7 @@ disks: []`,
 	}
 }
 
-func TestStorageConfig_DeserializeInvalidZFSRaid(t *testing.T) {
+func TestStorageConfigDeserializeInvalidZFSRaid(t *testing.T) {
 	tests := []struct {
 		name        string
 		yamlInput   string
@@ -697,7 +697,7 @@ disks:
 	}
 }
 
-func TestStorageConfig_EnvironmentVariableTagsPresent(t *testing.T) {
+func TestStorageConfigEnvironmentVariableTagsPresent(t *testing.T) {
 	expectedEnvTags := map[string]string{
 		"ZFSRaid": "ZFS_RAID",
 		"Disks":   "DISKS",
@@ -714,7 +714,7 @@ func TestStorageConfig_EnvironmentVariableTagsPresent(t *testing.T) {
 	}
 }
 
-func TestStorageConfig_YAMLTagsPresent(t *testing.T) {
+func TestStorageConfigYAMLTagsPresent(t *testing.T) {
 	expectedYAMLTags := map[string]string{
 		"ZFSRaid": "zfs_raid",
 		"Disks":   "disks",
@@ -731,7 +731,7 @@ func TestStorageConfig_YAMLTagsPresent(t *testing.T) {
 	}
 }
 
-func TestStorageConfig_AllFieldsExist(t *testing.T) {
+func TestStorageConfigAllFieldsExist(t *testing.T) {
 	expectedFields := map[string]string{
 		"ZFSRaid": "ZFSRaid",
 		"Disks":   "slice",
@@ -751,7 +751,7 @@ func TestStorageConfig_AllFieldsExist(t *testing.T) {
 	}
 }
 
-func TestStorageConfig_RoundTripMarshalUnmarshal(t *testing.T) {
+func TestStorageConfigRoundTripMarshalUnmarshal(t *testing.T) {
 	tests := []struct {
 		name string
 		cfg  StorageConfig
@@ -801,7 +801,7 @@ func TestStorageConfig_RoundTripMarshalUnmarshal(t *testing.T) {
 	}
 }
 
-func TestStorageConfig_EnvSeparatorTagPresent(t *testing.T) {
+func TestStorageConfigEnvSeparatorTagPresent(t *testing.T) {
 	cfgType := reflect.TypeOf(StorageConfig{})
 
 	field, found := cfgType.FieldByName("Disks")
@@ -813,7 +813,7 @@ func TestStorageConfig_EnvSeparatorTagPresent(t *testing.T) {
 
 // TailscaleConfig tests
 
-func TestTailscaleConfig_AuthKeyOmittedFromYAML(t *testing.T) {
+func TestTailscaleConfigAuthKeyOmittedFromYAML(t *testing.T) {
 	tests := []struct {
 		name             string
 		cfg              TailscaleConfig
@@ -883,7 +883,7 @@ func TestTailscaleConfig_AuthKeyOmittedFromYAML(t *testing.T) {
 	}
 }
 
-func TestTailscaleConfig_BooleanFieldsSerializeCorrectly(t *testing.T) {
+func TestTailscaleConfigBooleanFieldsSerializeCorrectly(t *testing.T) {
 	tests := []struct {
 		name string
 		cfg  TailscaleConfig
@@ -946,7 +946,7 @@ func TestTailscaleConfig_BooleanFieldsSerializeCorrectly(t *testing.T) {
 	}
 }
 
-func TestTailscaleConfig_DeserializeFromYAML(t *testing.T) {
+func TestTailscaleConfigDeserializeFromYAML(t *testing.T) {
 	tests := []struct {
 		name        string
 		yamlInput   string
@@ -1031,7 +1031,7 @@ webui: true`,
 	}
 }
 
-func TestTailscaleConfig_RoundTripMarshalUnmarshal(t *testing.T) {
+func TestTailscaleConfigRoundTripMarshalUnmarshal(t *testing.T) {
 	original := TailscaleConfig{
 		Enabled: true,
 		AuthKey: testTailscaleAuthKey2,
@@ -1057,7 +1057,7 @@ func TestTailscaleConfig_RoundTripMarshalUnmarshal(t *testing.T) {
 	assert.Empty(t, restored.AuthKey)
 }
 
-func TestTailscaleConfig_EnvironmentVariableTagsPresent(t *testing.T) {
+func TestTailscaleConfigEnvironmentVariableTagsPresent(t *testing.T) {
 	expectedEnvTags := map[string]string{
 		"Enabled": "INSTALL_TAILSCALE",
 		"AuthKey": "TAILSCALE_AUTH_KEY",
@@ -1076,7 +1076,7 @@ func TestTailscaleConfig_EnvironmentVariableTagsPresent(t *testing.T) {
 	}
 }
 
-func TestTailscaleConfig_YAMLTagsPresent(t *testing.T) {
+func TestTailscaleConfigYAMLTagsPresent(t *testing.T) {
 	expectedYAMLTags := map[string]string{
 		"Enabled": "enabled",
 		"AuthKey": "-",
@@ -1095,7 +1095,7 @@ func TestTailscaleConfig_YAMLTagsPresent(t *testing.T) {
 	}
 }
 
-func TestTailscaleConfig_AllFieldsExist(t *testing.T) {
+func TestTailscaleConfigAllFieldsExist(t *testing.T) {
 	expectedFields := map[string]string{
 		"Enabled": "bool",
 		"AuthKey": "string",
@@ -1113,7 +1113,7 @@ func TestTailscaleConfig_AllFieldsExist(t *testing.T) {
 	}
 }
 
-func TestTailscaleConfig_AllSSHWebUICombinations(t *testing.T) {
+func TestTailscaleConfigAllSSHWebUICombinations(t *testing.T) {
 	// Test all combinations of SSH and WebUI flags
 	combinations := []struct {
 		ssh   bool
@@ -1159,7 +1159,7 @@ func boolToStr(b bool) string {
 
 // Config tests
 
-func TestConfig_NestedStructsSerializeCorrectly(t *testing.T) {
+func TestConfigNestedStructsSerializeCorrectly(t *testing.T) {
 	cfg := Config{
 		System: SystemConfig{
 			Hostname:     testHostnamePveServer,
@@ -1205,7 +1205,7 @@ func TestConfig_NestedStructsSerializeCorrectly(t *testing.T) {
 	assert.Contains(t, yamlStr, "enabled: true")
 }
 
-func TestConfig_DeserializeFromYAML(t *testing.T) {
+func TestConfigDeserializeFromYAML(t *testing.T) {
 	yamlInput := `system:
   hostname: test-server
   domain_suffix: example.com
@@ -1248,7 +1248,7 @@ tailscale:
 	assert.False(t, cfg.Verbose)
 }
 
-func TestConfig_VerboseExcludedFromYAML(t *testing.T) {
+func TestConfigVerboseExcludedFromYAML(t *testing.T) {
 	cfg := Config{
 		System: SystemConfig{
 			Hostname: "test",
@@ -1263,7 +1263,7 @@ func TestConfig_VerboseExcludedFromYAML(t *testing.T) {
 	assert.NotContains(t, yamlStr, "verbose")
 }
 
-func TestConfig_SensitiveFieldsNotSerialized(t *testing.T) {
+func TestConfigSensitiveFieldsNotSerialized(t *testing.T) {
 	cfg := Config{
 		System: SystemConfig{
 			Hostname:     "pve",
@@ -1288,7 +1288,7 @@ func TestConfig_SensitiveFieldsNotSerialized(t *testing.T) {
 	assert.NotContains(t, yamlStr, "auth_key")
 }
 
-func TestConfig_PartialConfigDeserialize(t *testing.T) {
+func TestConfigPartialConfigDeserialize(t *testing.T) {
 	tests := []struct {
 		name      string
 		yamlInput string
@@ -1325,7 +1325,7 @@ func TestConfig_PartialConfigDeserialize(t *testing.T) {
 	}
 }
 
-func TestConfig_RoundTripMarshalUnmarshal(t *testing.T) {
+func TestConfigRoundTripMarshalUnmarshal(t *testing.T) {
 	original := Config{
 		System: SystemConfig{
 			Hostname:     "production-pve",
@@ -1386,7 +1386,7 @@ func TestConfig_RoundTripMarshalUnmarshal(t *testing.T) {
 	assert.False(t, restored.Verbose)
 }
 
-func TestConfig_YAMLTagsPresent(t *testing.T) {
+func TestConfigYAMLTagsPresent(t *testing.T) {
 	expectedYAMLTags := map[string]string{
 		"System":    "system",
 		"Network":   "network",
@@ -1406,7 +1406,7 @@ func TestConfig_YAMLTagsPresent(t *testing.T) {
 	}
 }
 
-func TestConfig_AllFieldsExist(t *testing.T) {
+func TestConfigAllFieldsExist(t *testing.T) {
 	expectedFields := map[string]string{
 		"System":    "SystemConfig",
 		"Network":   "NetworkConfig",
@@ -1431,12 +1431,12 @@ func TestConfig_AllFieldsExist(t *testing.T) {
 
 // DefaultConfig tests
 
-func TestDefaultConfig_ReturnsValidPointer(t *testing.T) {
+func TestDefaultConfigReturnsValidPointer(t *testing.T) {
 	cfg := DefaultConfig()
 	require.NotNil(t, cfg)
 }
 
-func TestDefaultConfig_ReturnsNewInstanceEachCall(t *testing.T) {
+func TestDefaultConfigReturnsNewInstanceEachCall(t *testing.T) {
 	cfg1 := DefaultConfig()
 	cfg2 := DefaultConfig()
 
@@ -1449,7 +1449,7 @@ func TestDefaultConfig_ReturnsNewInstanceEachCall(t *testing.T) {
 	assert.Equal(t, testDefaultHostname, cfg2.System.Hostname)
 }
 
-func TestDefaultConfig_SystemDefaults(t *testing.T) {
+func TestDefaultConfigSystemDefaults(t *testing.T) {
 	cfg := DefaultConfig()
 
 	assert.Equal(t, testDefaultHostname, cfg.System.Hostname)
@@ -1458,7 +1458,7 @@ func TestDefaultConfig_SystemDefaults(t *testing.T) {
 	assert.Equal(t, "admin@qoxi.cloud", cfg.System.Email)
 }
 
-func TestDefaultConfig_NetworkDefaults(t *testing.T) {
+func TestDefaultConfigNetworkDefaults(t *testing.T) {
 	cfg := DefaultConfig()
 
 	assert.Equal(t, BridgeModeInternal, cfg.Network.BridgeMode)
@@ -1466,7 +1466,7 @@ func TestDefaultConfig_NetworkDefaults(t *testing.T) {
 	assert.Empty(t, cfg.Network.InterfaceName) // Should be auto-detected
 }
 
-func TestDefaultConfig_StorageDefaults(t *testing.T) {
+func TestDefaultConfigStorageDefaults(t *testing.T) {
 	cfg := DefaultConfig()
 
 	assert.Equal(t, ZFSRaid1, cfg.Storage.ZFSRaid)
@@ -1474,7 +1474,7 @@ func TestDefaultConfig_StorageDefaults(t *testing.T) {
 	assert.Empty(t, cfg.Storage.Disks) // Should be auto-detected
 }
 
-func TestDefaultConfig_TailscaleDefaults(t *testing.T) {
+func TestDefaultConfigTailscaleDefaults(t *testing.T) {
 	cfg := DefaultConfig()
 
 	assert.False(t, cfg.Tailscale.Enabled)
@@ -1482,13 +1482,13 @@ func TestDefaultConfig_TailscaleDefaults(t *testing.T) {
 	assert.False(t, cfg.Tailscale.WebUI)
 }
 
-func TestDefaultConfig_VerboseDefault(t *testing.T) {
+func TestDefaultConfigVerboseDefault(t *testing.T) {
 	cfg := DefaultConfig()
 
 	assert.False(t, cfg.Verbose)
 }
 
-func TestDefaultConfig_SensitiveFieldsEmpty(t *testing.T) {
+func TestDefaultConfigSensitiveFieldsEmpty(t *testing.T) {
 	cfg := DefaultConfig()
 
 	// All sensitive fields should be empty strings
@@ -1499,7 +1499,7 @@ func TestDefaultConfig_SensitiveFieldsEmpty(t *testing.T) {
 
 // FQDN method tests
 
-func TestConfig_FQDN_WithHostnameAndDomainSuffix(t *testing.T) {
+func TestConfigFQDNWithHostnameAndDomainSuffix(t *testing.T) {
 	tests := []struct {
 		name         string
 		hostname     string
@@ -1545,7 +1545,7 @@ func TestConfig_FQDN_WithHostnameAndDomainSuffix(t *testing.T) {
 	}
 }
 
-func TestConfig_FQDN_WithEmptyDomainSuffix(t *testing.T) {
+func TestConfigFQDNWithEmptyDomainSuffix(t *testing.T) {
 	cfg := &Config{
 		System: SystemConfig{
 			Hostname:     "standalone-server",
@@ -1555,7 +1555,7 @@ func TestConfig_FQDN_WithEmptyDomainSuffix(t *testing.T) {
 	assert.Equal(t, "standalone-server", cfg.FQDN())
 }
 
-func TestConfig_FQDN_WithEmptyHostname(t *testing.T) {
+func TestConfigFQDNWithEmptyHostname(t *testing.T) {
 	cfg := &Config{
 		System: SystemConfig{
 			Hostname:     "",
@@ -1566,7 +1566,7 @@ func TestConfig_FQDN_WithEmptyHostname(t *testing.T) {
 	assert.Equal(t, testDotLocal, cfg.FQDN())
 }
 
-func TestConfig_FQDN_WithBothEmpty(t *testing.T) {
+func TestConfigFQDNWithBothEmpty(t *testing.T) {
 	cfg := &Config{
 		System: SystemConfig{
 			Hostname:     "",
@@ -1577,13 +1577,13 @@ func TestConfig_FQDN_WithBothEmpty(t *testing.T) {
 	assert.Equal(t, "", cfg.FQDN())
 }
 
-func TestConfig_FQDN_WithDefaultConfig(t *testing.T) {
+func TestConfigFQDNWithDefaultConfig(t *testing.T) {
 	cfg := DefaultConfig()
 	// Default config has hostname "pve-qoxi-cloud" and domain_suffix "local"
 	assert.Equal(t, testDefaultHostname+testDotLocal, cfg.FQDN())
 }
 
-func TestDefaultConfig_AllDefaultsMatchPRDSpecification(t *testing.T) {
+func TestDefaultConfigAllDefaultsMatchPRDSpecification(t *testing.T) {
 	cfg := DefaultConfig()
 
 	// This is a comprehensive test that verifies all defaults match PRD
