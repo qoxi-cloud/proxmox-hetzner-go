@@ -8,11 +8,18 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Test error constants for validation tests.
+// Test error message constants to avoid duplication.
+const (
+	errMsgHostnameEmpty   = "hostname is required"
+	errMsgEmailInvalid    = "email format is invalid"
+	errMsgPasswordTooWeak = "password must be at least 8 characters"
+)
+
+// Test error variables for validation tests.
 var (
-	errHostnameEmpty   = errors.New("hostname is required")
-	errEmailInvalid    = errors.New("email format is invalid")
-	errPasswordTooWeak = errors.New("password must be at least 8 characters")
+	errHostnameEmpty   = errors.New(errMsgHostnameEmpty)
+	errEmailInvalid    = errors.New(errMsgEmailInvalid)
+	errPasswordTooWeak = errors.New(errMsgPasswordTooWeak)
 )
 
 func TestValidationError_Error_Empty(t *testing.T) {
@@ -30,7 +37,7 @@ func TestValidationError_Error_SingleError(t *testing.T) {
 
 	result := ve.Error()
 
-	assert.Equal(t, "hostname is required", result)
+	assert.Equal(t, errMsgHostnameEmpty, result)
 }
 
 func TestValidationError_Error_MultipleErrors(t *testing.T) {
@@ -44,7 +51,7 @@ func TestValidationError_Error_MultipleErrors(t *testing.T) {
 
 	result := ve.Error()
 
-	assert.Equal(t, "hostname is required; email format is invalid; password must be at least 8 characters", result)
+	assert.Equal(t, errMsgHostnameEmpty+"; "+errMsgEmailInvalid+"; "+errMsgPasswordTooWeak, result)
 }
 
 func TestValidationError_Error_TwoErrors(t *testing.T) {
@@ -57,7 +64,7 @@ func TestValidationError_Error_TwoErrors(t *testing.T) {
 
 	result := ve.Error()
 
-	assert.Equal(t, "hostname is required; email format is invalid", result)
+	assert.Equal(t, errMsgHostnameEmpty+"; "+errMsgEmailInvalid, result)
 }
 
 func TestValidationError_HasErrors_Empty(t *testing.T) {
@@ -144,7 +151,7 @@ func TestValidationError_ImplementsErrorInterface(t *testing.T) {
 	}
 
 	assert.NotNil(t, err)
-	assert.Equal(t, "hostname is required", err.Error())
+	assert.Equal(t, errMsgHostnameEmpty, err.Error())
 }
 
 func TestValidationError_Add_NilError(t *testing.T) {
@@ -236,21 +243,21 @@ func TestValidationError_TableDriven(t *testing.T) {
 		{
 			name:           "single error",
 			errors:         []error{errHostnameEmpty},
-			expectedString: "hostname is required",
+			expectedString: errMsgHostnameEmpty,
 			hasErrors:      true,
 			unwrapResult:   errHostnameEmpty,
 		},
 		{
 			name:           "two errors",
 			errors:         []error{errHostnameEmpty, errEmailInvalid},
-			expectedString: "hostname is required; email format is invalid",
+			expectedString: errMsgHostnameEmpty + "; " + errMsgEmailInvalid,
 			hasErrors:      true,
 			unwrapResult:   errHostnameEmpty,
 		},
 		{
 			name:           "three errors",
 			errors:         []error{errHostnameEmpty, errEmailInvalid, errPasswordTooWeak},
-			expectedString: "hostname is required; email format is invalid; password must be at least 8 characters",
+			expectedString: errMsgHostnameEmpty + "; " + errMsgEmailInvalid + "; " + errMsgPasswordTooWeak,
 			hasErrors:      true,
 			unwrapResult:   errHostnameEmpty,
 		},
