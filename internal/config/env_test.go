@@ -935,86 +935,79 @@ func TestLoadFromEnvEmptyVsUnset(t *testing.T) {
 	}
 }
 
-// TestLoadFromEnvBooleanEdgeCases tests additional boolean parsing edge cases
-// beyond what's covered by TestLoadFromEnvTailscaleBoolTrueValues and
-// TestLoadFromEnvTailscaleBoolFalseValues.
-func TestLoadFromEnvBooleanEdgeCases(t *testing.T) {
-	// Extended case variations (basic true/false covered elsewhere).
+// TestLoadFromEnvBooleanExtendedTrueValues tests mixed case true values.
+func TestLoadFromEnvBooleanExtendedTrueValues(t *testing.T) {
 	extendedTrue := []string{"TrUe", "yEs"}
+	for _, bt := range tailscaleBoolTests() {
+		for _, v := range extendedTrue {
+			t.Run(bt.envName+"/"+v, func(t *testing.T) {
+				cfg := DefaultConfig()
+				bt.setField(cfg, false)
+				t.Setenv(bt.envName, v)
+				LoadFromEnv(cfg)
+				if !bt.getField(cfg) {
+					t.Errorf("%s=%q: got false, want true", bt.envName, v)
+				}
+			})
+		}
+	}
+}
+
+// TestLoadFromEnvBooleanExtendedFalseValues tests mixed case false values.
+func TestLoadFromEnvBooleanExtendedFalseValues(t *testing.T) {
 	extendedFalse := []string{"FaLsE", "nO"}
+	for _, bt := range tailscaleBoolTests() {
+		for _, v := range extendedFalse {
+			t.Run(bt.envName+"/"+v, func(t *testing.T) {
+				cfg := DefaultConfig()
+				bt.setField(cfg, true)
+				t.Setenv(bt.envName, v)
+				LoadFromEnv(cfg)
+				if bt.getField(cfg) {
+					t.Errorf("%s=%q: got true, want false", bt.envName, v)
+				}
+			})
+		}
+	}
+}
+
+// TestLoadFromEnvBooleanInvalidValues tests that invalid values are treated as false.
+func TestLoadFromEnvBooleanInvalidValues(t *testing.T) {
 	invalidValues := []string{"maybe", "2", "on", "off", "enabled", "disabled", "y", "n"}
-
-	// Test extended true values for all boolean fields.
-	t.Run("extended true values", func(t *testing.T) {
-		for _, bt := range tailscaleBoolTests() {
-			for _, v := range extendedTrue {
-				t.Run(bt.envName+"/"+v, func(t *testing.T) {
-					cfg := DefaultConfig()
-					bt.setField(cfg, false)
-					t.Setenv(bt.envName, v)
-					LoadFromEnv(cfg)
-					if !bt.getField(cfg) {
-						t.Errorf("%s=%q: got false, want true", bt.envName, v)
-					}
-				})
+	for _, v := range invalidValues {
+		t.Run(v, func(t *testing.T) {
+			cfg := DefaultConfig()
+			cfg.Tailscale.Enabled = true
+			t.Setenv("INSTALL_TAILSCALE", v)
+			LoadFromEnv(cfg)
+			if cfg.Tailscale.Enabled {
+				t.Errorf("INSTALL_TAILSCALE=%q: got true, want false", v)
 			}
-		}
-	})
+		})
+	}
+}
 
-	// Test extended false values for all boolean fields.
-	t.Run("extended false values", func(t *testing.T) {
-		for _, bt := range tailscaleBoolTests() {
-			for _, v := range extendedFalse {
-				t.Run(bt.envName+"/"+v, func(t *testing.T) {
-					cfg := DefaultConfig()
-					bt.setField(cfg, true)
-					t.Setenv(bt.envName, v)
-					LoadFromEnv(cfg)
-					if bt.getField(cfg) {
-						t.Errorf("%s=%q: got true, want false", bt.envName, v)
-					}
-				})
+// TestLoadFromEnvBooleanWhitespaceHandling tests whitespace trimming in boolean values.
+func TestLoadFromEnvBooleanWhitespaceHandling(t *testing.T) {
+	tests := []struct {
+		input string
+		want  bool
+	}{
+		{" true", true}, {"true ", true}, {" true ", true},
+		{"\ttrue", true}, {"true\n", true}, {" \ttrue\n ", true},
+		{" false ", false}, {"\tno\n", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			cfg := DefaultConfig()
+			cfg.Tailscale.Enabled = !tt.want
+			t.Setenv("INSTALL_TAILSCALE", tt.input)
+			LoadFromEnv(cfg)
+			if cfg.Tailscale.Enabled != tt.want {
+				t.Errorf("INSTALL_TAILSCALE=%q: got %v, want %v", tt.input, cfg.Tailscale.Enabled, tt.want)
 			}
-		}
-	})
-
-	// Test invalid values (treated as false).
-	t.Run("invalid values treated as false", func(t *testing.T) {
-		for _, v := range invalidValues {
-			t.Run(v, func(t *testing.T) {
-				cfg := DefaultConfig()
-				cfg.Tailscale.Enabled = true
-				t.Setenv("INSTALL_TAILSCALE", v)
-				LoadFromEnv(cfg)
-				if cfg.Tailscale.Enabled {
-					t.Errorf("INSTALL_TAILSCALE=%q: got true, want false", v)
-				}
-			})
-		}
-	})
-
-	// Test whitespace handling.
-	t.Run("whitespace handling", func(t *testing.T) {
-		whitespaceTests := []struct {
-			input string
-			want  bool
-		}{
-			{" true", true}, {"true ", true}, {" true ", true},
-			{"\ttrue", true}, {"true\n", true}, {" \ttrue\n ", true},
-			{" false ", false}, {"\tno\n", false},
-		}
-		for _, tt := range whitespaceTests {
-			t.Run(tt.input, func(t *testing.T) {
-				cfg := DefaultConfig()
-				cfg.Tailscale.Enabled = !tt.want
-				t.Setenv("INSTALL_TAILSCALE", tt.input)
-				LoadFromEnv(cfg)
-				if cfg.Tailscale.Enabled != tt.want {
-					t.Errorf("INSTALL_TAILSCALE=%q: got %v, want %v", tt.input, cfg.Tailscale.Enabled, tt.want)
-				}
-			})
-		}
-	})
+		})
+	}
 }
 
 // Note: Disk format variations are covered by TestLoadFromEnvDisksValues and
@@ -1082,8 +1075,8 @@ func envVarTestCases() []envVarTestCase {
 		{"PVE_HOSTNAME", "test-host",
 			func(c *Config) bool { return c.System.Hostname == "test-host" },
 			func(c, d *Config) bool { return c.System.Hostname == d.System.Hostname }},
-		{"PVE_DOMAIN_SUFFIX", "test.local",
-			func(c *Config) bool { return c.System.DomainSuffix == "test.local" },
+		{"PVE_DOMAIN_SUFFIX", testMultiDomain,
+			func(c *Config) bool { return c.System.DomainSuffix == testMultiDomain },
 			func(c, d *Config) bool { return c.System.DomainSuffix == d.System.DomainSuffix }},
 		{"PVE_TIMEZONE", "UTC",
 			func(c *Config) bool { return c.System.Timezone == "UTC" },
