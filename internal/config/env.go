@@ -20,3 +20,39 @@ func EnvVarSet(name string) bool {
 	_, exists := os.LookupEnv(name)
 	return exists
 }
+
+// LoadFromEnv loads configuration values from environment variables into cfg.
+// Only non-empty environment variable values override existing configuration;
+// empty or unset variables leave the current values unchanged.
+// Sensitive fields (RootPassword, SSHPublicKey) are loaded from env but are
+// never persisted to configuration files.
+func LoadFromEnv(cfg *Config) {
+	if cfg == nil {
+		return
+	}
+
+	// System configuration
+	if v := os.Getenv("PVE_HOSTNAME"); v != "" {
+		cfg.System.Hostname = v
+	}
+
+	if v := os.Getenv("PVE_DOMAIN_SUFFIX"); v != "" {
+		cfg.System.DomainSuffix = v
+	}
+
+	if v := os.Getenv("PVE_TIMEZONE"); v != "" {
+		cfg.System.Timezone = v
+	}
+
+	if v := os.Getenv("PVE_EMAIL"); v != "" {
+		cfg.System.Email = v
+	}
+
+	if v := os.Getenv("PVE_ROOT_PASSWORD"); v != "" {
+		cfg.System.RootPassword = v
+	}
+
+	if v := os.Getenv("PVE_SSH_PUBLIC_KEY"); v != "" {
+		cfg.System.SSHPublicKey = v
+	}
+}

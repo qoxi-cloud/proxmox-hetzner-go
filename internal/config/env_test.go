@@ -133,3 +133,211 @@ func TestEnvVarSet(t *testing.T) {
 func ptrString(s string) *string {
 	return &s
 }
+
+// Test constants for LoadFromEnv tests.
+const (
+	testHostname      = "test-server"
+	testDomain        = "example.com"
+	testTimezone      = "America/New_York"
+	testEmail         = "test@example.com"
+	testSSHKey        = "ssh-ed25519 AAAA... test@example.com"
+	testMultiHostname = "multi-test"
+	testMultiDomain   = "test.local"
+	testMultiEmail    = "admin@test.local"
+	testMultiSSHKey   = "ssh-rsa AAAAB3..."
+	testPartial       = "partial-test"
+	testModify        = "modify-test"
+
+	// Error format strings.
+	errFmtHostname = "Hostname = %q, want %q"
+)
+
+func TestLoadFromEnvNilConfig(t *testing.T) {
+	// Should not panic when called with nil config
+	LoadFromEnv(nil)
+	// If we reached here without panic, the test passes
+	t.Log("LoadFromEnv(nil) completed without panic")
+}
+
+func TestLoadFromEnvHostname(t *testing.T) {
+	cfg := DefaultConfig()
+	original := cfg.System.Hostname
+
+	t.Setenv("PVE_HOSTNAME", testHostname)
+	LoadFromEnv(cfg)
+
+	if cfg.System.Hostname != testHostname {
+		t.Errorf(errFmtHostname, cfg.System.Hostname, testHostname)
+	}
+
+	// Verify original was different
+	if original == testHostname {
+		t.Error("Default hostname should not be 'test-server'")
+	}
+}
+
+func TestLoadFromEnvDomainSuffix(t *testing.T) {
+	cfg := DefaultConfig()
+
+	t.Setenv("PVE_DOMAIN_SUFFIX", testDomain)
+	LoadFromEnv(cfg)
+
+	if cfg.System.DomainSuffix != testDomain {
+		t.Errorf("DomainSuffix = %q, want %q", cfg.System.DomainSuffix, testDomain)
+	}
+}
+
+func TestLoadFromEnvTimezone(t *testing.T) {
+	cfg := DefaultConfig()
+
+	t.Setenv("PVE_TIMEZONE", testTimezone)
+	LoadFromEnv(cfg)
+
+	if cfg.System.Timezone != testTimezone {
+		t.Errorf("Timezone = %q, want %q", cfg.System.Timezone, testTimezone)
+	}
+}
+
+func TestLoadFromEnvEmail(t *testing.T) {
+	cfg := DefaultConfig()
+
+	t.Setenv("PVE_EMAIL", testEmail)
+	LoadFromEnv(cfg)
+
+	if cfg.System.Email != testEmail {
+		t.Errorf("Email = %q, want %q", cfg.System.Email, testEmail)
+	}
+}
+
+func TestLoadFromEnvRootPassword(t *testing.T) {
+	cfg := DefaultConfig()
+	testValue := "supersecret" // NOSONAR(go:S2068) test value, not a real credential
+
+	t.Setenv("PVE_ROOT_PASSWORD", testValue)
+	LoadFromEnv(cfg)
+
+	if cfg.System.RootPassword != testValue {
+		t.Errorf("RootPassword = %q, want %q", cfg.System.RootPassword, testValue)
+	}
+}
+
+func TestLoadFromEnvSSHPublicKey(t *testing.T) {
+	cfg := DefaultConfig()
+
+	t.Setenv("PVE_SSH_PUBLIC_KEY", testSSHKey)
+	LoadFromEnv(cfg)
+
+	if cfg.System.SSHPublicKey != testSSHKey {
+		t.Errorf("SSHPublicKey = %q, want %q", cfg.System.SSHPublicKey, testSSHKey)
+	}
+}
+
+func TestLoadFromEnvEmptyDoesNotOverride(t *testing.T) {
+	cfg := DefaultConfig()
+	original := cfg.System.Hostname
+
+	// Set env var to empty string - should NOT override
+	t.Setenv("PVE_HOSTNAME", "")
+	LoadFromEnv(cfg)
+
+	if cfg.System.Hostname != original {
+		t.Errorf("Empty env var overrode Hostname: got %q, want %q", cfg.System.Hostname, original)
+	}
+}
+
+func TestLoadFromEnvMultipleFields(t *testing.T) {
+	cfg := DefaultConfig()
+	testRootValue := "secret123" // NOSONAR(go:S2068) test value, not a real credential
+
+	t.Setenv("PVE_HOSTNAME", testMultiHostname)
+	t.Setenv("PVE_DOMAIN_SUFFIX", testMultiDomain)
+	t.Setenv("PVE_TIMEZONE", "UTC")
+	t.Setenv("PVE_EMAIL", testMultiEmail)
+	t.Setenv("PVE_ROOT_PASSWORD", testRootValue)
+	t.Setenv("PVE_SSH_PUBLIC_KEY", testMultiSSHKey)
+
+	LoadFromEnv(cfg)
+
+	if cfg.System.Hostname != testMultiHostname {
+		t.Errorf(errFmtHostname, cfg.System.Hostname, testMultiHostname)
+	}
+
+	if cfg.System.DomainSuffix != testMultiDomain {
+		t.Errorf("DomainSuffix = %q, want %q", cfg.System.DomainSuffix, testMultiDomain)
+	}
+
+	if cfg.System.Timezone != "UTC" {
+		t.Errorf("Timezone = %q, want %q", cfg.System.Timezone, "UTC")
+	}
+
+	if cfg.System.Email != testMultiEmail {
+		t.Errorf("Email = %q, want %q", cfg.System.Email, testMultiEmail)
+	}
+
+	if cfg.System.RootPassword != testRootValue {
+		t.Errorf("RootPassword = %q, want %q", cfg.System.RootPassword, testRootValue)
+	}
+
+	if cfg.System.SSHPublicKey != testMultiSSHKey {
+		t.Errorf("SSHPublicKey = %q, want %q", cfg.System.SSHPublicKey, testMultiSSHKey)
+	}
+}
+
+func TestLoadFromEnvPartialOverride(t *testing.T) {
+	cfg := DefaultConfig()
+	originalDomain := cfg.System.DomainSuffix
+	originalTimezone := cfg.System.Timezone
+
+	// Only override hostname, leave others unchanged
+	t.Setenv("PVE_HOSTNAME", testPartial)
+	LoadFromEnv(cfg)
+
+	if cfg.System.Hostname != testPartial {
+		t.Errorf(errFmtHostname, cfg.System.Hostname, testPartial)
+	}
+
+	if cfg.System.DomainSuffix != originalDomain {
+		t.Errorf("DomainSuffix changed unexpectedly: got %q, want %q", cfg.System.DomainSuffix, originalDomain)
+	}
+
+	if cfg.System.Timezone != originalTimezone {
+		t.Errorf("Timezone changed unexpectedly: got %q, want %q", cfg.System.Timezone, originalTimezone)
+	}
+}
+
+func TestLoadFromEnvModifiesOriginalConfig(t *testing.T) {
+	cfg := DefaultConfig()
+	cfgPtr := cfg // Keep pointer to verify same instance is modified
+
+	t.Setenv("PVE_HOSTNAME", testModify)
+	LoadFromEnv(cfg)
+
+	// Verify the same config instance was modified
+	if cfgPtr.System.Hostname != testModify {
+		t.Errorf("Original config pointer not modified: got %q, want %q", cfgPtr.System.Hostname, testModify)
+	}
+}
+
+func TestLoadFromEnvPreservesNonSystemFields(t *testing.T) {
+	cfg := DefaultConfig()
+	originalBridgeMode := cfg.Network.BridgeMode
+	originalZFSRaid := cfg.Storage.ZFSRaid
+	originalTailscaleEnabled := cfg.Tailscale.Enabled
+	testPreserve := "preserve-test"
+
+	t.Setenv("PVE_HOSTNAME", testPreserve)
+	LoadFromEnv(cfg)
+
+	// Verify non-system fields are untouched
+	if cfg.Network.BridgeMode != originalBridgeMode {
+		t.Errorf("Network.BridgeMode changed unexpectedly: got %v, want %v", cfg.Network.BridgeMode, originalBridgeMode)
+	}
+
+	if cfg.Storage.ZFSRaid != originalZFSRaid {
+		t.Errorf("Storage.ZFSRaid changed unexpectedly: got %v, want %v", cfg.Storage.ZFSRaid, originalZFSRaid)
+	}
+
+	if cfg.Tailscale.Enabled != originalTailscaleEnabled {
+		t.Errorf("Tailscale.Enabled changed unexpectedly: got %v, want %v", cfg.Tailscale.Enabled, originalTailscaleEnabled)
+	}
+}
