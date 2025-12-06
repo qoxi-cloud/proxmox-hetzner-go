@@ -1,6 +1,9 @@
 package config
 
-import "testing"
+import (
+	"os"
+	"testing"
+)
 
 func TestParseBool(t *testing.T) {
 	tests := []struct {
@@ -66,4 +69,65 @@ func TestParseBool(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestEnvVarSet(t *testing.T) {
+	tests := []struct {
+		name     string
+		envName  string
+		setValue *string // nil means unset, empty string means set to ""
+		want     bool
+	}{
+		{
+			name:     "variable set with value",
+			envName:  "TEST_VAR_WITH_VALUE",
+			setValue: ptrString("somevalue"),
+			want:     true,
+		},
+		{
+			name:     "variable set to empty string",
+			envName:  "TEST_VAR_EMPTY",
+			setValue: ptrString(""),
+			want:     true,
+		},
+		{
+			name:     "variable not set",
+			envName:  "TEST_VAR_UNSET",
+			setValue: nil,
+			want:     false,
+		},
+		{
+			name:     "variable with underscores",
+			envName:  "TEST_VAR_WITH_UNDERSCORES",
+			setValue: ptrString("value"),
+			want:     true,
+		},
+		{
+			name:     "variable with numbers",
+			envName:  "TEST_VAR_123",
+			setValue: ptrString("value"),
+			want:     true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Ensure the variable is unset before the test
+			os.Unsetenv(tt.envName)
+
+			if tt.setValue != nil {
+				t.Setenv(tt.envName, *tt.setValue)
+			}
+
+			got := EnvVarSet(tt.envName)
+			if got != tt.want {
+				t.Errorf("EnvVarSet(%q) = %v, want %v", tt.envName, got, tt.want)
+			}
+		})
+	}
+}
+
+// ptrString is a helper to create a pointer to a string.
+func ptrString(s string) *string {
+	return &s
 }
