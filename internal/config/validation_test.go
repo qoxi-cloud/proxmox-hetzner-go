@@ -305,6 +305,63 @@ func TestValidationError_TableDriven(t *testing.T) {
 	}
 }
 
+// ValidateEmail tests
+
+func TestValidateEmail(t *testing.T) {
+	tests := []struct {
+		name        string
+		email       string
+		expectedErr error
+	}{
+		// Valid emails
+		{"valid simple email", "admin@example.com", nil},
+		{"valid with dot in local", "user.name@domain.co", nil},
+		{"valid with plus label", "test+label@gmail.com", nil},
+		{"valid with subdomain", "user@sub.domain.com", nil},
+		{"valid with numbers in domain", "user@example123.com", nil},
+		{"valid with underscore in local", "user_name@example.com", nil},
+		{"valid with percent in local", "user%name@example.com", nil},
+		{"valid with hyphen in domain", "user@my-domain.com", nil},
+		{"valid two letter TLD", "user@example.co", nil},
+		{"valid long TLD", "user@example.museum", nil},
+		// Empty email
+		{"empty email", "", ErrEmailEmpty},
+		// Invalid - no @ symbol
+		{"no at symbol", "userexample.com", ErrEmailInvalid},
+		// Invalid - no domain
+		{"no domain", "user@", ErrEmailInvalid},
+		// Invalid - no local part
+		{"no local part", "@example.com", ErrEmailInvalid},
+		// Invalid - no TLD
+		{"no TLD", "user@example", ErrEmailInvalid},
+		// Invalid - single char TLD
+		{"single char TLD", "user@example.c", ErrEmailInvalid},
+		// Invalid - multiple @ symbols
+		{"multiple at symbols", "user@@example.com", ErrEmailInvalid},
+		// Invalid - space in email
+		{"space in email", "user @example.com", ErrEmailInvalid},
+		// Invalid - special characters
+		{"special char exclamation", "user!name@example.com", ErrEmailInvalid},
+		{"special char hash", "user#name@example.com", ErrEmailInvalid},
+		// Invalid - trailing dot in domain
+		{"trailing dot in domain", "user@example.com.", ErrEmailInvalid},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateEmail(tt.email)
+
+			if tt.expectedErr == nil {
+				assert.NoError(t, err)
+			} else {
+				require.Error(t, err)
+				assert.Equal(t, tt.expectedErr, err)
+				assert.True(t, errors.Is(err, tt.expectedErr))
+			}
+		})
+	}
+}
+
 // ValidateHostname tests
 
 func TestValidateHostname(t *testing.T) {
