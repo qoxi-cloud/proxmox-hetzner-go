@@ -1,3 +1,43 @@
+// Package config provides configuration structures and utilities for the
+// Proxmox VE installer on Hetzner dedicated servers.
+//
+// # Environment Variable Support
+//
+// This file provides functions for loading configuration from environment variables.
+// Environment variables override file configuration values but are overridden by
+// TUI user input.
+//
+// # Configuration Priority (highest to lowest)
+//
+//  1. User input in TUI
+//  2. Environment variables (PVE_* prefix)
+//  3. Config file values
+//  4. Default values from DefaultConfig()
+//
+// # Supported Environment Variables
+//
+// System Configuration:
+//   - PVE_HOSTNAME: Server hostname (RFC 1123 compliant)
+//   - PVE_DOMAIN_SUFFIX: Domain suffix (e.g., "local")
+//   - PVE_TIMEZONE: Timezone (e.g., "Europe/Kyiv")
+//   - PVE_EMAIL: Admin email address
+//   - PVE_ROOT_PASSWORD: Root password (sensitive)
+//   - PVE_SSH_PUBLIC_KEY: SSH public key (sensitive)
+//
+// Network Configuration:
+//   - INTERFACE_NAME: Primary network interface (e.g., "eth0")
+//   - BRIDGE_MODE: VM networking mode (internal, external, both)
+//   - PRIVATE_SUBNET: NAT network subnet (e.g., "10.0.0.0/24")
+//
+// Storage Configuration:
+//   - ZFS_RAID: ZFS RAID level (single, raid0, raid1)
+//   - DISKS: Comma-separated list of disk devices
+//
+// Tailscale Configuration:
+//   - INSTALL_TAILSCALE: Enable Tailscale (true/false/yes/no/1/0)
+//   - TAILSCALE_AUTH_KEY: Tailscale auth key (sensitive)
+//   - TAILSCALE_SSH: Enable SSH over Tailscale (true/false)
+//   - TAILSCALE_WEBUI: Expose WebUI via Tailscale (true/false)
 package config
 
 import (
