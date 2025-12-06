@@ -134,6 +134,21 @@ func ptrString(s string) *string {
 	return &s
 }
 
+// Test constants for LoadFromEnv tests.
+const (
+	testHostname      = "test-server"
+	testDomain        = "example.com"
+	testTimezone      = "America/New_York"
+	testEmail         = "test@example.com"
+	testSSHKey        = "ssh-ed25519 AAAA... test@example.com"
+	testMultiHostname = "multi-test"
+	testMultiDomain   = "test.local"
+	testMultiEmail    = "admin@test.local"
+	testMultiSSHKey   = "ssh-rsa AAAAB3..."
+	testPartial       = "partial-test"
+	testModify        = "modify-test"
+)
+
 func TestLoadFromEnvNilConfig(t *testing.T) {
 	t.Helper()
 	// Should not panic when called with nil config
@@ -144,15 +159,15 @@ func TestLoadFromEnvHostname(t *testing.T) {
 	cfg := DefaultConfig()
 	original := cfg.System.Hostname
 
-	t.Setenv("PVE_HOSTNAME", "test-server")
+	t.Setenv("PVE_HOSTNAME", testHostname)
 	LoadFromEnv(cfg)
 
-	if cfg.System.Hostname != "test-server" {
-		t.Errorf("Hostname = %q, want %q", cfg.System.Hostname, "test-server")
+	if cfg.System.Hostname != testHostname {
+		t.Errorf("Hostname = %q, want %q", cfg.System.Hostname, testHostname)
 	}
 
 	// Verify original was different
-	if original == "test-server" {
+	if original == testHostname {
 		t.Error("Default hostname should not be 'test-server'")
 	}
 }
@@ -160,55 +175,56 @@ func TestLoadFromEnvHostname(t *testing.T) {
 func TestLoadFromEnvDomainSuffix(t *testing.T) {
 	cfg := DefaultConfig()
 
-	t.Setenv("PVE_DOMAIN_SUFFIX", "example.com")
+	t.Setenv("PVE_DOMAIN_SUFFIX", testDomain)
 	LoadFromEnv(cfg)
 
-	if cfg.System.DomainSuffix != "example.com" {
-		t.Errorf("DomainSuffix = %q, want %q", cfg.System.DomainSuffix, "example.com")
+	if cfg.System.DomainSuffix != testDomain {
+		t.Errorf("DomainSuffix = %q, want %q", cfg.System.DomainSuffix, testDomain)
 	}
 }
 
 func TestLoadFromEnvTimezone(t *testing.T) {
 	cfg := DefaultConfig()
 
-	t.Setenv("PVE_TIMEZONE", "America/New_York")
+	t.Setenv("PVE_TIMEZONE", testTimezone)
 	LoadFromEnv(cfg)
 
-	if cfg.System.Timezone != "America/New_York" {
-		t.Errorf("Timezone = %q, want %q", cfg.System.Timezone, "America/New_York")
+	if cfg.System.Timezone != testTimezone {
+		t.Errorf("Timezone = %q, want %q", cfg.System.Timezone, testTimezone)
 	}
 }
 
 func TestLoadFromEnvEmail(t *testing.T) {
 	cfg := DefaultConfig()
 
-	t.Setenv("PVE_EMAIL", "test@example.com")
+	t.Setenv("PVE_EMAIL", testEmail)
 	LoadFromEnv(cfg)
 
-	if cfg.System.Email != "test@example.com" {
-		t.Errorf("Email = %q, want %q", cfg.System.Email, "test@example.com")
+	if cfg.System.Email != testEmail {
+		t.Errorf("Email = %q, want %q", cfg.System.Email, testEmail)
 	}
 }
 
 func TestLoadFromEnvRootPassword(t *testing.T) {
 	cfg := DefaultConfig()
+	testPassword := "supersecret"
 
-	t.Setenv("PVE_ROOT_PASSWORD", "supersecret")
+	t.Setenv("PVE_ROOT_PASSWORD", testPassword)
 	LoadFromEnv(cfg)
 
-	if cfg.System.RootPassword != "supersecret" {
-		t.Errorf("RootPassword = %q, want %q", cfg.System.RootPassword, "supersecret")
+	if cfg.System.RootPassword != testPassword {
+		t.Errorf("RootPassword = %q, want %q", cfg.System.RootPassword, testPassword)
 	}
 }
 
 func TestLoadFromEnvSSHPublicKey(t *testing.T) {
 	cfg := DefaultConfig()
 
-	t.Setenv("PVE_SSH_PUBLIC_KEY", "ssh-ed25519 AAAA... test@example.com")
+	t.Setenv("PVE_SSH_PUBLIC_KEY", testSSHKey)
 	LoadFromEnv(cfg)
 
-	if cfg.System.SSHPublicKey != "ssh-ed25519 AAAA... test@example.com" {
-		t.Errorf("SSHPublicKey = %q, want %q", cfg.System.SSHPublicKey, "ssh-ed25519 AAAA... test@example.com")
+	if cfg.System.SSHPublicKey != testSSHKey {
+		t.Errorf("SSHPublicKey = %q, want %q", cfg.System.SSHPublicKey, testSSHKey)
 	}
 }
 
@@ -227,33 +243,39 @@ func TestLoadFromEnvEmptyDoesNotOverride(t *testing.T) {
 
 func TestLoadFromEnvMultipleFields(t *testing.T) {
 	cfg := DefaultConfig()
+	testPassword := "secret123"
 
-	t.Setenv("PVE_HOSTNAME", "multi-test")
-	t.Setenv("PVE_DOMAIN_SUFFIX", "test.local")
+	t.Setenv("PVE_HOSTNAME", testMultiHostname)
+	t.Setenv("PVE_DOMAIN_SUFFIX", testMultiDomain)
 	t.Setenv("PVE_TIMEZONE", "UTC")
-	t.Setenv("PVE_EMAIL", "admin@test.local")
-	t.Setenv("PVE_ROOT_PASSWORD", "secret123")
-	t.Setenv("PVE_SSH_PUBLIC_KEY", "ssh-rsa AAAAB3...")
+	t.Setenv("PVE_EMAIL", testMultiEmail)
+	t.Setenv("PVE_ROOT_PASSWORD", testPassword)
+	t.Setenv("PVE_SSH_PUBLIC_KEY", testMultiSSHKey)
 
 	LoadFromEnv(cfg)
 
-	if cfg.System.Hostname != "multi-test" {
-		t.Errorf("Hostname = %q, want %q", cfg.System.Hostname, "multi-test")
+	if cfg.System.Hostname != testMultiHostname {
+		t.Errorf("Hostname = %q, want %q", cfg.System.Hostname, testMultiHostname)
 	}
-	if cfg.System.DomainSuffix != "test.local" {
-		t.Errorf("DomainSuffix = %q, want %q", cfg.System.DomainSuffix, "test.local")
+
+	if cfg.System.DomainSuffix != testMultiDomain {
+		t.Errorf("DomainSuffix = %q, want %q", cfg.System.DomainSuffix, testMultiDomain)
 	}
+
 	if cfg.System.Timezone != "UTC" {
 		t.Errorf("Timezone = %q, want %q", cfg.System.Timezone, "UTC")
 	}
-	if cfg.System.Email != "admin@test.local" {
-		t.Errorf("Email = %q, want %q", cfg.System.Email, "admin@test.local")
+
+	if cfg.System.Email != testMultiEmail {
+		t.Errorf("Email = %q, want %q", cfg.System.Email, testMultiEmail)
 	}
-	if cfg.System.RootPassword != "secret123" {
-		t.Errorf("RootPassword = %q, want %q", cfg.System.RootPassword, "secret123")
+
+	if cfg.System.RootPassword != testPassword {
+		t.Errorf("RootPassword = %q, want %q", cfg.System.RootPassword, testPassword)
 	}
-	if cfg.System.SSHPublicKey != "ssh-rsa AAAAB3..." {
-		t.Errorf("SSHPublicKey = %q, want %q", cfg.System.SSHPublicKey, "ssh-rsa AAAAB3...")
+
+	if cfg.System.SSHPublicKey != testMultiSSHKey {
+		t.Errorf("SSHPublicKey = %q, want %q", cfg.System.SSHPublicKey, testMultiSSHKey)
 	}
 }
 
@@ -263,15 +285,17 @@ func TestLoadFromEnvPartialOverride(t *testing.T) {
 	originalTimezone := cfg.System.Timezone
 
 	// Only override hostname, leave others unchanged
-	t.Setenv("PVE_HOSTNAME", "partial-test")
+	t.Setenv("PVE_HOSTNAME", testPartial)
 	LoadFromEnv(cfg)
 
-	if cfg.System.Hostname != "partial-test" {
-		t.Errorf("Hostname = %q, want %q", cfg.System.Hostname, "partial-test")
+	if cfg.System.Hostname != testPartial {
+		t.Errorf("Hostname = %q, want %q", cfg.System.Hostname, testPartial)
 	}
+
 	if cfg.System.DomainSuffix != originalDomain {
 		t.Errorf("DomainSuffix changed unexpectedly: got %q, want %q", cfg.System.DomainSuffix, originalDomain)
 	}
+
 	if cfg.System.Timezone != originalTimezone {
 		t.Errorf("Timezone changed unexpectedly: got %q, want %q", cfg.System.Timezone, originalTimezone)
 	}
@@ -281,12 +305,12 @@ func TestLoadFromEnvModifiesOriginalConfig(t *testing.T) {
 	cfg := DefaultConfig()
 	cfgPtr := cfg // Keep pointer to verify same instance is modified
 
-	t.Setenv("PVE_HOSTNAME", "modify-test")
+	t.Setenv("PVE_HOSTNAME", testModify)
 	LoadFromEnv(cfg)
 
 	// Verify the same config instance was modified
-	if cfgPtr.System.Hostname != "modify-test" {
-		t.Errorf("Original config pointer not modified: got %q, want %q", cfgPtr.System.Hostname, "modify-test")
+	if cfgPtr.System.Hostname != testModify {
+		t.Errorf("Original config pointer not modified: got %q, want %q", cfgPtr.System.Hostname, testModify)
 	}
 }
 
@@ -295,17 +319,20 @@ func TestLoadFromEnvPreservesNonSystemFields(t *testing.T) {
 	originalBridgeMode := cfg.Network.BridgeMode
 	originalZFSRaid := cfg.Storage.ZFSRaid
 	originalTailscaleEnabled := cfg.Tailscale.Enabled
+	testPreserve := "preserve-test"
 
-	t.Setenv("PVE_HOSTNAME", "preserve-test")
+	t.Setenv("PVE_HOSTNAME", testPreserve)
 	LoadFromEnv(cfg)
 
 	// Verify non-system fields are untouched
 	if cfg.Network.BridgeMode != originalBridgeMode {
 		t.Errorf("Network.BridgeMode changed unexpectedly: got %v, want %v", cfg.Network.BridgeMode, originalBridgeMode)
 	}
+
 	if cfg.Storage.ZFSRaid != originalZFSRaid {
 		t.Errorf("Storage.ZFSRaid changed unexpectedly: got %v, want %v", cfg.Storage.ZFSRaid, originalZFSRaid)
 	}
+
 	if cfg.Tailscale.Enabled != originalTailscaleEnabled {
 		t.Errorf("Tailscale.Enabled changed unexpectedly: got %v, want %v", cfg.Tailscale.Enabled, originalTailscaleEnabled)
 	}
