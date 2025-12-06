@@ -1476,6 +1476,92 @@ func TestDefaultConfig_SensitiveFieldsEmpty(t *testing.T) {
 	assert.Empty(t, cfg.Tailscale.AuthKey)
 }
 
+// FQDN method tests
+
+func TestConfig_FQDN_WithHostnameAndDomainSuffix(t *testing.T) {
+	tests := []struct {
+		name         string
+		hostname     string
+		domainSuffix string
+		expectedFQDN string
+	}{
+		{
+			name:         "standard local domain",
+			hostname:     "pve-server",
+			domainSuffix: "local",
+			expectedFQDN: "pve-server.local",
+		},
+		{
+			name:         "example.com domain",
+			hostname:     "production",
+			domainSuffix: "example.com",
+			expectedFQDN: "production.example.com",
+		},
+		{
+			name:         "home.arpa domain",
+			hostname:     "homelab",
+			domainSuffix: "home.arpa",
+			expectedFQDN: "homelab.home.arpa",
+		},
+		{
+			name:         "subdomain style",
+			hostname:     "pve01",
+			domainSuffix: "dc1.prod.example.com",
+			expectedFQDN: "pve01.dc1.prod.example.com",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := &Config{
+				System: SystemConfig{
+					Hostname:     tt.hostname,
+					DomainSuffix: tt.domainSuffix,
+				},
+			}
+			assert.Equal(t, tt.expectedFQDN, cfg.FQDN())
+		})
+	}
+}
+
+func TestConfig_FQDN_WithEmptyDomainSuffix(t *testing.T) {
+	cfg := &Config{
+		System: SystemConfig{
+			Hostname:     "standalone-server",
+			DomainSuffix: "",
+		},
+	}
+	assert.Equal(t, "standalone-server", cfg.FQDN())
+}
+
+func TestConfig_FQDN_WithEmptyHostname(t *testing.T) {
+	cfg := &Config{
+		System: SystemConfig{
+			Hostname:     "",
+			DomainSuffix: "local",
+		},
+	}
+	// Returns ".local" when hostname is empty
+	assert.Equal(t, ".local", cfg.FQDN())
+}
+
+func TestConfig_FQDN_WithBothEmpty(t *testing.T) {
+	cfg := &Config{
+		System: SystemConfig{
+			Hostname:     "",
+			DomainSuffix: "",
+		},
+	}
+	// Returns empty string when both are empty
+	assert.Equal(t, "", cfg.FQDN())
+}
+
+func TestConfig_FQDN_WithDefaultConfig(t *testing.T) {
+	cfg := DefaultConfig()
+	// Default config has hostname "pve-qoxi-cloud" and domain_suffix "local"
+	assert.Equal(t, testDefaultHostname+".local", cfg.FQDN())
+}
+
 func TestDefaultConfig_AllDefaultsMatchPRDSpecification(t *testing.T) {
 	cfg := DefaultConfig()
 
