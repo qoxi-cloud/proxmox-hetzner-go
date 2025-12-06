@@ -86,6 +86,16 @@ const (
 	defaultPrivateSubnet = "10.0.0.0/24" // NOSONAR(go:S1313) RFC 1918 private range - default config value
 )
 
+// FQDN returns the fully qualified domain name (hostname.domain_suffix).
+// If DomainSuffix is empty, returns only the hostname.
+func (c *Config) FQDN() string {
+	if c.System.DomainSuffix == "" {
+		return c.System.Hostname
+	}
+
+	return c.System.Hostname + "." + c.System.DomainSuffix
+}
+
 // DefaultConfig returns a Config with sensible default values.
 // Each call returns a new Config instance to avoid shared state.
 func DefaultConfig() *Config {

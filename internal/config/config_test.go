@@ -27,6 +27,9 @@ const (
 	testTailscaleAuthKey  = "tskey-auth-secret123"   // NOSONAR(go:S1313) Test Tailscale key - not real
 	testTailscaleAuthKey2 = "tskey-auth-supersecret" // NOSONAR(go:S1313) Test Tailscale key - not real
 	testDefaultHostname   = "pve-qoxi-cloud"         // Default hostname per PRD specification
+	testHostnamePveServer = "pve-server"             // Common test hostname
+	testDomainSuffixLocal = "local"                  // Default domain suffix per PRD specification
+	testDotLocal          = ".local"                 // Domain suffix with dot prefix for FQDN tests
 )
 
 func TestSystemConfig_SensitiveFieldsOmittedFromYAML(t *testing.T) {
@@ -39,15 +42,15 @@ func TestSystemConfig_SensitiveFieldsOmittedFromYAML(t *testing.T) {
 		{
 			name: "standard config with all fields",
 			cfg: SystemConfig{
-				Hostname:     "pve-server",
-				DomainSuffix: "local",
+				Hostname:     testHostnamePveServer,
+				DomainSuffix: testDomainSuffixLocal,
 				Timezone:     testTimezoneKyiv,
 				Email:        "admin@example.com",
 				RootPassword: testPassword,
 				SSHPublicKey: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIG...",
 			},
 			shouldNotContain: []string{testPassword, "ssh-ed25519", "root_password", "ssh_public_key"},
-			shouldContain:    []string{"hostname: pve-server", "domain_suffix: local", "timezone: " + testTimezoneKyiv, "email: admin@example.com"},
+			shouldContain:    []string{"hostname: " + testHostnamePveServer, "domain_suffix: " + testDomainSuffixLocal, "timezone: " + testTimezoneKyiv, "email: admin@example.com"},
 		},
 		{
 			name: "config with special characters in sensitive fields",
@@ -66,7 +69,7 @@ func TestSystemConfig_SensitiveFieldsOmittedFromYAML(t *testing.T) {
 			name: "config with empty sensitive fields",
 			cfg: SystemConfig{
 				Hostname:     "empty-secrets",
-				DomainSuffix: "local",
+				DomainSuffix: testDomainSuffixLocal,
 				Timezone:     "UTC",
 				Email:        "admin@local",
 				RootPassword: "",
@@ -1141,8 +1144,8 @@ func boolToStr(b bool) string {
 func TestConfig_NestedStructsSerializeCorrectly(t *testing.T) {
 	cfg := Config{
 		System: SystemConfig{
-			Hostname:     "pve-server",
-			DomainSuffix: "local",
+			Hostname:     testHostnamePveServer,
+			DomainSuffix: testDomainSuffixLocal,
 			Timezone:     testTimezoneKyiv,
 			Email:        "admin@example.com",
 			RootPassword: testPassword,
@@ -1178,7 +1181,7 @@ func TestConfig_NestedStructsSerializeCorrectly(t *testing.T) {
 	assert.Contains(t, yamlStr, "tailscale:")
 
 	// Check nested values
-	assert.Contains(t, yamlStr, "hostname: pve-server")
+	assert.Contains(t, yamlStr, "hostname: "+testHostnamePveServer)
 	assert.Contains(t, yamlStr, "interface: eth0")
 	assert.Contains(t, yamlStr, "zfs_raid: raid1")
 	assert.Contains(t, yamlStr, "enabled: true")
@@ -1432,7 +1435,7 @@ func TestDefaultConfig_SystemDefaults(t *testing.T) {
 	cfg := DefaultConfig()
 
 	assert.Equal(t, testDefaultHostname, cfg.System.Hostname)
-	assert.Equal(t, "local", cfg.System.DomainSuffix)
+	assert.Equal(t, testDomainSuffixLocal, cfg.System.DomainSuffix)
 	assert.Equal(t, testTimezoneKyiv, cfg.System.Timezone)
 	assert.Equal(t, "admin@qoxi.cloud", cfg.System.Email)
 }
@@ -1476,6 +1479,92 @@ func TestDefaultConfig_SensitiveFieldsEmpty(t *testing.T) {
 	assert.Empty(t, cfg.Tailscale.AuthKey)
 }
 
+// FQDN method tests
+
+func TestConfig_FQDN_WithHostnameAndDomainSuffix(t *testing.T) {
+	tests := []struct {
+		name         string
+		hostname     string
+		domainSuffix string
+		expectedFQDN string
+	}{
+		{
+			name:         "standard local domain",
+			hostname:     testHostnamePveServer,
+			domainSuffix: testDomainSuffixLocal,
+			expectedFQDN: testHostnamePveServer + testDotLocal,
+		},
+		{
+			name:         "example.com domain",
+			hostname:     "production",
+			domainSuffix: "example.com",
+			expectedFQDN: "production.example.com",
+		},
+		{
+			name:         "home.arpa domain",
+			hostname:     "homelab",
+			domainSuffix: "home.arpa",
+			expectedFQDN: "homelab.home.arpa",
+		},
+		{
+			name:         "subdomain style",
+			hostname:     "pve01",
+			domainSuffix: "dc1.prod.example.com",
+			expectedFQDN: "pve01.dc1.prod.example.com",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := &Config{
+				System: SystemConfig{
+					Hostname:     tt.hostname,
+					DomainSuffix: tt.domainSuffix,
+				},
+			}
+			assert.Equal(t, tt.expectedFQDN, cfg.FQDN())
+		})
+	}
+}
+
+func TestConfig_FQDN_WithEmptyDomainSuffix(t *testing.T) {
+	cfg := &Config{
+		System: SystemConfig{
+			Hostname:     "standalone-server",
+			DomainSuffix: "",
+		},
+	}
+	assert.Equal(t, "standalone-server", cfg.FQDN())
+}
+
+func TestConfig_FQDN_WithEmptyHostname(t *testing.T) {
+	cfg := &Config{
+		System: SystemConfig{
+			Hostname:     "",
+			DomainSuffix: testDomainSuffixLocal,
+		},
+	}
+	// Returns ".local" when hostname is empty
+	assert.Equal(t, testDotLocal, cfg.FQDN())
+}
+
+func TestConfig_FQDN_WithBothEmpty(t *testing.T) {
+	cfg := &Config{
+		System: SystemConfig{
+			Hostname:     "",
+			DomainSuffix: "",
+		},
+	}
+	// Returns empty string when both are empty
+	assert.Equal(t, "", cfg.FQDN())
+}
+
+func TestConfig_FQDN_WithDefaultConfig(t *testing.T) {
+	cfg := DefaultConfig()
+	// Default config has hostname "pve-qoxi-cloud" and domain_suffix "local"
+	assert.Equal(t, testDefaultHostname+testDotLocal, cfg.FQDN())
+}
+
 func TestDefaultConfig_AllDefaultsMatchPRDSpecification(t *testing.T) {
 	cfg := DefaultConfig()
 
@@ -1486,8 +1575,8 @@ func TestDefaultConfig_AllDefaultsMatchPRDSpecification(t *testing.T) {
 		expected interface{}
 	}{
 		{"Hostname", cfg.System.Hostname, testDefaultHostname},
-		{"DomainSuffix", cfg.System.DomainSuffix, "local"},
-		{"Timezone", cfg.System.Timezone, "Europe/Kyiv"},
+		{"DomainSuffix", cfg.System.DomainSuffix, testDomainSuffixLocal},
+		{"Timezone", cfg.System.Timezone, testTimezoneKyiv},
 		{"Email", cfg.System.Email, "admin@qoxi.cloud"},
 		{"BridgeMode", cfg.Network.BridgeMode, BridgeModeInternal},
 		{"PrivateSubnet", cfg.Network.PrivateSubnet, testSubnetClassA},
