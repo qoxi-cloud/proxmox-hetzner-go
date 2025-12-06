@@ -132,14 +132,66 @@ See [configs/example.yaml](configs/example.yaml) for a complete configuration re
 
 ### Environment Variables
 
-All configuration options can be set via environment variables with the `PVE_` prefix:
+All configuration options can be set via environment variables. Environment variables override config file values but are overridden by TUI user input.
+
+> **Note:** System configuration variables use the `PVE_` prefix, while network, storage, and Tailscale variables use descriptive names without prefix for clarity and brevity.
+
+#### System Configuration
+
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `PVE_HOSTNAME` | Server hostname (RFC 1123 compliant) | `pve-server` |
+| `PVE_DOMAIN_SUFFIX` | Domain suffix for FQDN | `local` |
+| `PVE_TIMEZONE` | Server timezone | `Europe/Kyiv` |
+| `PVE_EMAIL` | Admin email address | `admin@example.com` |
+| `PVE_ROOT_PASSWORD` | Root password (sensitive) | - |
+| `PVE_SSH_PUBLIC_KEY` | SSH public key (sensitive) | - |
+
+#### Network Configuration
+
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `INTERFACE_NAME` | Primary network interface | `eth0` |
+| `BRIDGE_MODE` | VM networking mode | `internal`, `external`, `both` |
+| `PRIVATE_SUBNET` | NAT network subnet | `10.0.0.0/24` |
+
+#### Storage Configuration
+
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `ZFS_RAID` | ZFS RAID level | `single`, `raid0`, `raid1` |
+| `DISKS` | Disk devices (comma-separated) | `/dev/sda,/dev/sdb` |
+
+#### Tailscale Configuration
+
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `INSTALL_TAILSCALE` | Enable Tailscale installation | `true`, `false`, `yes`, `no`, `1`, `0` |
+| `TAILSCALE_AUTH_KEY` | Tailscale auth key (sensitive) | - |
+| `TAILSCALE_SSH` | Enable SSH over Tailscale | `true`, `false`, `yes`, `no`, `1`, `0` |
+| `TAILSCALE_WEBUI` | Expose WebUI via Tailscale | `true`, `false`, `yes`, `no`, `1`, `0` |
+
+#### Example Usage
 
 ```bash
+# Basic setup
 export PVE_HOSTNAME=pve-server
-export PVE_NETWORK_ADDRESS=192.168.1.100/24
-export PVE_STORAGE_FILESYSTEM=zfs
+export PVE_TIMEZONE=Europe/Berlin
+export PVE_EMAIL=admin@example.com
+./pve-install
+
+# With storage configuration
+export ZFS_RAID=raid1
+export DISKS="/dev/sda,/dev/sdb"
+./pve-install
+
+# With Tailscale
+export INSTALL_TAILSCALE=true
+export TAILSCALE_AUTH_KEY=tskey-auth-xxx
 ./pve-install
 ```
+
+> **Note:** Sensitive fields (`PVE_ROOT_PASSWORD`, `PVE_SSH_PUBLIC_KEY`, `TAILSCALE_AUTH_KEY`) are loaded from environment variables but are never persisted to configuration files.
 
 ## Development
 
