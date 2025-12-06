@@ -10,9 +10,10 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// Test constants for file names to avoid duplication.
+// Test constants to avoid duplication.
 const (
-	testConfigFileName = "config.yaml"
+	testConfigFileName    = "config.yaml"
+	errMsgFailedParseYAML = "failed to parse YAML"
 )
 
 func TestSaveToFileSuccessfulSave(t *testing.T) {
@@ -549,61 +550,42 @@ storage:
 // TestLoadFromFileErrorCases uses table-driven tests to verify error handling
 // across multiple failure scenarios with descriptive error messages.
 func TestLoadFromFileErrorCases(t *testing.T) {
-	// createTempFile is a helper to reduce duplication in test setup.
-	createTempFile := func(t *testing.T, filename string, content []byte) string {
-		t.Helper()
-		filePath := filepath.Join(t.TempDir(), filename)
-		err := os.WriteFile(filePath, content, 0o600)
-		require.NoError(t, err)
-		return filePath
-	}
-
 	tests := []struct {
-		name           string
-		filePath       string
-		content        []byte
-		useNonExistent bool
-		wantErr        bool
-		errContains    string
-		errIs          error
+		name        string
+		content     []byte
+		wantErr     bool
+		errContains string
+		errIs       error
 	}{
-		{
-			name:           "file not found",
-			filePath:       "/nonexistent/path/config.yaml",
-			useNonExistent: true,
-			wantErr:        true,
-			errContains:    "config file not found",
-			errIs:          os.ErrNotExist,
-		},
 		{
 			name:        "malformed YAML with unclosed bracket",
 			content:     []byte("system:\n  hostname: [unclosed"),
 			wantErr:     true,
-			errContains: "failed to parse YAML",
+			errContains: errMsgFailedParseYAML,
 		},
 		{
 			name:        "malformed YAML with tabs",
 			content:     []byte("system:\n\thostname: tab-indented"),
 			wantErr:     true,
-			errContains: "failed to parse YAML",
+			errContains: errMsgFailedParseYAML,
 		},
 		{
 			name:        "malformed YAML with duplicate keys",
 			content:     []byte("system:\n  hostname: first\n  hostname: second"),
 			wantErr:     true,
-			errContains: "failed to parse YAML",
+			errContains: errMsgFailedParseYAML,
 		},
 		{
 			name:        "invalid type coercion",
 			content:     []byte("storage:\n  disks:\n    invalid: not-a-list"),
 			wantErr:     true,
-			errContains: "failed to parse YAML",
+			errContains: errMsgFailedParseYAML,
 		},
 		{
 			name:        "binary content",
 			content:     []byte{0x00, 0x01, 0x02, 0xFF, 0xFE, 0xFD},
 			wantErr:     true,
-			errContains: "failed to parse YAML",
+			errContains: errMsgFailedParseYAML,
 		},
 		{
 			name:    "YAML with only comments",
@@ -624,30 +606,34 @@ func TestLoadFromFileErrorCases(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var filePath string
-			if tt.useNonExistent {
-				filePath = tt.filePath
-			} else {
-				filePath = createTempFile(t, "test.yaml", tt.content)
-			}
+			filePath := filepath.Join(t.TempDir(), "test.yaml")
+			require.NoError(t, os.WriteFile(filePath, tt.content, 0o600))
 
 			cfg, err := LoadFromFile(filePath)
 
-			if tt.wantErr {
-				require.Error(t, err)
-				require.Nil(t, cfg)
-				if tt.errContains != "" {
-					assert.Contains(t, err.Error(), tt.errContains)
-				}
-				if tt.errIs != nil {
-					assert.ErrorIs(t, err, tt.errIs)
-				}
-			} else {
+			if !tt.wantErr {
 				require.NoError(t, err)
 				assert.NotNil(t, cfg)
+				return
+			}
+			require.Error(t, err)
+			require.Nil(t, cfg)
+			assert.Contains(t, err.Error(), tt.errContains)
+			if tt.errIs != nil {
+				assert.ErrorIs(t, err, tt.errIs)
 			}
 		})
 	}
+}
+
+// TestLoadFromFileNotFound verifies error when config file does not exist.
+func TestLoadFromFileNotFound(t *testing.T) {
+	cfg, err := LoadFromFile("/nonexistent/path/config.yaml")
+
+	require.Error(t, err)
+	require.Nil(t, cfg)
+	assert.Contains(t, err.Error(), "config file not found")
+	assert.ErrorIs(t, err, os.ErrNotExist)
 }
 
 // TestLoadFromFileDirectoryPath verifies behavior when path points to a directory.
