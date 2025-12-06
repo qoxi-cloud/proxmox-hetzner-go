@@ -524,59 +524,43 @@ func TestLoadFromEnvInterfaceNameEmptyKeepsOriginal(t *testing.T) {
 
 // Storage configuration tests
 
-func TestLoadFromEnvZFSRaidSingle(t *testing.T) {
-	cfg := DefaultConfig()
-	cfg.Storage.ZFSRaid = ZFSRaid1 // Set to different value first
+// assertDisksEqual is a test helper that verifies disk slices match expected values.
+func assertDisksEqual(t *testing.T, got, want []string) {
+	t.Helper()
 
-	t.Setenv("ZFS_RAID", "single")
-	LoadFromEnv(cfg)
+	if len(got) != len(want) {
+		t.Fatalf("Disks length = %d, want %d", len(got), len(want))
+	}
 
-	if cfg.Storage.ZFSRaid != ZFSRaidSingle {
-		t.Errorf(errFmtZFSRaid, cfg.Storage.ZFSRaid, ZFSRaidSingle)
+	for i, w := range want {
+		if got[i] != w {
+			t.Errorf("Disks[%d] = %q, want %q", i, got[i], w)
+		}
 	}
 }
 
-func TestLoadFromEnvZFSRaidRaid0(t *testing.T) {
-	cfg := DefaultConfig()
-
-	t.Setenv("ZFS_RAID", "raid0")
-	LoadFromEnv(cfg)
-
-	if cfg.Storage.ZFSRaid != ZFSRaid0 {
-		t.Errorf(errFmtZFSRaid, cfg.Storage.ZFSRaid, ZFSRaid0)
-	}
-}
-
-func TestLoadFromEnvZFSRaidRaid1(t *testing.T) {
-	cfg := DefaultConfig()
-	cfg.Storage.ZFSRaid = ZFSRaidSingle // Set to different value first
-
-	t.Setenv("ZFS_RAID", "raid1")
-	LoadFromEnv(cfg)
-
-	if cfg.Storage.ZFSRaid != ZFSRaid1 {
-		t.Errorf(errFmtZFSRaid, cfg.Storage.ZFSRaid, ZFSRaid1)
-	}
-}
-
-func TestLoadFromEnvZFSRaidCaseInsensitive(t *testing.T) {
+func TestLoadFromEnvZFSRaidValues(t *testing.T) {
 	tests := []struct {
-		name  string
-		input string
-		want  ZFSRaid
+		name    string
+		input   string
+		want    ZFSRaid
+		initial ZFSRaid
 	}{
-		{"uppercase SINGLE", "SINGLE", ZFSRaidSingle},
-		{"mixed case Single", "Single", ZFSRaidSingle},
-		{"uppercase RAID0", "RAID0", ZFSRaid0},
-		{"mixed case Raid0", "Raid0", ZFSRaid0},
-		{"uppercase RAID1", "RAID1", ZFSRaid1},
-		{"mixed case Raid1", "Raid1", ZFSRaid1},
+		{"single lowercase", "single", ZFSRaidSingle, ZFSRaid1},
+		{"raid0 lowercase", "raid0", ZFSRaid0, ZFSRaid1},
+		{"raid1 lowercase", "raid1", ZFSRaid1, ZFSRaidSingle},
+		{"uppercase SINGLE", "SINGLE", ZFSRaidSingle, ZFSRaid1},
+		{"mixed case Single", "Single", ZFSRaidSingle, ZFSRaid1},
+		{"uppercase RAID0", "RAID0", ZFSRaid0, ZFSRaid1},
+		{"mixed case Raid0", "Raid0", ZFSRaid0, ZFSRaid1},
+		{"uppercase RAID1", "RAID1", ZFSRaid1, ZFSRaidSingle},
+		{"mixed case Raid1", "Raid1", ZFSRaid1, ZFSRaidSingle},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cfg := DefaultConfig()
-			cfg.Storage.ZFSRaid = "" // Clear default
+			cfg.Storage.ZFSRaid = tt.initial
 
 			t.Setenv("ZFS_RAID", tt.input)
 			LoadFromEnv(cfg)
@@ -589,135 +573,76 @@ func TestLoadFromEnvZFSRaidCaseInsensitive(t *testing.T) {
 }
 
 func TestLoadFromEnvZFSRaidInvalidKeepsOriginal(t *testing.T) {
-	cfg := DefaultConfig()
-	original := cfg.Storage.ZFSRaid
+	tests := []struct {
+		name  string
+		input string
+	}{
+		{"invalid value", "invalid"},
+		{"empty string", ""},
+		{"raid5 unsupported", "raid5"},
+	}
 
-	// Set to an invalid value - should NOT change the config
-	t.Setenv("ZFS_RAID", "invalid")
-	LoadFromEnv(cfg)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := DefaultConfig()
+			original := cfg.Storage.ZFSRaid
 
-	if cfg.Storage.ZFSRaid != original {
-		t.Errorf("Invalid ZFS_RAID changed config: got %q, want %q", cfg.Storage.ZFSRaid, original)
+			t.Setenv("ZFS_RAID", tt.input)
+			LoadFromEnv(cfg)
+
+			if cfg.Storage.ZFSRaid != original {
+				t.Errorf("ZFS_RAID %q changed config: got %q, want %q", tt.input, cfg.Storage.ZFSRaid, original)
+			}
+		})
 	}
 }
 
-func TestLoadFromEnvZFSRaidEmptyKeepsOriginal(t *testing.T) {
-	cfg := DefaultConfig()
-	original := cfg.Storage.ZFSRaid
+func TestLoadFromEnvDisksValues(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  []string
+	}{
+		{"single disk", testDiskSda, []string{testDiskSda}},
+		{"two disks", testDiskSda + "," + testDiskSdb, []string{testDiskSda, testDiskSdb}},
+		{"three disks", testDiskSda + "," + testDiskSdb + "," + testDiskSdc, []string{testDiskSda, testDiskSdb, testDiskSdc}},
+		{"with spaces", testDiskSda + " , " + testDiskSdb, []string{testDiskSda, testDiskSdb}},
+		{"trailing comma", testDiskSda + "," + testDiskSdb + ",", []string{testDiskSda, testDiskSdb}},
+		{"leading comma", "," + testDiskSda + "," + testDiskSdb, []string{testDiskSda, testDiskSdb}},
+	}
 
-	// Set to empty value - should NOT change the config
-	t.Setenv("ZFS_RAID", "")
-	LoadFromEnv(cfg)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := DefaultConfig()
 
-	if cfg.Storage.ZFSRaid != original {
-		t.Errorf("Empty ZFS_RAID changed config: got %q, want %q", cfg.Storage.ZFSRaid, original)
+			t.Setenv("DISKS", tt.input)
+			LoadFromEnv(cfg)
+
+			assertDisksEqual(t, cfg.Storage.Disks, tt.want)
+		})
 	}
 }
 
-func TestLoadFromEnvDisksSingle(t *testing.T) {
-	cfg := DefaultConfig()
-
-	t.Setenv("DISKS", testDiskSda)
-	LoadFromEnv(cfg)
-
-	if len(cfg.Storage.Disks) != 1 {
-		t.Fatalf("Disks length = %d, want 1", len(cfg.Storage.Disks))
+func TestLoadFromEnvDisksKeepsOriginal(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+	}{
+		{"empty string", ""},
+		{"only commas", ",,,"},
+		{"only spaces and commas", " , , "},
 	}
 
-	if cfg.Storage.Disks[0] != testDiskSda {
-		t.Errorf("Disks[0] = %q, want %q", cfg.Storage.Disks[0], testDiskSda)
-	}
-}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := DefaultConfig()
+			cfg.Storage.Disks = []string{testDiskSdc}
 
-func TestLoadFromEnvDisksMultiple(t *testing.T) {
-	cfg := DefaultConfig()
+			t.Setenv("DISKS", tt.input)
+			LoadFromEnv(cfg)
 
-	t.Setenv("DISKS", testDiskSda+","+testDiskSdb)
-	LoadFromEnv(cfg)
-
-	if len(cfg.Storage.Disks) != 2 {
-		t.Fatalf("Disks length = %d, want 2", len(cfg.Storage.Disks))
-	}
-
-	if cfg.Storage.Disks[0] != testDiskSda {
-		t.Errorf("Disks[0] = %q, want %q", cfg.Storage.Disks[0], testDiskSda)
-	}
-
-	if cfg.Storage.Disks[1] != testDiskSdb {
-		t.Errorf("Disks[1] = %q, want %q", cfg.Storage.Disks[1], testDiskSdb)
-	}
-}
-
-func TestLoadFromEnvDisksTrimsWhitespace(t *testing.T) {
-	cfg := DefaultConfig()
-
-	// Spaces around comma-separated values
-	t.Setenv("DISKS", testDiskSda+" , "+testDiskSdb)
-	LoadFromEnv(cfg)
-
-	if len(cfg.Storage.Disks) != 2 {
-		t.Fatalf("Disks length = %d, want 2", len(cfg.Storage.Disks))
-	}
-
-	if cfg.Storage.Disks[0] != testDiskSda {
-		t.Errorf("Disks[0] = %q, want %q", cfg.Storage.Disks[0], testDiskSda)
-	}
-
-	if cfg.Storage.Disks[1] != testDiskSdb {
-		t.Errorf("Disks[1] = %q, want %q", cfg.Storage.Disks[1], testDiskSdb)
-	}
-}
-
-func TestLoadFromEnvDisksTrailingComma(t *testing.T) {
-	cfg := DefaultConfig()
-
-	// Trailing comma should be handled (filtered out empty string)
-	t.Setenv("DISKS", testDiskSda+","+testDiskSdb+",")
-	LoadFromEnv(cfg)
-
-	if len(cfg.Storage.Disks) != 2 {
-		t.Fatalf("Disks length = %d, want 2", len(cfg.Storage.Disks))
-	}
-
-	if cfg.Storage.Disks[0] != testDiskSda {
-		t.Errorf("Disks[0] = %q, want %q", cfg.Storage.Disks[0], testDiskSda)
-	}
-
-	if cfg.Storage.Disks[1] != testDiskSdb {
-		t.Errorf("Disks[1] = %q, want %q", cfg.Storage.Disks[1], testDiskSdb)
-	}
-}
-
-func TestLoadFromEnvDisksEmptyKeepsOriginal(t *testing.T) {
-	cfg := DefaultConfig()
-	cfg.Storage.Disks = []string{testDiskSdc} // Set initial value
-
-	t.Setenv("DISKS", "")
-	LoadFromEnv(cfg)
-
-	if len(cfg.Storage.Disks) != 1 {
-		t.Fatalf("Empty DISKS changed length: got %d, want 1", len(cfg.Storage.Disks))
-	}
-
-	if cfg.Storage.Disks[0] != testDiskSdc {
-		t.Errorf("Empty DISKS changed config: got %q, want %q", cfg.Storage.Disks[0], testDiskSdc)
-	}
-}
-
-func TestLoadFromEnvDisksOnlyCommasKeepsOriginal(t *testing.T) {
-	cfg := DefaultConfig()
-	cfg.Storage.Disks = []string{testDiskSdc} // Set initial value
-
-	// Only commas should result in all empty strings being filtered out
-	t.Setenv("DISKS", ",,,")
-	LoadFromEnv(cfg)
-
-	if len(cfg.Storage.Disks) != 1 {
-		t.Fatalf("Commas-only DISKS changed length: got %d, want 1", len(cfg.Storage.Disks))
-	}
-
-	if cfg.Storage.Disks[0] != testDiskSdc {
-		t.Errorf("Commas-only DISKS changed config: got %q, want %q", cfg.Storage.Disks[0], testDiskSdc)
+			assertDisksEqual(t, cfg.Storage.Disks, []string{testDiskSdc})
+		})
 	}
 }
 
@@ -733,14 +658,5 @@ func TestLoadFromEnvStorageMultipleFields(t *testing.T) {
 		t.Errorf(errFmtZFSRaid, cfg.Storage.ZFSRaid, ZFSRaid0)
 	}
 
-	if len(cfg.Storage.Disks) != 3 {
-		t.Fatalf("Disks length = %d, want 3", len(cfg.Storage.Disks))
-	}
-
-	expectedDisks := []string{testDiskSda, testDiskSdb, testDiskSdc}
-	for i, want := range expectedDisks {
-		if cfg.Storage.Disks[i] != want {
-			t.Errorf("Disks[%d] = %q, want %q", i, cfg.Storage.Disks[i], want)
-		}
-	}
+	assertDisksEqual(t, cfg.Storage.Disks, []string{testDiskSda, testDiskSdb, testDiskSdc})
 }
