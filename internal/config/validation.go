@@ -14,33 +14,47 @@ type ValidationError struct {
 }
 
 // Error returns all validation errors joined by semicolons.
-// Returns an empty string if there are no errors.
+// Returns an empty string if there are no errors or if the receiver is nil.
 func (v *ValidationError) Error() string {
-	if len(v.Errors) == 0 {
+	if v == nil || len(v.Errors) == 0 {
 		return ""
 	}
 
-	messages := make([]string, len(v.Errors))
-	for i, err := range v.Errors {
-		messages[i] = err.Error()
+	messages := make([]string, 0, len(v.Errors))
+	for _, err := range v.Errors {
+		if err == nil {
+			continue
+		}
+		messages = append(messages, err.Error())
+	}
+
+	if len(messages) == 0 {
+		return ""
 	}
 
 	return strings.Join(messages, "; ")
 }
 
 // HasErrors returns true if there are any validation errors.
+// Returns false if the receiver is nil.
 func (v *ValidationError) HasErrors() bool {
-	return len(v.Errors) > 0
+	return v != nil && len(v.Errors) > 0
 }
 
-// Unwrap returns the first error for compatibility with errors.Is() and errors.As().
-// Returns nil if there are no errors.
+// Unwrap returns the first non-nil error for compatibility with errors.Is() and errors.As().
+// Returns nil if there are no errors or if the receiver is nil.
 func (v *ValidationError) Unwrap() error {
-	if len(v.Errors) == 0 {
+	if v == nil {
 		return nil
 	}
 
-	return v.Errors[0]
+	for _, err := range v.Errors {
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // Add appends an error to the validation errors list.

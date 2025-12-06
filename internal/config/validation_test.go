@@ -225,6 +225,36 @@ func TestValidationError_ZeroValue(t *testing.T) {
 	assert.Nil(t, ve.Unwrap())
 }
 
+func TestValidationError_NilReceiver(t *testing.T) {
+	var ve *ValidationError
+
+	assert.False(t, ve.HasErrors())
+	assert.Equal(t, "", ve.Error())
+	assert.Nil(t, ve.Unwrap())
+}
+
+func TestValidationError_NilElementsInSlice(t *testing.T) {
+	ve := &ValidationError{
+		Errors: []error{nil, errHostnameEmpty, nil, errEmailInvalid, nil},
+	}
+
+	// Should skip nil elements
+	assert.Equal(t, errMsgHostnameEmpty+"; "+errMsgEmailInvalid, ve.Error())
+	assert.True(t, ve.HasErrors())
+	// Unwrap should return first non-nil error
+	assert.Equal(t, errHostnameEmpty, ve.Unwrap())
+}
+
+func TestValidationError_AllNilElements(t *testing.T) {
+	ve := &ValidationError{
+		Errors: []error{nil, nil, nil},
+	}
+
+	assert.Equal(t, "", ve.Error())
+	assert.True(t, ve.HasErrors()) // Slice has elements, even if nil
+	assert.Nil(t, ve.Unwrap())
+}
+
 func TestValidationError_TableDriven(t *testing.T) {
 	tests := []struct {
 		name           string
