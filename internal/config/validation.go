@@ -3,8 +3,63 @@
 package config
 
 import (
+	"errors"
+	"regexp"
 	"strings"
 )
+
+// Hostname validation constants.
+const (
+	// maxHostnameLength is the maximum allowed length for a hostname per RFC 1123.
+	maxHostnameLength = 63
+)
+
+// Hostname validation errors.
+var (
+	// ErrHostnameEmpty is returned when hostname is empty.
+	ErrHostnameEmpty = errors.New("hostname cannot be empty")
+	// ErrHostnameTooLong is returned when hostname exceeds 63 characters.
+	ErrHostnameTooLong = errors.New("hostname cannot exceed 63 characters")
+	// ErrHostnameStartsWithHyphen is returned when hostname starts with a hyphen.
+	ErrHostnameStartsWithHyphen = errors.New("hostname cannot start with a hyphen")
+	// ErrHostnameEndsWithHyphen is returned when hostname ends with a hyphen.
+	ErrHostnameEndsWithHyphen = errors.New("hostname cannot end with a hyphen")
+	// ErrHostnameInvalidChars is returned when hostname contains invalid characters.
+	ErrHostnameInvalidChars = errors.New("hostname can only contain alphanumeric characters and hyphens")
+)
+
+// hostnameRegex matches valid RFC 1123 hostname characters (alphanumeric and hyphens).
+var hostnameRegex = regexp.MustCompile(`^[a-zA-Z0-9-]+$`)
+
+// ValidateHostname validates a hostname according to RFC 1123.
+// A valid hostname:
+//   - Must not be empty
+//   - Must not exceed 63 characters
+//   - Can only contain alphanumeric characters (a-z, A-Z, 0-9) and hyphens (-)
+//   - Cannot start or end with a hyphen
+func ValidateHostname(hostname string) error {
+	if hostname == "" {
+		return ErrHostnameEmpty
+	}
+
+	if len(hostname) > maxHostnameLength {
+		return ErrHostnameTooLong
+	}
+
+	if hostname[0] == '-' {
+		return ErrHostnameStartsWithHyphen
+	}
+
+	if hostname[len(hostname)-1] == '-' {
+		return ErrHostnameEndsWithHyphen
+	}
+
+	if !hostnameRegex.MatchString(hostname) {
+		return ErrHostnameInvalidChars
+	}
+
+	return nil
+}
 
 // ValidationError aggregates multiple validation errors, enabling users
 // to see all configuration issues at once instead of one at a time.
