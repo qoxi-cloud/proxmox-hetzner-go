@@ -808,36 +808,7 @@ func TestLoadFromEnvTailscaleMultipleFields(t *testing.T) {
 	}
 }
 
-func TestLoadFromEnvTailscaleBooleanCaseInsensitive(t *testing.T) {
-	tests := []struct {
-		name     string
-		envName  string
-		input    string
-		getField func(*Config) bool
-		want     bool
-	}{
-		{"INSTALL_TAILSCALE True", "INSTALL_TAILSCALE", "True", func(c *Config) bool { return c.Tailscale.Enabled }, true},
-		{"INSTALL_TAILSCALE TRUE", "INSTALL_TAILSCALE", "TRUE", func(c *Config) bool { return c.Tailscale.Enabled }, true},
-		{"INSTALL_TAILSCALE yEs", "INSTALL_TAILSCALE", "yEs", func(c *Config) bool { return c.Tailscale.Enabled }, true},
-		{"INSTALL_TAILSCALE YES", "INSTALL_TAILSCALE", "YES", func(c *Config) bool { return c.Tailscale.Enabled }, true},
-		{"TAILSCALE_SSH TrUe", "TAILSCALE_SSH", "TrUe", func(c *Config) bool { return c.Tailscale.SSH }, true},
-		{"TAILSCALE_WEBUI TRUE", "TAILSCALE_WEBUI", "TRUE", func(c *Config) bool { return c.Tailscale.WebUI }, true},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			cfg := DefaultConfig()
-
-			t.Setenv(tt.envName, tt.input)
-			LoadFromEnv(cfg)
-
-			got := tt.getField(cfg)
-			if got != tt.want {
-				t.Errorf("%s with value %q: got %v, want %v", tt.envName, tt.input, got, tt.want)
-			}
-		})
-	}
-}
+// Note: Case-insensitive boolean tests are covered by TestLoadFromEnvBooleanEdgeCases.
 
 // =============================================================================
 // Integration Tests
@@ -1318,123 +1289,49 @@ func TestLoadFromEnvBooleanEdgeCases(t *testing.T) {
 
 // TestLoadFromEnvDisksFormats tests various formats for the DISKS environment variable.
 func TestLoadFromEnvDisksFormats(t *testing.T) {
+	sda := "/dev/sda"
+	sdb := "/dev/sdb"
+	sdc := "/dev/sdc"
+	twoDisks := []string{sda, sdb}
+	originalDisks := []string{"/dev/original"}
+
 	tests := []struct {
 		name         string
 		input        string
 		want         []string
-		wantOriginal bool // If true, original disks should be preserved
+		wantOriginal bool
 	}{
 		// Valid formats
-		{
-			name:  "single disk no comma",
-			input: "/dev/sda",
-			want:  []string{"/dev/sda"},
-		},
-		{
-			name:  "two disks",
-			input: "/dev/sda,/dev/sdb",
-			want:  []string{"/dev/sda", "/dev/sdb"},
-		},
-		{
-			name:  "three disks",
-			input: "/dev/sda,/dev/sdb,/dev/sdc",
-			want:  []string{"/dev/sda", "/dev/sdb", "/dev/sdc"},
-		},
-		{
-			name:  "nvme disks",
-			input: "/dev/nvme0n1,/dev/nvme1n1",
-			want:  []string{"/dev/nvme0n1", "/dev/nvme1n1"},
-		},
-		{
-			name:  "mixed disk types",
-			input: "/dev/sda,/dev/nvme0n1,/dev/vda",
-			want:  []string{"/dev/sda", "/dev/nvme0n1", "/dev/vda"},
-		},
-		// Whitespace handling
-		{
-			name:  "spaces around commas",
-			input: "/dev/sda , /dev/sdb",
-			want:  []string{"/dev/sda", "/dev/sdb"},
-		},
-		{
-			name:  "spaces before comma",
-			input: "/dev/sda ,/dev/sdb",
-			want:  []string{"/dev/sda", "/dev/sdb"},
-		},
-		{
-			name:  "spaces after comma",
-			input: "/dev/sda, /dev/sdb",
-			want:  []string{"/dev/sda", "/dev/sdb"},
-		},
-		{
-			name:  "tabs and spaces",
-			input: "/dev/sda\t,\t/dev/sdb",
-			want:  []string{"/dev/sda", "/dev/sdb"},
-		},
-		{
-			name:  "leading whitespace",
-			input: "  /dev/sda,/dev/sdb",
-			want:  []string{"/dev/sda", "/dev/sdb"},
-		},
-		{
-			name:  "trailing whitespace",
-			input: "/dev/sda,/dev/sdb  ",
-			want:  []string{"/dev/sda", "/dev/sdb"},
-		},
-		// Edge cases with commas
-		{
-			name:  "trailing comma",
-			input: "/dev/sda,/dev/sdb,",
-			want:  []string{"/dev/sda", "/dev/sdb"},
-		},
-		{
-			name:  "leading comma",
-			input: ",/dev/sda,/dev/sdb",
-			want:  []string{"/dev/sda", "/dev/sdb"},
-		},
-		{
-			name:  "multiple trailing commas",
-			input: "/dev/sda,/dev/sdb,,,",
-			want:  []string{"/dev/sda", "/dev/sdb"},
-		},
-		{
-			name:  "consecutive commas",
-			input: "/dev/sda,,/dev/sdb",
-			want:  []string{"/dev/sda", "/dev/sdb"},
-		},
-		// Empty/invalid cases (should preserve original)
-		{
-			name:         "empty string",
-			input:        "",
-			wantOriginal: true,
-		},
-		{
-			name:         "only commas",
-			input:        ",,,",
-			wantOriginal: true,
-		},
-		{
-			name:         "only spaces",
-			input:        "   ",
-			wantOriginal: true,
-		},
-		{
-			name:         "spaces and commas",
-			input:        " , , , ",
-			wantOriginal: true,
-		},
+		{"single disk", sda, []string{sda}, false},
+		{"two disks", sda + "," + sdb, twoDisks, false},
+		{"three disks", sda + "," + sdb + "," + sdc, []string{sda, sdb, sdc}, false},
+		{"nvme disks", "/dev/nvme0n1,/dev/nvme1n1", []string{"/dev/nvme0n1", "/dev/nvme1n1"}, false},
+		{"mixed types", sda + ",/dev/nvme0n1,/dev/vda", []string{sda, "/dev/nvme0n1", "/dev/vda"}, false},
+		// Whitespace handling - all result in twoDisks
+		{"spaces around commas", sda + " , " + sdb, twoDisks, false},
+		{"spaces before comma", sda + " ," + sdb, twoDisks, false},
+		{"spaces after comma", sda + ", " + sdb, twoDisks, false},
+		{"tabs and spaces", sda + "\t,\t" + sdb, twoDisks, false},
+		{"leading whitespace", "  " + sda + "," + sdb, twoDisks, false},
+		{"trailing whitespace", sda + "," + sdb + "  ", twoDisks, false},
+		// Edge cases with commas - all result in twoDisks
+		{"trailing comma", sda + "," + sdb + ",", twoDisks, false},
+		{"leading comma", "," + sda + "," + sdb, twoDisks, false},
+		{"multiple trailing commas", sda + "," + sdb + ",,,", twoDisks, false},
+		{"consecutive commas", sda + ",," + sdb, twoDisks, false},
+		// Empty/invalid cases - preserve original
+		{"empty string", "", nil, true},
+		{"only commas", ",,,", nil, true},
+		{"only spaces", "   ", nil, true},
+		{"spaces and commas", " , , , ", nil, true},
 	}
-
-	originalDisks := []string{"/dev/original"}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cfg := DefaultConfig()
 			cfg.Storage.Disks = originalDisks
-
 			t.Setenv("DISKS", tt.input)
 			LoadFromEnv(cfg)
-
 			if tt.wantOriginal {
 				assertDisksEqual(t, cfg.Storage.Disks, originalDisks)
 			} else {
