@@ -10,13 +10,18 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-func TestSaveToFile_SuccessfulSave(t *testing.T) {
+// Test constants for file names to avoid duplication.
+const (
+	testConfigFileName = "config.yaml"
+)
+
+func TestSaveToFileSuccessfulSave(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.System.Hostname = "test-save-host"
 	cfg.System.Email = "test@example.com"
 
 	tmpDir := t.TempDir()
-	filePath := filepath.Join(tmpDir, "config.yaml")
+	filePath := filepath.Join(tmpDir, testConfigFileName)
 
 	err := cfg.SaveToFile(filePath)
 	require.NoError(t, err)
@@ -37,14 +42,14 @@ func TestSaveToFile_SuccessfulSave(t *testing.T) {
 	assert.Equal(t, "test@example.com", restored.System.Email)
 }
 
-func TestSaveToFile_SensitiveFieldsExcluded(t *testing.T) {
+func TestSaveToFileSensitiveFieldsExcluded(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.System.RootPassword = "super-secret-password"
 	cfg.System.SSHPublicKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIG..."
 	cfg.Tailscale.AuthKey = "tskey-auth-secret123"
 
 	tmpDir := t.TempDir()
-	filePath := filepath.Join(tmpDir, "config.yaml")
+	filePath := filepath.Join(tmpDir, testConfigFileName)
 
 	err := cfg.SaveToFile(filePath)
 	require.NoError(t, err)
@@ -63,14 +68,14 @@ func TestSaveToFile_SensitiveFieldsExcluded(t *testing.T) {
 	assert.NotContains(t, content, "auth_key")
 }
 
-func TestSaveToFile_OriginalConfigUnmodified(t *testing.T) {
+func TestSaveToFileOriginalConfigUnmodified(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.System.RootPassword = "original-password"
 	cfg.System.SSHPublicKey = "original-ssh-key"
 	cfg.Tailscale.AuthKey = "original-tailscale-key"
 
 	tmpDir := t.TempDir()
-	filePath := filepath.Join(tmpDir, "config.yaml")
+	filePath := filepath.Join(tmpDir, testConfigFileName)
 
 	err := cfg.SaveToFile(filePath)
 	require.NoError(t, err)
@@ -81,11 +86,11 @@ func TestSaveToFile_OriginalConfigUnmodified(t *testing.T) {
 	assert.Equal(t, "original-tailscale-key", cfg.Tailscale.AuthKey)
 }
 
-func TestSaveToFile_CreatesParentDirectories(t *testing.T) {
+func TestSaveToFileCreatesParentDirectories(t *testing.T) {
 	cfg := DefaultConfig()
 
 	tmpDir := t.TempDir()
-	filePath := filepath.Join(tmpDir, "nested", "config.yaml")
+	filePath := filepath.Join(tmpDir, "nested", testConfigFileName)
 
 	err := cfg.SaveToFile(filePath)
 	require.NoError(t, err)
@@ -95,11 +100,11 @@ func TestSaveToFile_CreatesParentDirectories(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestSaveToFile_CreatesNestedDirectories(t *testing.T) {
+func TestSaveToFileCreatesNestedDirectories(t *testing.T) {
 	cfg := DefaultConfig()
 
 	tmpDir := t.TempDir()
-	filePath := filepath.Join(tmpDir, "level1", "level2", "level3", "config.yaml")
+	filePath := filepath.Join(tmpDir, "level1", "level2", "level3", testConfigFileName)
 
 	err := cfg.SaveToFile(filePath)
 	require.NoError(t, err)
@@ -113,11 +118,11 @@ func TestSaveToFile_CreatesNestedDirectories(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestSaveToFile_FilePermissions(t *testing.T) {
+func TestSaveToFileFilePermissions(t *testing.T) {
 	cfg := DefaultConfig()
 
 	tmpDir := t.TempDir()
-	filePath := filepath.Join(tmpDir, "config.yaml")
+	filePath := filepath.Join(tmpDir, testConfigFileName)
 
 	err := cfg.SaveToFile(filePath)
 	require.NoError(t, err)
@@ -132,12 +137,12 @@ func TestSaveToFile_FilePermissions(t *testing.T) {
 	assert.Equal(t, expectedMode, actualMode, "file permissions should be 0600")
 }
 
-func TestSaveToFile_OverwritesExistingFile(t *testing.T) {
+func TestSaveToFileOverwritesExistingFile(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.System.Hostname = "first-hostname"
 
 	tmpDir := t.TempDir()
-	filePath := filepath.Join(tmpDir, "config.yaml")
+	filePath := filepath.Join(tmpDir, testConfigFileName)
 
 	// First save
 	err := cfg.SaveToFile(filePath)
@@ -159,7 +164,7 @@ func TestSaveToFile_OverwritesExistingFile(t *testing.T) {
 	assert.Equal(t, "second-hostname", restored.System.Hostname)
 }
 
-func TestSaveToFile_InvalidPath(t *testing.T) {
+func TestSaveToFileInvalidPath(t *testing.T) {
 	cfg := DefaultConfig()
 
 	// Try to save to a path where directory creation should fail
@@ -168,7 +173,7 @@ func TestSaveToFile_InvalidPath(t *testing.T) {
 	require.Error(t, err)
 }
 
-func TestSaveToFile_PreservesAllNonSensitiveFields(t *testing.T) {
+func TestSaveToFilePreservesAllNonSensitiveFields(t *testing.T) {
 	cfg := &Config{
 		System: SystemConfig{
 			Hostname:     "test-hostname",
@@ -196,7 +201,7 @@ func TestSaveToFile_PreservesAllNonSensitiveFields(t *testing.T) {
 	}
 
 	tmpDir := t.TempDir()
-	filePath := filepath.Join(tmpDir, "config.yaml")
+	filePath := filepath.Join(tmpDir, testConfigFileName)
 
 	err := cfg.SaveToFile(filePath)
 	require.NoError(t, err)
@@ -231,11 +236,11 @@ func TestSaveToFile_PreservesAllNonSensitiveFields(t *testing.T) {
 	assert.Empty(t, restored.Tailscale.AuthKey)
 }
 
-func TestSaveToFile_ValidYAMLOutput(t *testing.T) {
+func TestSaveToFileValidYAMLOutput(t *testing.T) {
 	cfg := DefaultConfig()
 
 	tmpDir := t.TempDir()
-	filePath := filepath.Join(tmpDir, "config.yaml")
+	filePath := filepath.Join(tmpDir, testConfigFileName)
 
 	err := cfg.SaveToFile(filePath)
 	require.NoError(t, err)
@@ -268,12 +273,12 @@ func TestSaveToFile_ValidYAMLOutput(t *testing.T) {
 	assert.True(t, hasTailscale, "YAML should have 'tailscale' key")
 }
 
-func TestSaveToFile_DirectoryPermissions(t *testing.T) {
+func TestSaveToFileDirectoryPermissions(t *testing.T) {
 	cfg := DefaultConfig()
 
 	tmpDir := t.TempDir()
 	nestedDir := filepath.Join(tmpDir, "created_dir")
-	filePath := filepath.Join(nestedDir, "config.yaml")
+	filePath := filepath.Join(nestedDir, testConfigFileName)
 
 	err := cfg.SaveToFile(filePath)
 	require.NoError(t, err)
@@ -288,7 +293,7 @@ func TestSaveToFile_DirectoryPermissions(t *testing.T) {
 	assert.Equal(t, expectedMode, actualMode, "directory permissions should be 0750")
 }
 
-func TestSaveToFile_EmptyConfig(t *testing.T) {
+func TestSaveToFileEmptyConfig(t *testing.T) {
 	cfg := &Config{}
 
 	tmpDir := t.TempDir()
@@ -306,7 +311,7 @@ func TestSaveToFile_EmptyConfig(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestSaveToFile_WithSpecialCharactersInPath(t *testing.T) {
+func TestSaveToFileWithSpecialCharactersInPath(t *testing.T) {
 	cfg := DefaultConfig()
 
 	tmpDir := t.TempDir()
