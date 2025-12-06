@@ -28,6 +28,8 @@ const (
 	testTailscaleAuthKey2 = "tskey-auth-supersecret" // NOSONAR(go:S1313) Test Tailscale key - not real
 	testDefaultHostname   = "pve-qoxi-cloud"         // Default hostname per PRD specification
 	testHostnamePveServer = "pve-server"             // Common test hostname
+	testDomainSuffixLocal = "local"                  // Default domain suffix per PRD specification
+	testDotLocal          = ".local"                 // Domain suffix with dot prefix for FQDN tests
 )
 
 func TestSystemConfig_SensitiveFieldsOmittedFromYAML(t *testing.T) {
@@ -41,14 +43,14 @@ func TestSystemConfig_SensitiveFieldsOmittedFromYAML(t *testing.T) {
 			name: "standard config with all fields",
 			cfg: SystemConfig{
 				Hostname:     testHostnamePveServer,
-				DomainSuffix: "local",
+				DomainSuffix: testDomainSuffixLocal,
 				Timezone:     testTimezoneKyiv,
 				Email:        "admin@example.com",
 				RootPassword: testPassword,
 				SSHPublicKey: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIG...",
 			},
 			shouldNotContain: []string{testPassword, "ssh-ed25519", "root_password", "ssh_public_key"},
-			shouldContain:    []string{"hostname: " + testHostnamePveServer, "domain_suffix: local", "timezone: " + testTimezoneKyiv, "email: admin@example.com"},
+			shouldContain:    []string{"hostname: " + testHostnamePveServer, "domain_suffix: " + testDomainSuffixLocal, "timezone: " + testTimezoneKyiv, "email: admin@example.com"},
 		},
 		{
 			name: "config with special characters in sensitive fields",
@@ -67,7 +69,7 @@ func TestSystemConfig_SensitiveFieldsOmittedFromYAML(t *testing.T) {
 			name: "config with empty sensitive fields",
 			cfg: SystemConfig{
 				Hostname:     "empty-secrets",
-				DomainSuffix: "local",
+				DomainSuffix: testDomainSuffixLocal,
 				Timezone:     "UTC",
 				Email:        "admin@local",
 				RootPassword: "",
@@ -1143,7 +1145,7 @@ func TestConfig_NestedStructsSerializeCorrectly(t *testing.T) {
 	cfg := Config{
 		System: SystemConfig{
 			Hostname:     testHostnamePveServer,
-			DomainSuffix: "local",
+			DomainSuffix: testDomainSuffixLocal,
 			Timezone:     testTimezoneKyiv,
 			Email:        "admin@example.com",
 			RootPassword: testPassword,
@@ -1433,7 +1435,7 @@ func TestDefaultConfig_SystemDefaults(t *testing.T) {
 	cfg := DefaultConfig()
 
 	assert.Equal(t, testDefaultHostname, cfg.System.Hostname)
-	assert.Equal(t, "local", cfg.System.DomainSuffix)
+	assert.Equal(t, testDomainSuffixLocal, cfg.System.DomainSuffix)
 	assert.Equal(t, testTimezoneKyiv, cfg.System.Timezone)
 	assert.Equal(t, "admin@qoxi.cloud", cfg.System.Email)
 }
@@ -1489,8 +1491,8 @@ func TestConfig_FQDN_WithHostnameAndDomainSuffix(t *testing.T) {
 		{
 			name:         "standard local domain",
 			hostname:     testHostnamePveServer,
-			domainSuffix: "local",
-			expectedFQDN: testHostnamePveServer + ".local",
+			domainSuffix: testDomainSuffixLocal,
+			expectedFQDN: testHostnamePveServer + testDotLocal,
 		},
 		{
 			name:         "example.com domain",
@@ -1539,11 +1541,11 @@ func TestConfig_FQDN_WithEmptyHostname(t *testing.T) {
 	cfg := &Config{
 		System: SystemConfig{
 			Hostname:     "",
-			DomainSuffix: "local",
+			DomainSuffix: testDomainSuffixLocal,
 		},
 	}
 	// Returns ".local" when hostname is empty
-	assert.Equal(t, ".local", cfg.FQDN())
+	assert.Equal(t, testDotLocal, cfg.FQDN())
 }
 
 func TestConfig_FQDN_WithBothEmpty(t *testing.T) {
@@ -1560,7 +1562,7 @@ func TestConfig_FQDN_WithBothEmpty(t *testing.T) {
 func TestConfig_FQDN_WithDefaultConfig(t *testing.T) {
 	cfg := DefaultConfig()
 	// Default config has hostname "pve-qoxi-cloud" and domain_suffix "local"
-	assert.Equal(t, testDefaultHostname+".local", cfg.FQDN())
+	assert.Equal(t, testDefaultHostname+testDotLocal, cfg.FQDN())
 }
 
 func TestDefaultConfig_AllDefaultsMatchPRDSpecification(t *testing.T) {
@@ -1573,8 +1575,8 @@ func TestDefaultConfig_AllDefaultsMatchPRDSpecification(t *testing.T) {
 		expected interface{}
 	}{
 		{"Hostname", cfg.System.Hostname, testDefaultHostname},
-		{"DomainSuffix", cfg.System.DomainSuffix, "local"},
-		{"Timezone", cfg.System.Timezone, "Europe/Kyiv"},
+		{"DomainSuffix", cfg.System.DomainSuffix, testDomainSuffixLocal},
+		{"Timezone", cfg.System.Timezone, testTimezoneKyiv},
 		{"Email", cfg.System.Email, "admin@qoxi.cloud"},
 		{"BridgeMode", cfg.Network.BridgeMode, BridgeModeInternal},
 		{"PrivateSubnet", cfg.Network.PrivateSubnet, testSubnetClassA},
