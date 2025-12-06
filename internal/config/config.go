@@ -78,3 +78,30 @@ type Config struct {
 	// Verbose enables verbose logging (runtime only, not saved).
 	Verbose bool `yaml:"-"`
 }
+
+// DefaultConfig returns a Config with sensible default values.
+// Each call returns a new Config instance to avoid shared state.
+func DefaultConfig() *Config {
+	return &Config{
+		System: SystemConfig{
+			Hostname:     "pve-qoxi-cloud",
+			DomainSuffix: "local",
+			Timezone:     "Europe/Kyiv",
+			Email:        "admin@qoxi.cloud",
+		},
+		Network: NetworkConfig{
+			BridgeMode:    BridgeModeInternal,
+			PrivateSubnet: "10.0.0.0/24",
+		},
+		Storage: StorageConfig{
+			ZFSRaid: ZFSRaid1,
+			Disks:   []string{},
+		},
+		Tailscale: TailscaleConfig{
+			Enabled: false,
+			SSH:     true,
+			WebUI:   false,
+		},
+		Verbose: false,
+	}
+}

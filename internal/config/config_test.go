@@ -1406,3 +1406,100 @@ func TestConfig_AllFieldsExist(t *testing.T) {
 		}
 	}
 }
+
+// DefaultConfig tests
+
+func TestDefaultConfig_ReturnsValidPointer(t *testing.T) {
+	cfg := DefaultConfig()
+	require.NotNil(t, cfg)
+}
+
+func TestDefaultConfig_ReturnsNewInstanceEachCall(t *testing.T) {
+	cfg1 := DefaultConfig()
+	cfg2 := DefaultConfig()
+
+	// Should be different pointers
+	require.NotSame(t, cfg1, cfg2)
+
+	// Modify cfg1 and verify cfg2 is not affected
+	cfg1.System.Hostname = "modified-hostname"
+	assert.NotEqual(t, cfg1.System.Hostname, cfg2.System.Hostname)
+	assert.Equal(t, "pve-qoxi-cloud", cfg2.System.Hostname)
+}
+
+func TestDefaultConfig_SystemDefaults(t *testing.T) {
+	cfg := DefaultConfig()
+
+	assert.Equal(t, "pve-qoxi-cloud", cfg.System.Hostname)
+	assert.Equal(t, "local", cfg.System.DomainSuffix)
+	assert.Equal(t, testTimezoneKyiv, cfg.System.Timezone)
+	assert.Equal(t, "admin@qoxi.cloud", cfg.System.Email)
+}
+
+func TestDefaultConfig_NetworkDefaults(t *testing.T) {
+	cfg := DefaultConfig()
+
+	assert.Equal(t, BridgeModeInternal, cfg.Network.BridgeMode)
+	assert.Equal(t, testSubnetClassA, cfg.Network.PrivateSubnet)
+	assert.Empty(t, cfg.Network.InterfaceName) // Should be auto-detected
+}
+
+func TestDefaultConfig_StorageDefaults(t *testing.T) {
+	cfg := DefaultConfig()
+
+	assert.Equal(t, ZFSRaid1, cfg.Storage.ZFSRaid)
+	assert.NotNil(t, cfg.Storage.Disks)
+	assert.Empty(t, cfg.Storage.Disks) // Should be auto-detected
+}
+
+func TestDefaultConfig_TailscaleDefaults(t *testing.T) {
+	cfg := DefaultConfig()
+
+	assert.False(t, cfg.Tailscale.Enabled)
+	assert.True(t, cfg.Tailscale.SSH)
+	assert.False(t, cfg.Tailscale.WebUI)
+}
+
+func TestDefaultConfig_VerboseDefault(t *testing.T) {
+	cfg := DefaultConfig()
+
+	assert.False(t, cfg.Verbose)
+}
+
+func TestDefaultConfig_SensitiveFieldsEmpty(t *testing.T) {
+	cfg := DefaultConfig()
+
+	// All sensitive fields should be empty strings
+	assert.Empty(t, cfg.System.RootPassword)
+	assert.Empty(t, cfg.System.SSHPublicKey)
+	assert.Empty(t, cfg.Tailscale.AuthKey)
+}
+
+func TestDefaultConfig_AllDefaultsMatchPRDSpecification(t *testing.T) {
+	cfg := DefaultConfig()
+
+	// This is a comprehensive test that verifies all defaults match PRD
+	tests := []struct {
+		name     string
+		got      interface{}
+		expected interface{}
+	}{
+		{"Hostname", cfg.System.Hostname, "pve-qoxi-cloud"},
+		{"DomainSuffix", cfg.System.DomainSuffix, "local"},
+		{"Timezone", cfg.System.Timezone, "Europe/Kyiv"},
+		{"Email", cfg.System.Email, "admin@qoxi.cloud"},
+		{"BridgeMode", cfg.Network.BridgeMode, BridgeModeInternal},
+		{"PrivateSubnet", cfg.Network.PrivateSubnet, "10.0.0.0/24"},
+		{"ZFSRaid", cfg.Storage.ZFSRaid, ZFSRaid1},
+		{"TailscaleEnabled", cfg.Tailscale.Enabled, false},
+		{"TailscaleSSH", cfg.Tailscale.SSH, true},
+		{"TailscaleWebUI", cfg.Tailscale.WebUI, false},
+		{"Verbose", cfg.Verbose, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.expected, tt.got)
+		})
+	}
+}
