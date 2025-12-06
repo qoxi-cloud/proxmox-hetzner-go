@@ -304,3 +304,59 @@ func TestValidationError_TableDriven(t *testing.T) {
 		})
 	}
 }
+
+// ValidateHostname tests
+
+func TestValidateHostname(t *testing.T) {
+	tests := []struct {
+		name        string
+		hostname    string
+		expectedErr error
+	}{
+		// Valid hostnames
+		{"valid simple hostname", "pve-server", nil},
+		{"valid single letter", "a", nil},
+		{"valid single digit", "1", nil},
+		{"valid alphanumeric", "server1", nil},
+		{"valid with multiple hyphens", "my-pve-server-01", nil},
+		{"valid uppercase letters", "PVE-SERVER", nil},
+		{"valid mixed case", "Pve-Server-01", nil},
+		{"valid exactly 63 characters", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", nil},
+		{"valid numbers only", "12345", nil},
+		{"valid hyphen in middle", "a-b", nil},
+		// Empty hostname
+		{"empty hostname", "", ErrHostnameEmpty},
+		// Too long hostname (64 characters)
+		{"too long hostname", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", ErrHostnameTooLong},
+		// Starts with hyphen
+		{"starts with hyphen", "-server", ErrHostnameStartsWithHyphen},
+		{"only hyphen", "-", ErrHostnameStartsWithHyphen},
+		{"multiple hyphens only", "---", ErrHostnameStartsWithHyphen},
+		// Ends with hyphen
+		{"ends with hyphen", "server-", ErrHostnameEndsWithHyphen},
+		// Invalid characters
+		{"invalid underscore", "pve_server", ErrHostnameInvalidChars},
+		{"invalid period", "pve.server", ErrHostnameInvalidChars},
+		{"invalid at symbol", "pve@server", ErrHostnameInvalidChars},
+		{"invalid space", "pve server", ErrHostnameInvalidChars},
+		{"invalid exclamation", "pve!server", ErrHostnameInvalidChars},
+		{"invalid hash", "pve#server", ErrHostnameInvalidChars},
+		{"invalid dollar", "pve$server", ErrHostnameInvalidChars},
+		{"invalid percent", "pve%server", ErrHostnameInvalidChars},
+		{"invalid unicode", "pve-сервер", ErrHostnameInvalidChars},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateHostname(tt.hostname)
+
+			if tt.expectedErr == nil {
+				assert.NoError(t, err)
+			} else {
+				require.Error(t, err)
+				assert.Equal(t, tt.expectedErr, err)
+				assert.True(t, errors.Is(err, tt.expectedErr))
+			}
+		})
+	}
+}
