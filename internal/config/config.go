@@ -79,9 +79,12 @@ type Config struct {
 	Verbose bool `yaml:"-"`
 }
 
-// Default private subnet for NAT network (RFC 1918 Class A private range).
-// This is intentionally hardcoded as the default value per PRD specification.
-const defaultPrivateSubnet = "10.0.0.0/24" //nolint:gosec // NOSONAR(go:S1313) RFC 1918 private range - default config
+// Default configuration values per PRD specification.
+// These are intentionally hardcoded as sensible defaults for the installer.
+const (
+	// defaultPrivateSubnet is the default NAT network subnet (RFC 1918 Class A private range).
+	defaultPrivateSubnet = "10.0.0.0/24" // NOSONAR(go:S1313) RFC 1918 private range - default config value
+)
 
 // DefaultConfig returns a Config with sensible default values.
 // Each call returns a new Config instance to avoid shared state.
