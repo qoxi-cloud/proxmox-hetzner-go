@@ -49,8 +49,8 @@ func parseDisksEnv(v string) []string {
 // LoadFromEnv loads configuration values from environment variables into cfg.
 // Only non-empty environment variable values override existing configuration;
 // empty or unset variables leave the current values unchanged.
-// Sensitive fields (RootPassword, SSHPublicKey) are loaded from env but are
-// never persisted to configuration files.
+// Sensitive fields (RootPassword, SSHPublicKey, TailscaleAuthKey) are loaded
+// from env but are never persisted to configuration files.
 func LoadFromEnv(cfg *Config) {
 	if cfg == nil {
 		return
@@ -59,6 +59,7 @@ func LoadFromEnv(cfg *Config) {
 	loadSystemEnv(cfg)
 	loadNetworkEnv(cfg)
 	loadStorageEnv(cfg)
+	loadTailscaleEnv(cfg)
 }
 
 // loadSystemEnv loads system configuration from environment variables.
@@ -119,5 +120,26 @@ func loadStorageEnv(cfg *Config) {
 		if disks := parseDisksEnv(v); disks != nil {
 			cfg.Storage.Disks = disks
 		}
+	}
+}
+
+// loadTailscaleEnv loads Tailscale configuration from environment variables.
+// Boolean fields use EnvVarSet to distinguish unset from "false".
+// TAILSCALE_AUTH_KEY is a sensitive field loaded from env but never persisted.
+func loadTailscaleEnv(cfg *Config) {
+	if EnvVarSet("INSTALL_TAILSCALE") {
+		cfg.Tailscale.Enabled = parseBool(os.Getenv("INSTALL_TAILSCALE"))
+	}
+
+	if v := os.Getenv("TAILSCALE_AUTH_KEY"); v != "" {
+		cfg.Tailscale.AuthKey = v
+	}
+
+	if EnvVarSet("TAILSCALE_SSH") {
+		cfg.Tailscale.SSH = parseBool(os.Getenv("TAILSCALE_SSH"))
+	}
+
+	if EnvVarSet("TAILSCALE_WEBUI") {
+		cfg.Tailscale.WebUI = parseBool(os.Getenv("TAILSCALE_WEBUI"))
 	}
 }
