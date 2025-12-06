@@ -10,7 +10,7 @@ import (
 
 // Hostname validation constants.
 const (
-	// maxHostnameLength is the maximum allowed length for a hostname per RFC 1123.
+	// MaxHostnameLength is the maximum allowed length for a hostname per RFC 1123.
 	maxHostnameLength = 63
 )
 
