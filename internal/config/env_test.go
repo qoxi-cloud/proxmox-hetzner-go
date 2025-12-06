@@ -147,6 +147,9 @@ const (
 	testMultiSSHKey   = "ssh-rsa AAAAB3..."
 	testPartial       = "partial-test"
 	testModify        = "modify-test"
+
+	// Error format strings.
+	errFmtHostname = "Hostname = %q, want %q"
 )
 
 func TestLoadFromEnvNilConfig(t *testing.T) {
@@ -164,7 +167,7 @@ func TestLoadFromEnvHostname(t *testing.T) {
 	LoadFromEnv(cfg)
 
 	if cfg.System.Hostname != testHostname {
-		t.Errorf("Hostname = %q, want %q", cfg.System.Hostname, testHostname)
+		t.Errorf(errFmtHostname, cfg.System.Hostname, testHostname)
 	}
 
 	// Verify original was different
@@ -256,7 +259,7 @@ func TestLoadFromEnvMultipleFields(t *testing.T) {
 	LoadFromEnv(cfg)
 
 	if cfg.System.Hostname != testMultiHostname {
-		t.Errorf("Hostname = %q, want %q", cfg.System.Hostname, testMultiHostname)
+		t.Errorf(errFmtHostname, cfg.System.Hostname, testMultiHostname)
 	}
 
 	if cfg.System.DomainSuffix != testMultiDomain {
@@ -290,7 +293,7 @@ func TestLoadFromEnvPartialOverride(t *testing.T) {
 	LoadFromEnv(cfg)
 
 	if cfg.System.Hostname != testPartial {
-		t.Errorf("Hostname = %q, want %q", cfg.System.Hostname, testPartial)
+		t.Errorf(errFmtHostname, cfg.System.Hostname, testPartial)
 	}
 
 	if cfg.System.DomainSuffix != originalDomain {
