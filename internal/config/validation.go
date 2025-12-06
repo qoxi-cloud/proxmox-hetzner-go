@@ -75,6 +75,14 @@ var (
 	ErrBridgeModeInvalid = errors.New("bridge mode must be one of: internal, external, both")
 )
 
+// ZFS RAID validation errors.
+var (
+	// ErrZFSRaidEmpty is returned when ZFS RAID level is empty.
+	ErrZFSRaidEmpty = errors.New("ZFS RAID level is required")
+	// ErrZFSRaidInvalid is returned when ZFS RAID level is not a valid value.
+	ErrZFSRaidInvalid = errors.New("ZFS RAID level must be one of: single, raid0, raid1")
+)
+
 // hostnameRegex matches valid RFC 1123 hostname characters (alphanumeric and hyphens).
 var hostnameRegex = regexp.MustCompile(`^[a-zA-Z0-9-]+$`)
 
@@ -267,6 +275,24 @@ func ValidateBridgeMode(mode BridgeMode) error {
 
 	if !mode.IsValid() {
 		return ErrBridgeModeInvalid
+	}
+
+	return nil
+}
+
+// ValidateZFSRaid validates a ZFS RAID level.
+// A valid ZFS RAID level:
+//   - Must not be empty
+//   - Must be one of: single, raid0, raid1
+//
+// This function uses the ZFSRaid.IsValid() method for validation.
+func ValidateZFSRaid(raid ZFSRaid) error {
+	if raid == "" {
+		return ErrZFSRaidEmpty
+	}
+
+	if !raid.IsValid() {
+		return ErrZFSRaidInvalid
 	}
 
 	return nil

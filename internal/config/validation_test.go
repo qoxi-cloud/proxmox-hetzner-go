@@ -601,3 +601,54 @@ func TestValidateBridgeMode(t *testing.T) {
 		})
 	}
 }
+
+// ValidateZFSRaid tests
+
+func TestValidateZFSRaid(t *testing.T) {
+	tests := []struct {
+		name        string
+		raid        ZFSRaid
+		expectedErr error
+	}{
+		// Valid ZFS RAID levels
+		{"valid single", ZFSRaidSingle, nil},
+		{"valid raid0", ZFSRaid0, nil},
+		{"valid raid1", ZFSRaid1, nil},
+		// Empty RAID level
+		{"empty raid level", ZFSRaid(""), ErrZFSRaidEmpty},
+		// Invalid - unsupported RAID levels
+		{"invalid raid5", ZFSRaid("raid5"), ErrZFSRaidInvalid},
+		{"invalid raid6", ZFSRaid("raid6"), ErrZFSRaidInvalid},
+		{"invalid raidz", ZFSRaid("raidz"), ErrZFSRaidInvalid},
+		{"invalid raidz2", ZFSRaid("raidz2"), ErrZFSRaidInvalid},
+		// Invalid - case sensitivity
+		{"invalid uppercase SINGLE", ZFSRaid("SINGLE"), ErrZFSRaidInvalid},
+		{"invalid uppercase Single", ZFSRaid("Single"), ErrZFSRaidInvalid},
+		{"invalid uppercase RAID0", ZFSRaid("RAID0"), ErrZFSRaidInvalid},
+		{"invalid uppercase Raid0", ZFSRaid("Raid0"), ErrZFSRaidInvalid},
+		{"invalid uppercase RAID1", ZFSRaid("RAID1"), ErrZFSRaidInvalid},
+		// Invalid - random strings
+		{"invalid random string", ZFSRaid("random"), ErrZFSRaidInvalid},
+		{"invalid numeric only", ZFSRaid("123"), ErrZFSRaidInvalid},
+		// Invalid - partial matches
+		{"invalid partial raid", ZFSRaid("raid"), ErrZFSRaidInvalid},
+		{"invalid partial sing", ZFSRaid("sing"), ErrZFSRaidInvalid},
+		// Invalid - with spaces
+		{"invalid leading space", ZFSRaid(" single"), ErrZFSRaidInvalid},
+		{"invalid trailing space", ZFSRaid("raid0 "), ErrZFSRaidInvalid},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateZFSRaid(tt.raid)
+
+			if tt.expectedErr == nil {
+				assert.NoError(t, err)
+			} else {
+				require.Error(t, err)
+				assert.Equal(t, tt.expectedErr, err)
+				assert.True(t, errors.Is(err, tt.expectedErr))
+			}
+		})
+	}
+}
