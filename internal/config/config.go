@@ -92,6 +92,7 @@ func (c *Config) FQDN() string {
 	if c.System.DomainSuffix == "" {
 		return c.System.Hostname
 	}
+
 	return c.System.Hostname + "." + c.System.DomainSuffix
 }
 
