@@ -438,6 +438,22 @@ func assertDisksEqual(t *testing.T, got, want []string) {
 	}
 }
 
+// assertStringField is a test helper that verifies a string field value.
+func assertStringField(t *testing.T, name, got, want string) {
+	t.Helper()
+	if got != want {
+		t.Errorf("%s = %q, want %q", name, got, want)
+	}
+}
+
+// assertBoolField is a test helper that verifies a boolean field value.
+func assertBoolField(t *testing.T, name string, got, want bool) {
+	t.Helper()
+	if got != want {
+		t.Errorf("%s = %v, want %v", name, got, want)
+	}
+}
+
 func TestLoadFromEnvZFSRaidValues(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -497,50 +513,56 @@ func TestLoadFromEnvZFSRaidInvalidKeepsOriginal(t *testing.T) {
 }
 
 func TestLoadFromEnvDisksValues(t *testing.T) {
+	twoDisks := []string{testDiskSda, testDiskSdb}
 	tests := []struct {
 		name  string
 		input string
 		want  []string
 	}{
 		{"single disk", testDiskSda, []string{testDiskSda}},
-		{"two disks", testDiskSda + "," + testDiskSdb, []string{testDiskSda, testDiskSdb}},
+		{"two disks", testDiskSda + "," + testDiskSdb, twoDisks},
 		{"three disks", testDiskSda + "," + testDiskSdb + "," + testDiskSdc, []string{testDiskSda, testDiskSdb, testDiskSdc}},
-		{"with spaces", testDiskSda + " , " + testDiskSdb, []string{testDiskSda, testDiskSdb}},
-		{"trailing comma", testDiskSda + "," + testDiskSdb + ",", []string{testDiskSda, testDiskSdb}},
-		{"leading comma", "," + testDiskSda + "," + testDiskSdb, []string{testDiskSda, testDiskSdb}},
+		{"nvme disks", "/dev/nvme0n1,/dev/nvme1n1", []string{"/dev/nvme0n1", "/dev/nvme1n1"}},
+		{"mixed types", testDiskSda + ",/dev/nvme0n1,/dev/vda", []string{testDiskSda, "/dev/nvme0n1", "/dev/vda"}},
+		{"with spaces", testDiskSda + " , " + testDiskSdb, twoDisks},
+		{"tabs and spaces", testDiskSda + "\t,\t" + testDiskSdb, twoDisks},
+		{"leading whitespace", "  " + testDiskSda + "," + testDiskSdb, twoDisks},
+		{"trailing whitespace", testDiskSda + "," + testDiskSdb + "  ", twoDisks},
+		{"trailing comma", testDiskSda + "," + testDiskSdb + ",", twoDisks},
+		{"leading comma", "," + testDiskSda + "," + testDiskSdb, twoDisks},
+		{"multiple trailing commas", testDiskSda + "," + testDiskSdb + ",,,", twoDisks},
+		{"consecutive commas", testDiskSda + ",," + testDiskSdb, twoDisks},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cfg := DefaultConfig()
-
 			t.Setenv("DISKS", tt.input)
 			LoadFromEnv(cfg)
-
 			assertDisksEqual(t, cfg.Storage.Disks, tt.want)
 		})
 	}
 }
 
 func TestLoadFromEnvDisksKeepsOriginal(t *testing.T) {
+	originalDisks := []string{testDiskSdc}
 	tests := []struct {
 		name  string
 		input string
 	}{
 		{testCaseEmptyString, ""},
 		{"only commas", ",,,"},
+		{"only spaces", "   "},
 		{"only spaces and commas", " , , "},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cfg := DefaultConfig()
-			cfg.Storage.Disks = []string{testDiskSdc}
-
+			cfg.Storage.Disks = originalDisks
 			t.Setenv("DISKS", tt.input)
 			LoadFromEnv(cfg)
-
-			assertDisksEqual(t, cfg.Storage.Disks, []string{testDiskSdc})
+			assertDisksEqual(t, cfg.Storage.Disks, originalDisks)
 		})
 	}
 }
@@ -715,149 +737,56 @@ func TestLoadFromEnvFullConfiguration(t *testing.T) {
 	// NOSONAR(go:S2068) - test credentials, not real values
 	testPassword := "envpassword123" // NOSONAR(go:S2068) test value
 	testAuthKey := "tskey-auth-123"  // NOSONAR(go:S2068) test value
+	testSSHKeyFull := "ssh-ed25519 AAAA... test@example.com"
 
-	// System configuration
-	t.Setenv("PVE_HOSTNAME", "env-server")
-	t.Setenv("PVE_DOMAIN_SUFFIX", "env.local")
-	t.Setenv("PVE_TIMEZONE", "America/New_York")
-	t.Setenv("PVE_EMAIL", "env@test.com")
-	t.Setenv("PVE_ROOT_PASSWORD", testPassword)
-	t.Setenv("PVE_SSH_PUBLIC_KEY", "ssh-ed25519 AAAA... test@example.com")
-
-	// Network configuration
-	t.Setenv("INTERFACE_NAME", intTestInterfaceName)
-	t.Setenv("BRIDGE_MODE", "both")
-	t.Setenv("PRIVATE_SUBNET", intTestSubnet)
-
-	// Storage configuration
-	t.Setenv("ZFS_RAID", "raid0")
-	t.Setenv("DISKS", "/dev/nvme0n1,/dev/nvme1n1")
-
-	// Tailscale configuration
-	t.Setenv("INSTALL_TAILSCALE", "true")
-	t.Setenv("TAILSCALE_AUTH_KEY", testAuthKey)
-	t.Setenv("TAILSCALE_SSH", "yes")
-	t.Setenv("TAILSCALE_WEBUI", "1")
+	// Set all environment variables
+	envVars := map[string]string{
+		"PVE_HOSTNAME": "env-server", "PVE_DOMAIN_SUFFIX": "env.local",
+		"PVE_TIMEZONE": "America/New_York", "PVE_EMAIL": "env@test.com",
+		"PVE_ROOT_PASSWORD": testPassword, "PVE_SSH_PUBLIC_KEY": testSSHKeyFull,
+		"INTERFACE_NAME": intTestInterfaceName, "BRIDGE_MODE": "both", "PRIVATE_SUBNET": intTestSubnet,
+		"ZFS_RAID": "raid0", "DISKS": "/dev/nvme0n1,/dev/nvme1n1",
+		"INSTALL_TAILSCALE": "true", "TAILSCALE_AUTH_KEY": testAuthKey,
+		"TAILSCALE_SSH": "yes", "TAILSCALE_WEBUI": "1",
+	}
+	for k, v := range envVars {
+		t.Setenv(k, v)
+	}
 
 	LoadFromEnv(cfg)
 
-	// Verify System configuration
-	if cfg.System.Hostname != "env-server" {
-		t.Errorf("System.Hostname = %q, want %q", cfg.System.Hostname, "env-server")
-	}
-
-	if cfg.System.DomainSuffix != "env.local" {
-		t.Errorf("System.DomainSuffix = %q, want %q", cfg.System.DomainSuffix, "env.local")
-	}
-
-	if cfg.System.Timezone != "America/New_York" {
-		t.Errorf("System.Timezone = %q, want %q", cfg.System.Timezone, "America/New_York")
-	}
-
-	if cfg.System.Email != "env@test.com" {
-		t.Errorf("System.Email = %q, want %q", cfg.System.Email, "env@test.com")
-	}
-
-	if cfg.System.RootPassword != testPassword {
-		t.Errorf("System.RootPassword = %q, want %q", cfg.System.RootPassword, testPassword)
-	}
-
-	if cfg.System.SSHPublicKey != "ssh-ed25519 AAAA... test@example.com" {
-		t.Errorf("System.SSHPublicKey = %q, want %q", cfg.System.SSHPublicKey, "ssh-ed25519 AAAA... test@example.com")
-	}
-
-	// Verify Network configuration
-	if cfg.Network.InterfaceName != intTestInterfaceName {
-		t.Errorf("Network.InterfaceName = %q, want %q", cfg.Network.InterfaceName, intTestInterfaceName)
-	}
-
-	if cfg.Network.BridgeMode != BridgeModeBoth {
-		t.Errorf("Network.BridgeMode = %q, want %q", cfg.Network.BridgeMode, BridgeModeBoth)
-	}
-
-	if cfg.Network.PrivateSubnet != intTestSubnet {
-		t.Errorf("Network.PrivateSubnet = %q, want %q", cfg.Network.PrivateSubnet, intTestSubnet)
-	}
-
-	// Verify Storage configuration
-	if cfg.Storage.ZFSRaid != ZFSRaid0 {
-		t.Errorf("Storage.ZFSRaid = %q, want %q", cfg.Storage.ZFSRaid, ZFSRaid0)
-	}
-
-	expectedDisks := []string{"/dev/nvme0n1", "/dev/nvme1n1"}
-	assertDisksEqual(t, cfg.Storage.Disks, expectedDisks)
-
-	// Verify Tailscale configuration
-	if !cfg.Tailscale.Enabled {
-		t.Errorf("Tailscale.Enabled = %v, want %v", cfg.Tailscale.Enabled, true)
-	}
-
-	if cfg.Tailscale.AuthKey != testAuthKey {
-		t.Errorf("Tailscale.AuthKey = %q, want %q", cfg.Tailscale.AuthKey, testAuthKey)
-	}
-
-	if !cfg.Tailscale.SSH {
-		t.Errorf("Tailscale.SSH = %v, want %v", cfg.Tailscale.SSH, true)
-	}
-
-	if !cfg.Tailscale.WebUI {
-		t.Errorf("Tailscale.WebUI = %v, want %v", cfg.Tailscale.WebUI, true)
-	}
+	// Verify all fields using helper functions
+	assertStringField(t, "System.Hostname", cfg.System.Hostname, "env-server")
+	assertStringField(t, "System.DomainSuffix", cfg.System.DomainSuffix, "env.local")
+	assertStringField(t, "System.Timezone", cfg.System.Timezone, "America/New_York")
+	assertStringField(t, "System.Email", cfg.System.Email, "env@test.com")
+	assertStringField(t, "System.RootPassword", cfg.System.RootPassword, testPassword)
+	assertStringField(t, "System.SSHPublicKey", cfg.System.SSHPublicKey, testSSHKeyFull)
+	assertStringField(t, "Network.InterfaceName", cfg.Network.InterfaceName, intTestInterfaceName)
+	assertStringField(t, "Network.BridgeMode", string(cfg.Network.BridgeMode), string(BridgeModeBoth))
+	assertStringField(t, "Network.PrivateSubnet", cfg.Network.PrivateSubnet, intTestSubnet)
+	assertStringField(t, "Storage.ZFSRaid", string(cfg.Storage.ZFSRaid), string(ZFSRaid0))
+	assertDisksEqual(t, cfg.Storage.Disks, []string{"/dev/nvme0n1", "/dev/nvme1n1"})
+	assertBoolField(t, "Tailscale.Enabled", cfg.Tailscale.Enabled, true)
+	assertStringField(t, "Tailscale.AuthKey", cfg.Tailscale.AuthKey, testAuthKey)
+	assertBoolField(t, "Tailscale.SSH", cfg.Tailscale.SSH, true)
+	assertBoolField(t, "Tailscale.WebUI", cfg.Tailscale.WebUI, true)
 }
 
 // TestLoadFromEnvPartialConfiguration verifies that setting only some
 // environment variables correctly overrides those specific fields while
 // preserving default values for all other fields.
 func TestLoadFromEnvPartialConfiguration(t *testing.T) {
+	original := DefaultConfig()
 	cfg := DefaultConfig()
 
-	// Store original defaults
-	originalDomain := cfg.System.DomainSuffix
-	originalTimezone := cfg.System.Timezone
-	originalEmail := cfg.System.Email
-	originalRootPassword := cfg.System.RootPassword
-	originalSSHKey := cfg.System.SSHPublicKey
-	originalBridgeMode := cfg.Network.BridgeMode
-	originalPrivateSubnet := cfg.Network.PrivateSubnet
-	originalZFSRaid := cfg.Storage.ZFSRaid
-	originalDisks := cfg.Storage.Disks
-	originalTailscaleEnabled := cfg.Tailscale.Enabled
-	originalTailscaleSSH := cfg.Tailscale.SSH
-	originalTailscaleWebUI := cfg.Tailscale.WebUI
-
-	// Clear any externally-set env vars that would interfere with testing
-	// This ensures the test is isolated from the host environment
-	// Note: For string fields, setting to "" is sufficient (empty values are ignored)
-	// For boolean fields that use EnvVarSet, we must actually unset them
-	clearStringEnvVars := []string{
+	// Clear env vars that would interfere with testing
+	clearEnvForTest(t, []string{
 		"PVE_DOMAIN_SUFFIX", "PVE_TIMEZONE", "PVE_EMAIL",
 		"PVE_ROOT_PASSWORD", "PVE_SSH_PUBLIC_KEY",
-		"BRIDGE_MODE", "PRIVATE_SUBNET",
-		"ZFS_RAID", "DISKS",
-		"TAILSCALE_AUTH_KEY",
-	}
-	for _, env := range clearStringEnvVars {
-		t.Setenv(env, "")
-	}
-
-	// Boolean env vars use EnvVarSet which checks existence, so we must unset them.
-	// We store original values and restore them in cleanup.
-	boolEnvVars := []string{"INSTALL_TAILSCALE", "TAILSCALE_SSH", "TAILSCALE_WEBUI"}
-	for _, env := range boolEnvVars {
-		originalVal, wasSet := os.LookupEnv(env)
-		if wasSet {
-			if err := os.Unsetenv(env); err != nil {
-				t.Fatalf("failed to unset %s: %v", env, err)
-			}
-			envCopy := env         // Capture for closure
-			valCopy := originalVal // Capture for closure
-			t.Cleanup(func() {
-				// Restore original value. Error ignored as this is cleanup code.
-				//nolint:errcheck,usetesting // cleanup code, t.Setenv not available
-				os.Setenv(envCopy, valCopy)
-			})
-		}
-	}
+		"BRIDGE_MODE", "PRIVATE_SUBNET", "ZFS_RAID", "DISKS", "TAILSCALE_AUTH_KEY",
+		"INSTALL_TAILSCALE", "TAILSCALE_SSH", "TAILSCALE_WEBUI",
+	})
 
 	// Only set a subset of environment variables
 	t.Setenv("PVE_HOSTNAME", "partial-server")
@@ -866,78 +795,32 @@ func TestLoadFromEnvPartialConfiguration(t *testing.T) {
 	LoadFromEnv(cfg)
 
 	// Verify set fields were updated
-	if cfg.System.Hostname != "partial-server" {
-		t.Errorf("System.Hostname = %q, want %q", cfg.System.Hostname, "partial-server")
-	}
-
-	if cfg.Network.InterfaceName != "eth1" {
-		t.Errorf("Network.InterfaceName = %q, want %q", cfg.Network.InterfaceName, "eth1")
-	}
+	assertStringField(t, "System.Hostname", cfg.System.Hostname, "partial-server")
+	assertStringField(t, "Network.InterfaceName", cfg.Network.InterfaceName, "eth1")
 
 	// Verify all other fields retain defaults
-	if cfg.System.DomainSuffix != originalDomain {
-		t.Errorf("System.DomainSuffix = %q, want %q (original)", cfg.System.DomainSuffix, originalDomain)
-	}
-
-	if cfg.System.Timezone != originalTimezone {
-		t.Errorf("System.Timezone = %q, want %q (original)", cfg.System.Timezone, originalTimezone)
-	}
-
-	if cfg.System.Email != originalEmail {
-		t.Errorf("System.Email = %q, want %q (original)", cfg.System.Email, originalEmail)
-	}
-
-	if cfg.System.RootPassword != originalRootPassword {
-		t.Errorf("System.RootPassword changed unexpectedly")
-	}
-
-	if cfg.System.SSHPublicKey != originalSSHKey {
-		t.Errorf("System.SSHPublicKey changed unexpectedly")
-	}
-
-	if cfg.Network.BridgeMode != originalBridgeMode {
-		t.Errorf("Network.BridgeMode = %q, want %q (original)", cfg.Network.BridgeMode, originalBridgeMode)
-	}
-
-	if cfg.Network.PrivateSubnet != originalPrivateSubnet {
-		t.Errorf("Network.PrivateSubnet = %q, want %q (original)", cfg.Network.PrivateSubnet, originalPrivateSubnet)
-	}
-
-	if cfg.Storage.ZFSRaid != originalZFSRaid {
-		t.Errorf("Storage.ZFSRaid = %q, want %q (original)", cfg.Storage.ZFSRaid, originalZFSRaid)
-	}
-
-	if len(cfg.Storage.Disks) != len(originalDisks) {
-		t.Errorf("Storage.Disks length changed unexpectedly")
-	}
-
-	if cfg.Tailscale.Enabled != originalTailscaleEnabled {
-		t.Errorf("Tailscale.Enabled = %v, want %v (original)", cfg.Tailscale.Enabled, originalTailscaleEnabled)
-	}
-
-	// Note: AuthKey default is empty, verify it remains empty
-	if cfg.Tailscale.AuthKey != "" {
-		t.Errorf("Tailscale.AuthKey = %q, want empty (default)", cfg.Tailscale.AuthKey)
-	}
-
-	if cfg.Tailscale.SSH != originalTailscaleSSH {
-		t.Errorf("Tailscale.SSH = %v, want %v (original)", cfg.Tailscale.SSH, originalTailscaleSSH)
-	}
-
-	if cfg.Tailscale.WebUI != originalTailscaleWebUI {
-		t.Errorf("Tailscale.WebUI = %v, want %v (original)", cfg.Tailscale.WebUI, originalTailscaleWebUI)
-	}
+	assertStringField(t, "System.DomainSuffix", cfg.System.DomainSuffix, original.System.DomainSuffix)
+	assertStringField(t, "System.Timezone", cfg.System.Timezone, original.System.Timezone)
+	assertStringField(t, "System.Email", cfg.System.Email, original.System.Email)
+	assertStringField(t, "System.RootPassword", cfg.System.RootPassword, original.System.RootPassword)
+	assertStringField(t, "System.SSHPublicKey", cfg.System.SSHPublicKey, original.System.SSHPublicKey)
+	assertStringField(t, "Network.BridgeMode", string(cfg.Network.BridgeMode), string(original.Network.BridgeMode))
+	assertStringField(t, "Network.PrivateSubnet", cfg.Network.PrivateSubnet, original.Network.PrivateSubnet)
+	assertStringField(t, "Storage.ZFSRaid", string(cfg.Storage.ZFSRaid), string(original.Storage.ZFSRaid))
+	assertDisksEqual(t, cfg.Storage.Disks, original.Storage.Disks)
+	assertBoolField(t, "Tailscale.Enabled", cfg.Tailscale.Enabled, original.Tailscale.Enabled)
+	assertStringField(t, "Tailscale.AuthKey", cfg.Tailscale.AuthKey, "")
+	assertBoolField(t, "Tailscale.SSH", cfg.Tailscale.SSH, original.Tailscale.SSH)
+	assertBoolField(t, "Tailscale.WebUI", cfg.Tailscale.WebUI, original.Tailscale.WebUI)
 }
 
 // TestLoadFromEnvOverridesFileConfig verifies that environment variables
 // take priority over values loaded from a configuration file.
 // Configuration priority: 1. TUI > 2. Environment > 3. File > 4. Defaults.
 func TestLoadFromEnvOverridesFileConfig(t *testing.T) {
-	// Create a temporary config file
+	// Create and save a temporary config file
 	tempDir := t.TempDir()
 	configPath := tempDir + "/test-config.yaml"
-
-	// Create config with file-based values
 	fileConfig := DefaultConfig()
 	fileConfig.System.Hostname = "file-hostname"
 	fileConfig.System.DomainSuffix = "file.local"
@@ -948,8 +831,6 @@ func TestLoadFromEnvOverridesFileConfig(t *testing.T) {
 	fileConfig.Tailscale.Enabled = false
 	fileConfig.Tailscale.SSH = false
 	fileConfig.Tailscale.WebUI = false
-
-	// Save config to file
 	if err := fileConfig.SaveToFile(configPath); err != nil {
 		t.Fatalf("Failed to save test config: %v", err)
 	}
@@ -959,62 +840,31 @@ func TestLoadFromEnvOverridesFileConfig(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to load test config: %v", err)
 	}
-
-	// Verify file values were loaded
 	if cfg.System.Hostname != "file-hostname" {
 		t.Fatalf("File config not loaded correctly: Hostname = %q", cfg.System.Hostname)
 	}
 
 	// Set environment variables that should override file values
-	t.Setenv("PVE_HOSTNAME", "env-hostname")
-	t.Setenv("PVE_DOMAIN_SUFFIX", "env.local")
-	t.Setenv("INTERFACE_NAME", "enp0s25")
-	t.Setenv("BRIDGE_MODE", "external")
-	t.Setenv("ZFS_RAID", "raid0")
-	t.Setenv("INSTALL_TAILSCALE", "true")
-	t.Setenv("TAILSCALE_SSH", "true")
-	t.Setenv("TAILSCALE_WEBUI", "true")
-
-	// Apply environment variables
+	envOverrides := map[string]string{
+		"PVE_HOSTNAME": "env-hostname", "PVE_DOMAIN_SUFFIX": "env.local",
+		"INTERFACE_NAME": "enp0s25", "BRIDGE_MODE": "external", "ZFS_RAID": "raid0",
+		"INSTALL_TAILSCALE": "true", "TAILSCALE_SSH": "true", "TAILSCALE_WEBUI": "true",
+	}
+	for k, v := range envOverrides {
+		t.Setenv(k, v)
+	}
 	LoadFromEnv(cfg)
 
 	// Verify environment variables override file values
-	if cfg.System.Hostname != "env-hostname" {
-		t.Errorf("Env did not override Hostname: got %q, want %q", cfg.System.Hostname, "env-hostname")
-	}
-
-	if cfg.System.DomainSuffix != "env.local" {
-		t.Errorf("Env did not override DomainSuffix: got %q, want %q", cfg.System.DomainSuffix, "env.local")
-	}
-
-	// Timezone was not set in env, should retain file value
-	if cfg.System.Timezone != "Europe/London" {
-		t.Errorf("Unset env var changed Timezone: got %q, want %q", cfg.System.Timezone, "Europe/London")
-	}
-
-	if cfg.Network.InterfaceName != "enp0s25" {
-		t.Errorf("Env did not override InterfaceName: got %q, want %q", cfg.Network.InterfaceName, "enp0s25")
-	}
-
-	if cfg.Network.BridgeMode != BridgeModeExternal {
-		t.Errorf("Env did not override BridgeMode: got %q, want %q", cfg.Network.BridgeMode, BridgeModeExternal)
-	}
-
-	if cfg.Storage.ZFSRaid != ZFSRaid0 {
-		t.Errorf("Env did not override ZFSRaid: got %q, want %q", cfg.Storage.ZFSRaid, ZFSRaid0)
-	}
-
-	if !cfg.Tailscale.Enabled {
-		t.Errorf("Env did not override Tailscale.Enabled: got %v, want %v", cfg.Tailscale.Enabled, true)
-	}
-
-	if !cfg.Tailscale.SSH {
-		t.Errorf("Env did not override Tailscale.SSH: got %v, want %v", cfg.Tailscale.SSH, true)
-	}
-
-	if !cfg.Tailscale.WebUI {
-		t.Errorf("Env did not override Tailscale.WebUI: got %v, want %v", cfg.Tailscale.WebUI, true)
-	}
+	assertStringField(t, "System.Hostname", cfg.System.Hostname, "env-hostname")
+	assertStringField(t, "System.DomainSuffix", cfg.System.DomainSuffix, "env.local")
+	assertStringField(t, "System.Timezone", cfg.System.Timezone, "Europe/London") // not overridden
+	assertStringField(t, "Network.InterfaceName", cfg.Network.InterfaceName, "enp0s25")
+	assertStringField(t, "Network.BridgeMode", string(cfg.Network.BridgeMode), string(BridgeModeExternal))
+	assertStringField(t, "Storage.ZFSRaid", string(cfg.Storage.ZFSRaid), string(ZFSRaid0))
+	assertBoolField(t, "Tailscale.Enabled", cfg.Tailscale.Enabled, true)
+	assertBoolField(t, "Tailscale.SSH", cfg.Tailscale.SSH, true)
+	assertBoolField(t, "Tailscale.WebUI", cfg.Tailscale.WebUI, true)
 }
 
 // TestLoadFromEnvEmptyVsUnset verifies the distinction between:
@@ -1172,178 +1022,9 @@ func TestLoadFromEnvBooleanEdgeCases(t *testing.T) {
 	})
 }
 
-// TestLoadFromEnvDisksFormats tests various formats for the DISKS environment variable.
-func TestLoadFromEnvDisksFormats(t *testing.T) {
-	sda := "/dev/sda"
-	sdb := "/dev/sdb"
-	sdc := "/dev/sdc"
-	twoDisks := []string{sda, sdb}
-	originalDisks := []string{"/dev/original"}
-
-	tests := []struct {
-		name         string
-		input        string
-		want         []string
-		wantOriginal bool
-	}{
-		// Valid formats
-		{"single disk", sda, []string{sda}, false},
-		{"two disks", sda + "," + sdb, twoDisks, false},
-		{"three disks", sda + "," + sdb + "," + sdc, []string{sda, sdb, sdc}, false},
-		{"nvme disks", "/dev/nvme0n1,/dev/nvme1n1", []string{"/dev/nvme0n1", "/dev/nvme1n1"}, false},
-		{"mixed types", sda + ",/dev/nvme0n1,/dev/vda", []string{sda, "/dev/nvme0n1", "/dev/vda"}, false},
-		// Whitespace handling - all result in twoDisks
-		{"spaces around commas", sda + " , " + sdb, twoDisks, false},
-		{"spaces before comma", sda + " ," + sdb, twoDisks, false},
-		{"spaces after comma", sda + ", " + sdb, twoDisks, false},
-		{"tabs and spaces", sda + "\t,\t" + sdb, twoDisks, false},
-		{"leading whitespace", "  " + sda + "," + sdb, twoDisks, false},
-		{"trailing whitespace", sda + "," + sdb + "  ", twoDisks, false},
-		// Edge cases with commas - all result in twoDisks
-		{"trailing comma", sda + "," + sdb + ",", twoDisks, false},
-		{"leading comma", "," + sda + "," + sdb, twoDisks, false},
-		{"multiple trailing commas", sda + "," + sdb + ",,,", twoDisks, false},
-		{"consecutive commas", sda + ",," + sdb, twoDisks, false},
-		// Empty/invalid cases - preserve original
-		{"empty string", "", nil, true},
-		{"only commas", ",,,", nil, true},
-		{"only spaces", "   ", nil, true},
-		{"spaces and commas", " , , , ", nil, true},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			cfg := DefaultConfig()
-			cfg.Storage.Disks = originalDisks
-			t.Setenv("DISKS", tt.input)
-			LoadFromEnv(cfg)
-			if tt.wantOriginal {
-				assertDisksEqual(t, cfg.Storage.Disks, originalDisks)
-			} else {
-				assertDisksEqual(t, cfg.Storage.Disks, tt.want)
-			}
-		})
-	}
-}
-
-// TestLoadFromEnvEnumCaseVariations tests case-insensitive parsing
-// for BridgeMode and ZFSRaid enum types.
-func TestLoadFromEnvEnumCaseVariations(t *testing.T) {
-	t.Run("BridgeMode variations", func(t *testing.T) {
-		tests := []struct {
-			input string
-			want  BridgeMode
-		}{
-			// internal
-			{"internal", BridgeModeInternal},
-			{"Internal", BridgeModeInternal},
-			{"INTERNAL", BridgeModeInternal},
-			{"iNtErNaL", BridgeModeInternal},
-			// external
-			{"external", BridgeModeExternal},
-			{"External", BridgeModeExternal},
-			{"EXTERNAL", BridgeModeExternal},
-			{"eXtErNaL", BridgeModeExternal},
-			// both
-			{"both", BridgeModeBoth},
-			{"Both", BridgeModeBoth},
-			{"BOTH", BridgeModeBoth},
-			{"bOtH", BridgeModeBoth},
-		}
-
-		for _, tt := range tests {
-			t.Run(tt.input, func(t *testing.T) {
-				cfg := DefaultConfig()
-				cfg.Network.BridgeMode = "" // Clear default
-
-				t.Setenv("BRIDGE_MODE", tt.input)
-				LoadFromEnv(cfg)
-
-				if cfg.Network.BridgeMode != tt.want {
-					t.Errorf("BRIDGE_MODE=%q: got %q, want %q", tt.input, cfg.Network.BridgeMode, tt.want)
-				}
-			})
-		}
-	})
-
-	t.Run("BridgeMode invalid preserves original", func(t *testing.T) {
-		invalidValues := []string{"invalid", "nat", "bridge", "none", "default", ""}
-
-		for _, v := range invalidValues {
-			t.Run(v, func(t *testing.T) {
-				cfg := DefaultConfig()
-				original := cfg.Network.BridgeMode
-
-				t.Setenv("BRIDGE_MODE", v)
-				LoadFromEnv(cfg)
-
-				if cfg.Network.BridgeMode != original {
-					t.Errorf("BRIDGE_MODE=%q changed config: got %q, want %q", v, cfg.Network.BridgeMode, original)
-				}
-			})
-		}
-	})
-
-	t.Run("ZFSRaid variations", func(t *testing.T) {
-		tests := []struct {
-			input string
-			want  ZFSRaid
-		}{
-			// single
-			{"single", ZFSRaidSingle},
-			{"Single", ZFSRaidSingle},
-			{"SINGLE", ZFSRaidSingle},
-			{"sInGlE", ZFSRaidSingle},
-			// raid0
-			{"raid0", ZFSRaid0},
-			{"Raid0", ZFSRaid0},
-			{"RAID0", ZFSRaid0},
-			{"rAiD0", ZFSRaid0},
-			// raid1
-			{"raid1", ZFSRaid1},
-			{"Raid1", ZFSRaid1},
-			{"RAID1", ZFSRaid1},
-			{"rAiD1", ZFSRaid1},
-		}
-
-		for _, tt := range tests {
-			t.Run(tt.input, func(t *testing.T) {
-				cfg := DefaultConfig()
-				// Set to a different value to verify change
-				if tt.want == ZFSRaid1 {
-					cfg.Storage.ZFSRaid = ZFSRaidSingle
-				} else {
-					cfg.Storage.ZFSRaid = ZFSRaid1
-				}
-
-				t.Setenv("ZFS_RAID", tt.input)
-				LoadFromEnv(cfg)
-
-				if cfg.Storage.ZFSRaid != tt.want {
-					t.Errorf("ZFS_RAID=%q: got %q, want %q", tt.input, cfg.Storage.ZFSRaid, tt.want)
-				}
-			})
-		}
-	})
-
-	t.Run("ZFSRaid invalid preserves original", func(t *testing.T) {
-		invalidValues := []string{"invalid", "raid5", "raid6", "raidz", "mirror", "stripe", ""}
-
-		for _, v := range invalidValues {
-			t.Run(v, func(t *testing.T) {
-				cfg := DefaultConfig()
-				original := cfg.Storage.ZFSRaid
-
-				t.Setenv("ZFS_RAID", v)
-				LoadFromEnv(cfg)
-
-				if cfg.Storage.ZFSRaid != original {
-					t.Errorf("ZFS_RAID=%q changed config: got %q, want %q", v, cfg.Storage.ZFSRaid, original)
-				}
-			})
-		}
-	})
-}
+// Note: Disk format variations are covered by TestLoadFromEnvDisksValues and
+// TestLoadFromEnvDisksKeepsOriginal. Enum case variations are covered by
+// TestLoadFromEnvBridgeModeValues and TestLoadFromEnvZFSRaidValues.
 
 // clearEnvForTest clears environment variables for test isolation.
 // String vars are set to empty, boolean vars are unset and restored on cleanup.
