@@ -55,4 +55,20 @@ func LoadFromEnv(cfg *Config) {
 	if v := os.Getenv("PVE_SSH_PUBLIC_KEY"); v != "" {
 		cfg.System.SSHPublicKey = v
 	}
+
+	// Network configuration
+	if v := os.Getenv("INTERFACE_NAME"); v != "" {
+		cfg.Network.InterfaceName = v
+	}
+
+	if v := os.Getenv("BRIDGE_MODE"); v != "" {
+		mode := BridgeMode(strings.ToLower(v))
+		if mode.IsValid() {
+			cfg.Network.BridgeMode = mode
+		}
+	}
+
+	if v := os.Getenv("PRIVATE_SUBNET"); v != "" {
+		cfg.Network.PrivateSubnet = v
+	}
 }

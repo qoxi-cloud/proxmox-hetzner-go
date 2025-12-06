@@ -148,8 +148,17 @@ const (
 	testPartial       = "partial-test"
 	testModify        = "modify-test"
 
+	// Network test constants.
+	testInterfaceEth0       = "eth0"
+	testInterfaceEnp        = "enp0s31f6"
+	testPrivateSubnet       = "192.168.100.0/24"
+	testPrivateSubnetSecond = "172.16.0.0/16"
+
 	// Error format strings.
-	errFmtHostname = "Hostname = %q, want %q"
+	errFmtHostname      = "Hostname = %q, want %q"
+	errFmtInterfaceName = "InterfaceName = %q, want %q"
+	errFmtBridgeMode    = "BridgeMode = %q, want %q"
+	errFmtPrivateSubnet = "PrivateSubnet = %q, want %q"
 )
 
 func TestLoadFromEnvNilConfig(t *testing.T) {
@@ -318,9 +327,8 @@ func TestLoadFromEnvModifiesOriginalConfig(t *testing.T) {
 	}
 }
 
-func TestLoadFromEnvPreservesNonSystemFields(t *testing.T) {
+func TestLoadFromEnvPreservesNonEnvFields(t *testing.T) {
 	cfg := DefaultConfig()
-	originalBridgeMode := cfg.Network.BridgeMode
 	originalZFSRaid := cfg.Storage.ZFSRaid
 	originalTailscaleEnabled := cfg.Tailscale.Enabled
 	testPreserve := "preserve-test"
@@ -328,16 +336,182 @@ func TestLoadFromEnvPreservesNonSystemFields(t *testing.T) {
 	t.Setenv("PVE_HOSTNAME", testPreserve)
 	LoadFromEnv(cfg)
 
-	// Verify non-system fields are untouched
-	if cfg.Network.BridgeMode != originalBridgeMode {
-		t.Errorf("Network.BridgeMode changed unexpectedly: got %v, want %v", cfg.Network.BridgeMode, originalBridgeMode)
-	}
-
+	// Verify non-env fields are untouched
 	if cfg.Storage.ZFSRaid != originalZFSRaid {
 		t.Errorf("Storage.ZFSRaid changed unexpectedly: got %v, want %v", cfg.Storage.ZFSRaid, originalZFSRaid)
 	}
 
 	if cfg.Tailscale.Enabled != originalTailscaleEnabled {
 		t.Errorf("Tailscale.Enabled changed unexpectedly: got %v, want %v", cfg.Tailscale.Enabled, originalTailscaleEnabled)
+	}
+}
+
+// Network configuration tests
+
+func TestLoadFromEnvInterfaceNameEth0(t *testing.T) {
+	cfg := DefaultConfig()
+
+	t.Setenv("INTERFACE_NAME", testInterfaceEth0)
+	LoadFromEnv(cfg)
+
+	if cfg.Network.InterfaceName != testInterfaceEth0 {
+		t.Errorf(errFmtInterfaceName, cfg.Network.InterfaceName, testInterfaceEth0)
+	}
+}
+
+func TestLoadFromEnvInterfaceNameEnp(t *testing.T) {
+	cfg := DefaultConfig()
+
+	t.Setenv("INTERFACE_NAME", testInterfaceEnp)
+	LoadFromEnv(cfg)
+
+	if cfg.Network.InterfaceName != testInterfaceEnp {
+		t.Errorf(errFmtInterfaceName, cfg.Network.InterfaceName, testInterfaceEnp)
+	}
+}
+
+func TestLoadFromEnvBridgeModeInternal(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Network.BridgeMode = BridgeModeExternal // Set to different value first
+
+	t.Setenv("BRIDGE_MODE", "internal")
+	LoadFromEnv(cfg)
+
+	if cfg.Network.BridgeMode != BridgeModeInternal {
+		t.Errorf(errFmtBridgeMode, cfg.Network.BridgeMode, BridgeModeInternal)
+	}
+}
+
+func TestLoadFromEnvBridgeModeExternal(t *testing.T) {
+	cfg := DefaultConfig()
+
+	t.Setenv("BRIDGE_MODE", "external")
+	LoadFromEnv(cfg)
+
+	if cfg.Network.BridgeMode != BridgeModeExternal {
+		t.Errorf(errFmtBridgeMode, cfg.Network.BridgeMode, BridgeModeExternal)
+	}
+}
+
+func TestLoadFromEnvBridgeModeBoth(t *testing.T) {
+	cfg := DefaultConfig()
+
+	t.Setenv("BRIDGE_MODE", "both")
+	LoadFromEnv(cfg)
+
+	if cfg.Network.BridgeMode != BridgeModeBoth {
+		t.Errorf(errFmtBridgeMode, cfg.Network.BridgeMode, BridgeModeBoth)
+	}
+}
+
+func TestLoadFromEnvBridgeModeCaseInsensitive(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  BridgeMode
+	}{
+		{"uppercase INTERNAL", "INTERNAL", BridgeModeInternal},
+		{"mixed case Internal", "Internal", BridgeModeInternal},
+		{"uppercase EXTERNAL", "EXTERNAL", BridgeModeExternal},
+		{"mixed case External", "External", BridgeModeExternal},
+		{"uppercase BOTH", "BOTH", BridgeModeBoth},
+		{"mixed case Both", "Both", BridgeModeBoth},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := DefaultConfig()
+			cfg.Network.BridgeMode = "" // Clear default
+
+			t.Setenv("BRIDGE_MODE", tt.input)
+			LoadFromEnv(cfg)
+
+			if cfg.Network.BridgeMode != tt.want {
+				t.Errorf(errFmtBridgeMode, cfg.Network.BridgeMode, tt.want)
+			}
+		})
+	}
+}
+
+func TestLoadFromEnvBridgeModeInvalidKeepsOriginal(t *testing.T) {
+	cfg := DefaultConfig()
+	original := cfg.Network.BridgeMode
+
+	// Set to an invalid value - should NOT change the config
+	t.Setenv("BRIDGE_MODE", "invalid")
+	LoadFromEnv(cfg)
+
+	if cfg.Network.BridgeMode != original {
+		t.Errorf("Invalid BRIDGE_MODE changed config: got %q, want %q", cfg.Network.BridgeMode, original)
+	}
+}
+
+func TestLoadFromEnvBridgeModeEmptyKeepsOriginal(t *testing.T) {
+	cfg := DefaultConfig()
+	original := cfg.Network.BridgeMode
+
+	// Set to empty value - should NOT change the config
+	t.Setenv("BRIDGE_MODE", "")
+	LoadFromEnv(cfg)
+
+	if cfg.Network.BridgeMode != original {
+		t.Errorf("Empty BRIDGE_MODE changed config: got %q, want %q", cfg.Network.BridgeMode, original)
+	}
+}
+
+func TestLoadFromEnvPrivateSubnet(t *testing.T) {
+	cfg := DefaultConfig()
+
+	t.Setenv("PRIVATE_SUBNET", testPrivateSubnet)
+	LoadFromEnv(cfg)
+
+	if cfg.Network.PrivateSubnet != testPrivateSubnet {
+		t.Errorf(errFmtPrivateSubnet, cfg.Network.PrivateSubnet, testPrivateSubnet)
+	}
+}
+
+func TestLoadFromEnvPrivateSubnetEmptyKeepsOriginal(t *testing.T) {
+	cfg := DefaultConfig()
+	original := cfg.Network.PrivateSubnet
+
+	t.Setenv("PRIVATE_SUBNET", "")
+	LoadFromEnv(cfg)
+
+	if cfg.Network.PrivateSubnet != original {
+		t.Errorf("Empty PRIVATE_SUBNET changed config: got %q, want %q", cfg.Network.PrivateSubnet, original)
+	}
+}
+
+func TestLoadFromEnvNetworkMultipleFields(t *testing.T) {
+	cfg := DefaultConfig()
+
+	t.Setenv("INTERFACE_NAME", testInterfaceEth0)
+	t.Setenv("BRIDGE_MODE", "external")
+	t.Setenv("PRIVATE_SUBNET", testPrivateSubnetSecond)
+
+	LoadFromEnv(cfg)
+
+	if cfg.Network.InterfaceName != testInterfaceEth0 {
+		t.Errorf(errFmtInterfaceName, cfg.Network.InterfaceName, testInterfaceEth0)
+	}
+
+	if cfg.Network.BridgeMode != BridgeModeExternal {
+		t.Errorf(errFmtBridgeMode, cfg.Network.BridgeMode, BridgeModeExternal)
+	}
+
+	if cfg.Network.PrivateSubnet != testPrivateSubnetSecond {
+		t.Errorf(errFmtPrivateSubnet, cfg.Network.PrivateSubnet, testPrivateSubnetSecond)
+	}
+}
+
+func TestLoadFromEnvInterfaceNameEmptyKeepsOriginal(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Network.InterfaceName = testInterfaceEnp // Set initial value
+
+	t.Setenv("INTERFACE_NAME", "")
+	LoadFromEnv(cfg)
+
+	if cfg.Network.InterfaceName != testInterfaceEnp {
+		t.Errorf("Empty INTERFACE_NAME changed config: got %q, want %q", cfg.Network.InterfaceName, testInterfaceEnp)
 	}
 }
