@@ -368,84 +368,34 @@ func TestLoadFromEnvPreservesUnsetFields(t *testing.T) {
 
 // Network configuration tests
 
-func TestLoadFromEnvInterfaceNameEth0(t *testing.T) {
-	cfg := DefaultConfig()
-
-	t.Setenv("INTERFACE_NAME", testInterfaceEth0)
-	LoadFromEnv(cfg)
-
-	if cfg.Network.InterfaceName != testInterfaceEth0 {
-		t.Errorf(errFmtInterfaceName, cfg.Network.InterfaceName, testInterfaceEth0)
+func TestLoadFromEnvInterfaceNameValues(t *testing.T) {
+	for _, iface := range []string{testInterfaceEth0, testInterfaceEnp} {
+		t.Run(iface, func(t *testing.T) {
+			cfg := DefaultConfig()
+			t.Setenv("INTERFACE_NAME", iface)
+			LoadFromEnv(cfg)
+			if cfg.Network.InterfaceName != iface {
+				t.Errorf(errFmtInterfaceName, cfg.Network.InterfaceName, iface)
+			}
+		})
 	}
 }
 
-func TestLoadFromEnvInterfaceNameEnp(t *testing.T) {
-	cfg := DefaultConfig()
-
-	t.Setenv("INTERFACE_NAME", testInterfaceEnp)
-	LoadFromEnv(cfg)
-
-	if cfg.Network.InterfaceName != testInterfaceEnp {
-		t.Errorf(errFmtInterfaceName, cfg.Network.InterfaceName, testInterfaceEnp)
-	}
-}
-
-func TestLoadFromEnvBridgeModeInternal(t *testing.T) {
-	cfg := DefaultConfig()
-	cfg.Network.BridgeMode = BridgeModeExternal // Set to different value first
-
-	t.Setenv("BRIDGE_MODE", "internal")
-	LoadFromEnv(cfg)
-
-	if cfg.Network.BridgeMode != BridgeModeInternal {
-		t.Errorf(errFmtBridgeMode, cfg.Network.BridgeMode, BridgeModeInternal)
-	}
-}
-
-func TestLoadFromEnvBridgeModeExternal(t *testing.T) {
-	cfg := DefaultConfig()
-
-	t.Setenv("BRIDGE_MODE", "external")
-	LoadFromEnv(cfg)
-
-	if cfg.Network.BridgeMode != BridgeModeExternal {
-		t.Errorf(errFmtBridgeMode, cfg.Network.BridgeMode, BridgeModeExternal)
-	}
-}
-
-func TestLoadFromEnvBridgeModeBoth(t *testing.T) {
-	cfg := DefaultConfig()
-
-	t.Setenv("BRIDGE_MODE", "both")
-	LoadFromEnv(cfg)
-
-	if cfg.Network.BridgeMode != BridgeModeBoth {
-		t.Errorf(errFmtBridgeMode, cfg.Network.BridgeMode, BridgeModeBoth)
-	}
-}
-
-func TestLoadFromEnvBridgeModeCaseInsensitive(t *testing.T) {
+func TestLoadFromEnvBridgeModeValues(t *testing.T) {
 	tests := []struct {
-		name  string
 		input string
 		want  BridgeMode
 	}{
-		{"uppercase INTERNAL", "INTERNAL", BridgeModeInternal},
-		{"mixed case Internal", "Internal", BridgeModeInternal},
-		{"uppercase EXTERNAL", "EXTERNAL", BridgeModeExternal},
-		{"mixed case External", "External", BridgeModeExternal},
-		{"uppercase BOTH", "BOTH", BridgeModeBoth},
-		{"mixed case Both", "Both", BridgeModeBoth},
+		{"internal", BridgeModeInternal}, {"Internal", BridgeModeInternal}, {"INTERNAL", BridgeModeInternal},
+		{"external", BridgeModeExternal}, {"External", BridgeModeExternal}, {"EXTERNAL", BridgeModeExternal},
+		{"both", BridgeModeBoth}, {"Both", BridgeModeBoth}, {"BOTH", BridgeModeBoth},
 	}
-
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		t.Run(tt.input, func(t *testing.T) {
 			cfg := DefaultConfig()
-			cfg.Network.BridgeMode = "" // Clear default
-
+			cfg.Network.BridgeMode = ""
 			t.Setenv("BRIDGE_MODE", tt.input)
 			LoadFromEnv(cfg)
-
 			if cfg.Network.BridgeMode != tt.want {
 				t.Errorf(errFmtBridgeMode, cfg.Network.BridgeMode, tt.want)
 			}
@@ -453,86 +403,68 @@ func TestLoadFromEnvBridgeModeCaseInsensitive(t *testing.T) {
 	}
 }
 
-func TestLoadFromEnvBridgeModeInvalidKeepsOriginal(t *testing.T) {
-	cfg := DefaultConfig()
-	original := cfg.Network.BridgeMode
-
-	// Set to an invalid value - should NOT change the config
-	t.Setenv("BRIDGE_MODE", "invalid")
-	LoadFromEnv(cfg)
-
-	if cfg.Network.BridgeMode != original {
-		t.Errorf("Invalid BRIDGE_MODE changed config: got %q, want %q", cfg.Network.BridgeMode, original)
-	}
-}
-
-func TestLoadFromEnvBridgeModeEmptyKeepsOriginal(t *testing.T) {
-	cfg := DefaultConfig()
-	original := cfg.Network.BridgeMode
-
-	// Set to empty value - should NOT change the config
-	t.Setenv("BRIDGE_MODE", "")
-	LoadFromEnv(cfg)
-
-	if cfg.Network.BridgeMode != original {
-		t.Errorf("Empty BRIDGE_MODE changed config: got %q, want %q", cfg.Network.BridgeMode, original)
+func TestLoadFromEnvBridgeModeInvalidEmptyPreserves(t *testing.T) {
+	for _, v := range []string{"invalid", ""} {
+		t.Run(v, func(t *testing.T) {
+			cfg := DefaultConfig()
+			original := cfg.Network.BridgeMode
+			t.Setenv("BRIDGE_MODE", v)
+			LoadFromEnv(cfg)
+			if cfg.Network.BridgeMode != original {
+				t.Errorf("BRIDGE_MODE=%q changed config: got %q, want %q", v, cfg.Network.BridgeMode, original)
+			}
+		})
 	}
 }
 
 func TestLoadFromEnvPrivateSubnet(t *testing.T) {
 	cfg := DefaultConfig()
-
 	t.Setenv("PRIVATE_SUBNET", testPrivateSubnet)
 	LoadFromEnv(cfg)
-
 	if cfg.Network.PrivateSubnet != testPrivateSubnet {
 		t.Errorf(errFmtPrivateSubnet, cfg.Network.PrivateSubnet, testPrivateSubnet)
 	}
 }
 
-func TestLoadFromEnvPrivateSubnetEmptyKeepsOriginal(t *testing.T) {
-	cfg := DefaultConfig()
-	original := cfg.Network.PrivateSubnet
-
-	t.Setenv("PRIVATE_SUBNET", "")
-	LoadFromEnv(cfg)
-
-	if cfg.Network.PrivateSubnet != original {
-		t.Errorf("Empty PRIVATE_SUBNET changed config: got %q, want %q", cfg.Network.PrivateSubnet, original)
+func TestLoadFromEnvNetworkEmptyPreservesOriginal(t *testing.T) {
+	tests := []struct {
+		envName string
+		setup   func(*Config)
+		check   func(*Config) bool
+	}{
+		{"PRIVATE_SUBNET", nil, func(c *Config) bool { return c.Network.PrivateSubnet != "" }},
+		{"INTERFACE_NAME", func(c *Config) { c.Network.InterfaceName = testInterfaceEnp },
+			func(c *Config) bool { return c.Network.InterfaceName == testInterfaceEnp }},
+	}
+	for _, tt := range tests {
+		t.Run(tt.envName, func(t *testing.T) {
+			cfg := DefaultConfig()
+			if tt.setup != nil {
+				tt.setup(cfg)
+			}
+			t.Setenv(tt.envName, "")
+			LoadFromEnv(cfg)
+			if !tt.check(cfg) {
+				t.Errorf("Empty %s changed config unexpectedly", tt.envName)
+			}
+		})
 	}
 }
 
 func TestLoadFromEnvNetworkMultipleFields(t *testing.T) {
 	cfg := DefaultConfig()
-
 	t.Setenv("INTERFACE_NAME", testInterfaceEth0)
 	t.Setenv("BRIDGE_MODE", "external")
 	t.Setenv("PRIVATE_SUBNET", testPrivateSubnetSecond)
-
 	LoadFromEnv(cfg)
-
 	if cfg.Network.InterfaceName != testInterfaceEth0 {
 		t.Errorf(errFmtInterfaceName, cfg.Network.InterfaceName, testInterfaceEth0)
 	}
-
 	if cfg.Network.BridgeMode != BridgeModeExternal {
 		t.Errorf(errFmtBridgeMode, cfg.Network.BridgeMode, BridgeModeExternal)
 	}
-
 	if cfg.Network.PrivateSubnet != testPrivateSubnetSecond {
 		t.Errorf(errFmtPrivateSubnet, cfg.Network.PrivateSubnet, testPrivateSubnetSecond)
-	}
-}
-
-func TestLoadFromEnvInterfaceNameEmptyKeepsOriginal(t *testing.T) {
-	cfg := DefaultConfig()
-	cfg.Network.InterfaceName = testInterfaceEnp // Set initial value
-
-	t.Setenv("INTERFACE_NAME", "")
-	LoadFromEnv(cfg)
-
-	if cfg.Network.InterfaceName != testInterfaceEnp {
-		t.Errorf("Empty INTERFACE_NAME changed config: got %q, want %q", cfg.Network.InterfaceName, testInterfaceEnp)
 	}
 }
 
@@ -1508,6 +1440,13 @@ type envVarTestCase struct {
 	isDefaultFunc func(cfg, defaultCfg *Config) bool
 }
 
+// Test value constants for getEnvVarTestCases.
+const (
+	testSubnetIndep   = "10.99.0.0/24" // NOSONAR(go:S1313) RFC 1918 test value
+	testPasswordIndep = "testpass"     // NOSONAR(go:S2068) test value
+	testAuthKeyIndep  = "tskey-test"   // NOSONAR(go:S2068) test value
+)
+
 // getEnvVarTestCases returns the test cases for env var independence testing.
 func getEnvVarTestCases() []envVarTestCase {
 	return []envVarTestCase{
@@ -1523,8 +1462,8 @@ func getEnvVarTestCases() []envVarTestCase {
 		{"PVE_EMAIL", "test@test.com",
 			func(c *Config) bool { return c.System.Email == "test@test.com" },
 			func(c, d *Config) bool { return c.System.Email == d.System.Email }},
-		{"PVE_ROOT_PASSWORD", "testpass", // NOSONAR(go:S2068) test value
-			func(c *Config) bool { return c.System.RootPassword == "testpass" },
+		{"PVE_ROOT_PASSWORD", testPasswordIndep,
+			func(c *Config) bool { return c.System.RootPassword == testPasswordIndep },
 			func(c, d *Config) bool { return c.System.RootPassword == d.System.RootPassword }},
 		{"PVE_SSH_PUBLIC_KEY", "ssh-rsa test",
 			func(c *Config) bool { return c.System.SSHPublicKey == "ssh-rsa test" },
@@ -1535,8 +1474,8 @@ func getEnvVarTestCases() []envVarTestCase {
 		{"BRIDGE_MODE", "external",
 			func(c *Config) bool { return c.Network.BridgeMode == BridgeModeExternal },
 			func(c, d *Config) bool { return c.Network.BridgeMode == d.Network.BridgeMode }},
-		{"PRIVATE_SUBNET", "10.99.0.0/24", // NOSONAR(go:S1313) test value
-			func(c *Config) bool { return c.Network.PrivateSubnet == "10.99.0.0/24" },
+		{"PRIVATE_SUBNET", testSubnetIndep,
+			func(c *Config) bool { return c.Network.PrivateSubnet == testSubnetIndep },
 			func(c, d *Config) bool { return c.Network.PrivateSubnet == d.Network.PrivateSubnet }},
 		{"ZFS_RAID", "raid0",
 			func(c *Config) bool { return c.Storage.ZFSRaid == ZFSRaid0 },
@@ -1547,8 +1486,8 @@ func getEnvVarTestCases() []envVarTestCase {
 		{"INSTALL_TAILSCALE", "true",
 			func(c *Config) bool { return c.Tailscale.Enabled },
 			func(c, d *Config) bool { return c.Tailscale.Enabled == d.Tailscale.Enabled }},
-		{"TAILSCALE_AUTH_KEY", "tskey-test", // NOSONAR(go:S2068) test value
-			func(c *Config) bool { return c.Tailscale.AuthKey == "tskey-test" },
+		{"TAILSCALE_AUTH_KEY", testAuthKeyIndep,
+			func(c *Config) bool { return c.Tailscale.AuthKey == testAuthKeyIndep },
 			func(c, d *Config) bool { return c.Tailscale.AuthKey == d.Tailscale.AuthKey }},
 		{"TAILSCALE_SSH", "true",
 			func(c *Config) bool { return c.Tailscale.SSH },
