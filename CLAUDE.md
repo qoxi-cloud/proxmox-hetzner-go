@@ -737,36 +737,57 @@ Configuration is in a separate file: `.mcp.json`
 |------------|-------------|
 | **sonarcloud** | Static code analysis, security scanning, code quality metrics |
 
-**SonarCloud Tools (2)**:
-- `fetch_sonarcloud_issues` - Fetch detailed issues for a specific PR or branch
-- `summarize_sonarcloud_issues` - Get a high-level summary of issues
+**SonarCloud Tools:**
+
+- `search_sonar_issues_in_projects` - Search for issues in projects (supports PR filtering)
+- `get_project_quality_gate_status` - Get quality gate status for a project/PR
+- `search_my_sonarqube_projects` - Find available SonarQube projects
+- `show_rule` - Get detailed information about a specific rule
+- `list_rule_repositories` - List available rule repositories
+- `list_quality_gates` - List all quality gates
+- `get_component_measures` - Get project metrics (coverage, complexity, etc.)
+- `change_sonar_issue_status` - Change issue status (accept, falsepositive, reopen)
 
 **SonarCloud Usage Examples:**
 
 ```bash
-# Get summary of issues for a PR
-mcp__sonarcloud__summarize_sonarcloud_issues(pullRequest: "123")
-
-# Fetch detailed issues with filters
-mcp__sonarcloud__fetch_sonarcloud_issues(
-  pullRequest: "123",
-  impactSeverities: ["HIGH", "BLOCKER"],
-  issueStatuses: ["OPEN", "CONFIRMED"]
+# Search for issues in a specific PR
+mcp__sonarcloud__search_sonar_issues_in_projects(
+  projects: ["qoxi-cloud_proxmox-hetzner-go"],
+  pullRequestId: "117"
 )
 
-# Get issues for the main branch (new code period)
-mcp__sonarcloud__fetch_sonarcloud_issues(sinceLeakPeriod: true)
+# Filter by severity
+mcp__sonarcloud__search_sonar_issues_in_projects(
+  projects: ["qoxi-cloud_proxmox-hetzner-go"],
+  pullRequestId: "117",
+  severities: ["HIGH", "BLOCKER"]
+)
+
+# Get quality gate status for a PR
+mcp__sonarcloud__get_project_quality_gate_status(
+  projectKey: "qoxi-cloud_proxmox-hetzner-go",
+  pullRequest: "117"
+)
+
+# Get project metrics
+mcp__sonarcloud__get_component_measures(
+  projectKey: "qoxi-cloud_proxmox-hetzner-go",
+  metricKeys: ["coverage", "bugs", "vulnerabilities", "code_smells"]
+)
+
+# Get rule details
+mcp__sonarcloud__show_rule(key: "go:S1192")
 ```
 
 **Common SonarCloud Filters:**
 
 | Filter | Values |
 |--------|--------|
-| `impactSeverities` | INFO, LOW, MEDIUM, HIGH, BLOCKER |
+| `severities` | INFO, LOW, MEDIUM, HIGH, BLOCKER |
 | `issueStatuses` | OPEN, CONFIRMED, FALSE_POSITIVE, ACCEPTED, FIXED |
-| `impactSoftwareQualities` | MAINTAINABILITY, RELIABILITY, SECURITY |
 
-**Note:** SonarCloud runs via Docker. Environment variables `SONARCLOUD_TOKEN`, `SONARCLOUD_ORGANISATION`, and `SONARCLOUD_PROJECT_KEY` are configured in `.mcp.json`.
+**Note:** SonarCloud is configured via environment variables `SONARCLOUD_TOKEN`, `SONARCLOUD_ORGANISATION`, and `SONARCLOUD_PROJECT_KEY` in `.mcp.json`.
 
 ### MCP Server Usage
 
