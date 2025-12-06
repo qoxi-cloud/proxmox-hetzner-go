@@ -307,208 +307,43 @@ func TestValidationError_TableDriven(t *testing.T) {
 
 // ValidateHostname tests
 
-func TestValidateHostname_ValidHostnames(t *testing.T) {
-	tests := []struct {
-		name     string
-		hostname string
-	}{
-		{
-			name:     "simple hostname",
-			hostname: "pve-server",
-		},
-		{
-			name:     "single letter",
-			hostname: "a",
-		},
-		{
-			name:     "single digit",
-			hostname: "1",
-		},
-		{
-			name:     "alphanumeric",
-			hostname: "server1",
-		},
-		{
-			name:     "with multiple hyphens",
-			hostname: "my-pve-server-01",
-		},
-		{
-			name:     "uppercase letters",
-			hostname: "PVE-SERVER",
-		},
-		{
-			name:     "mixed case",
-			hostname: "Pve-Server-01",
-		},
-		{
-			name:     "exactly 63 characters",
-			hostname: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-		},
-		{
-			name:     "numbers only",
-			hostname: "12345",
-		},
-		{
-			name:     "hyphen in middle",
-			hostname: "a-b",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			err := ValidateHostname(tt.hostname)
-
-			assert.NoError(t, err)
-		})
-	}
-}
-
-func TestValidateHostname_EmptyHostname(t *testing.T) {
-	err := ValidateHostname("")
-
-	assert.Error(t, err)
-	assert.Equal(t, ErrHostnameEmpty, err)
-}
-
-func TestValidateHostname_TooLong(t *testing.T) {
-	// 64 characters - exceeds maximum
-	hostname := "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-	require.Len(t, hostname, 64)
-
-	err := ValidateHostname(hostname)
-
-	assert.Error(t, err)
-	assert.Equal(t, ErrHostnameTooLong, err)
-}
-
-func TestValidateHostname_StartsWithHyphen(t *testing.T) {
-	err := ValidateHostname("-server")
-
-	assert.Error(t, err)
-	assert.Equal(t, ErrHostnameStartsWithHyphen, err)
-}
-
-func TestValidateHostname_EndsWithHyphen(t *testing.T) {
-	err := ValidateHostname("server-")
-
-	assert.Error(t, err)
-	assert.Equal(t, ErrHostnameEndsWithHyphen, err)
-}
-
-func TestValidateHostname_InvalidCharacters(t *testing.T) {
-	tests := []struct {
-		name     string
-		hostname string
-	}{
-		{
-			name:     "underscore",
-			hostname: "pve_server",
-		},
-		{
-			name:     "period",
-			hostname: "pve.server",
-		},
-		{
-			name:     "at symbol",
-			hostname: "pve@server",
-		},
-		{
-			name:     "space",
-			hostname: "pve server",
-		},
-		{
-			name:     "exclamation mark",
-			hostname: "pve!server",
-		},
-		{
-			name:     "hash",
-			hostname: "pve#server",
-		},
-		{
-			name:     "dollar sign",
-			hostname: "pve$server",
-		},
-		{
-			name:     "percent",
-			hostname: "pve%server",
-		},
-		{
-			name:     "unicode character",
-			hostname: "pve-сервер",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			err := ValidateHostname(tt.hostname)
-
-			assert.Error(t, err)
-			assert.Equal(t, ErrHostnameInvalidChars, err)
-		})
-	}
-}
-
-func TestValidateHostname_TableDriven(t *testing.T) {
+func TestValidateHostname(t *testing.T) {
 	tests := []struct {
 		name        string
 		hostname    string
 		expectedErr error
 	}{
-		{
-			name:        "valid simple hostname",
-			hostname:    "pve-server",
-			expectedErr: nil,
-		},
-		{
-			name:        "valid single character",
-			hostname:    "a",
-			expectedErr: nil,
-		},
-		{
-			name:        "empty hostname",
-			hostname:    "",
-			expectedErr: ErrHostnameEmpty,
-		},
-		{
-			name:        "too long hostname",
-			hostname:    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-			expectedErr: ErrHostnameTooLong,
-		},
-		{
-			name:        "starts with hyphen",
-			hostname:    "-server",
-			expectedErr: ErrHostnameStartsWithHyphen,
-		},
-		{
-			name:        "ends with hyphen",
-			hostname:    "server-",
-			expectedErr: ErrHostnameEndsWithHyphen,
-		},
-		{
-			name:        "contains underscore",
-			hostname:    "pve_server",
-			expectedErr: ErrHostnameInvalidChars,
-		},
-		{
-			name:        "contains period",
-			hostname:    "pve.server",
-			expectedErr: ErrHostnameInvalidChars,
-		},
-		{
-			name:        "exactly 63 characters (valid)",
-			hostname:    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-			expectedErr: nil,
-		},
-		{
-			name:        "only hyphen",
-			hostname:    "-",
-			expectedErr: ErrHostnameStartsWithHyphen,
-		},
-		{
-			name:        "multiple hyphens only",
-			hostname:    "---",
-			expectedErr: ErrHostnameStartsWithHyphen,
-		},
+		// Valid hostnames
+		{"valid simple hostname", "pve-server", nil},
+		{"valid single letter", "a", nil},
+		{"valid single digit", "1", nil},
+		{"valid alphanumeric", "server1", nil},
+		{"valid with multiple hyphens", "my-pve-server-01", nil},
+		{"valid uppercase letters", "PVE-SERVER", nil},
+		{"valid mixed case", "Pve-Server-01", nil},
+		{"valid exactly 63 characters", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", nil},
+		{"valid numbers only", "12345", nil},
+		{"valid hyphen in middle", "a-b", nil},
+		// Empty hostname
+		{"empty hostname", "", ErrHostnameEmpty},
+		// Too long hostname (64 characters)
+		{"too long hostname", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", ErrHostnameTooLong},
+		// Starts with hyphen
+		{"starts with hyphen", "-server", ErrHostnameStartsWithHyphen},
+		{"only hyphen", "-", ErrHostnameStartsWithHyphen},
+		{"multiple hyphens only", "---", ErrHostnameStartsWithHyphen},
+		// Ends with hyphen
+		{"ends with hyphen", "server-", ErrHostnameEndsWithHyphen},
+		// Invalid characters
+		{"invalid underscore", "pve_server", ErrHostnameInvalidChars},
+		{"invalid period", "pve.server", ErrHostnameInvalidChars},
+		{"invalid at symbol", "pve@server", ErrHostnameInvalidChars},
+		{"invalid space", "pve server", ErrHostnameInvalidChars},
+		{"invalid exclamation", "pve!server", ErrHostnameInvalidChars},
+		{"invalid hash", "pve#server", ErrHostnameInvalidChars},
+		{"invalid dollar", "pve$server", ErrHostnameInvalidChars},
+		{"invalid percent", "pve%server", ErrHostnameInvalidChars},
+		{"invalid unicode", "pve-сервер", ErrHostnameInvalidChars},
 	}
 
 	for _, tt := range tests {
@@ -518,26 +353,10 @@ func TestValidateHostname_TableDriven(t *testing.T) {
 			if tt.expectedErr == nil {
 				assert.NoError(t, err)
 			} else {
+				require.Error(t, err)
 				assert.Equal(t, tt.expectedErr, err)
+				assert.True(t, errors.Is(err, tt.expectedErr))
 			}
 		})
 	}
-}
-
-func TestValidateHostname_ErrorsAreComparable(t *testing.T) {
-	// Verify that sentinel errors can be used with errors.Is
-	err := ValidateHostname("")
-	assert.True(t, errors.Is(err, ErrHostnameEmpty))
-
-	err = ValidateHostname("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
-	assert.True(t, errors.Is(err, ErrHostnameTooLong))
-
-	err = ValidateHostname("-server")
-	assert.True(t, errors.Is(err, ErrHostnameStartsWithHyphen))
-
-	err = ValidateHostname("server-")
-	assert.True(t, errors.Is(err, ErrHostnameEndsWithHyphen))
-
-	err = ValidateHostname("pve_server")
-	assert.True(t, errors.Is(err, ErrHostnameInvalidChars))
 }
