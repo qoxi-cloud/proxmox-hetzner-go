@@ -15,7 +15,7 @@ const (
 	testNameBothMode     = "both mode"
 )
 
-func TestBridgeMode_String(t *testing.T) {
+func TestBridgeModeString(t *testing.T) {
 	tests := []struct {
 		name     string
 		mode     BridgeMode
@@ -35,7 +35,7 @@ func TestBridgeMode_String(t *testing.T) {
 	}
 }
 
-func TestBridgeMode_IsValid(t *testing.T) {
+func TestBridgeModeIsValid(t *testing.T) {
 	tests := []struct {
 		name     string
 		mode     BridgeMode
@@ -57,7 +57,7 @@ func TestBridgeMode_IsValid(t *testing.T) {
 	}
 }
 
-func TestZFSRaid_String(t *testing.T) {
+func TestZFSRaidString(t *testing.T) {
 	tests := []struct {
 		name     string
 		raid     ZFSRaid
@@ -77,7 +77,7 @@ func TestZFSRaid_String(t *testing.T) {
 	}
 }
 
-func TestZFSRaid_IsValid(t *testing.T) {
+func TestZFSRaidIsValid(t *testing.T) {
 	tests := []struct {
 		name     string
 		raid     ZFSRaid
@@ -100,7 +100,7 @@ func TestZFSRaid_IsValid(t *testing.T) {
 	}
 }
 
-func TestBridgeMode_MarshalYAML(t *testing.T) {
+func TestBridgeModeMarshalYAML(t *testing.T) {
 	tests := []struct {
 		name     string
 		mode     BridgeMode
@@ -121,7 +121,7 @@ func TestBridgeMode_MarshalYAML(t *testing.T) {
 	}
 }
 
-func TestBridgeMode_UnmarshalYAML(t *testing.T) {
+func TestBridgeModeUnmarshalYAML(t *testing.T) {
 	tests := []struct {
 		name        string
 		input       string
@@ -153,7 +153,7 @@ func TestBridgeMode_UnmarshalYAML(t *testing.T) {
 	}
 }
 
-func TestZFSRaid_MarshalYAML(t *testing.T) {
+func TestZFSRaidMarshalYAML(t *testing.T) {
 	tests := []struct {
 		name     string
 		raid     ZFSRaid
@@ -174,7 +174,7 @@ func TestZFSRaid_MarshalYAML(t *testing.T) {
 	}
 }
 
-func TestZFSRaid_UnmarshalYAML(t *testing.T) {
+func TestZFSRaidUnmarshalYAML(t *testing.T) {
 	tests := []struct {
 		name        string
 		input       string
@@ -206,7 +206,7 @@ func TestZFSRaid_UnmarshalYAML(t *testing.T) {
 	}
 }
 
-func TestEnumTypes_RoundTrip(t *testing.T) {
+func TestEnumTypesRoundTrip(t *testing.T) {
 	type testConfig struct {
 		Bridge BridgeMode `yaml:"bridge"`
 		Raid   ZFSRaid    `yaml:"raid"`
