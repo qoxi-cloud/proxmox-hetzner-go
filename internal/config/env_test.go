@@ -150,9 +150,10 @@ const (
 )
 
 func TestLoadFromEnvNilConfig(t *testing.T) {
-	t.Helper()
 	// Should not panic when called with nil config
 	LoadFromEnv(nil)
+	// If we reached here without panic, the test passes
+	t.Log("LoadFromEnv(nil) completed without panic")
 }
 
 func TestLoadFromEnvHostname(t *testing.T) {

@@ -21,11 +21,11 @@ func EnvVarSet(name string) bool {
 	return exists
 }
 
-// LoadFromEnv loads configuration values from environment variables.
-// Environment variables override existing values in the Config.
-// Only variables that are explicitly set (not empty) override the config.
-// Sensitive fields (RootPassword, SSHPublicKey, AuthKey) are loaded but
-// never saved to files.
+// LoadFromEnv loads configuration values from environment variables into cfg.
+// Only non-empty environment variable values override existing configuration;
+// empty or unset variables leave the current values unchanged.
+// Sensitive fields (RootPassword, SSHPublicKey) are loaded from env but are
+// never persisted to configuration files.
 func LoadFromEnv(cfg *Config) {
 	if cfg == nil {
 		return
