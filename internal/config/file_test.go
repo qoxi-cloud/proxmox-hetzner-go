@@ -573,3 +573,202 @@ storage:
 
 	assert.Equal(t, []string{"/dev/sda", "/dev/sdb", "/dev/sdc"}, cfg.Storage.Disks)
 }
+
+// TestLoadFromFileDescriptiveErrors uses table-driven tests to verify error handling
+// across multiple failure scenarios with descriptive error messages.
+func TestLoadFromFileDescriptiveErrors(t *testing.T) {
+	tests := []struct {
+		name           string
+		setup          func(t *testing.T) string // returns file path
+		wantErr        bool
+		errContains    string
+		errIs          error // optional: check with errors.Is
+		configExpected bool  // true if cfg should be non-nil
+	}{
+		{
+			name: "file not found with descriptive path",
+			setup: func(_ *testing.T) string {
+				return "/nonexistent/deep/nested/path/config.yaml"
+			},
+			wantErr:        true,
+			errContains:    "config file not found",
+			errIs:          os.ErrNotExist,
+			configExpected: false,
+		},
+		{
+			name: "malformed YAML with unclosed bracket",
+			setup: func(t *testing.T) string {
+				tmpDir := t.TempDir()
+				filePath := filepath.Join(tmpDir, "malformed.yaml")
+				content := "system:\n  hostname: [unclosed"
+				err := os.WriteFile(filePath, []byte(content), 0o600)
+				require.NoError(t, err)
+				return filePath
+			},
+			wantErr:        true,
+			errContains:    "failed to parse YAML",
+			configExpected: false,
+		},
+		{
+			name: "malformed YAML with invalid indentation",
+			setup: func(t *testing.T) string {
+				tmpDir := t.TempDir()
+				filePath := filepath.Join(tmpDir, "bad-indent.yaml")
+				content := "system:\nhostname: bad-indent" // hostname should be indented
+				err := os.WriteFile(filePath, []byte(content), 0o600)
+				require.NoError(t, err)
+				return filePath
+			},
+			wantErr:        false, // YAML parser may accept this
+			configExpected: true,
+		},
+		{
+			name: "malformed YAML with tabs instead of spaces",
+			setup: func(t *testing.T) string {
+				tmpDir := t.TempDir()
+				filePath := filepath.Join(tmpDir, "tabs.yaml")
+				content := "system:\n\thostname: tab-indented" // tabs are not recommended but may work
+				err := os.WriteFile(filePath, []byte(content), 0o600)
+				require.NoError(t, err)
+				return filePath
+			},
+			wantErr:        true,
+			errContains:    "failed to parse YAML",
+			configExpected: false,
+		},
+		{
+			name: "malformed YAML with duplicate keys",
+			setup: func(t *testing.T) string {
+				tmpDir := t.TempDir()
+				filePath := filepath.Join(tmpDir, "duplicate.yaml")
+				content := "system:\n  hostname: first\n  hostname: second"
+				err := os.WriteFile(filePath, []byte(content), 0o600)
+				require.NoError(t, err)
+				return filePath
+			},
+			wantErr:        true, // yaml.v3 rejects duplicate keys
+			errContains:    "failed to parse YAML",
+			configExpected: false,
+		},
+		{
+			name: "malformed YAML with invalid type coercion",
+			setup: func(t *testing.T) string {
+				tmpDir := t.TempDir()
+				filePath := filepath.Join(tmpDir, "invalid-type.yaml")
+				// storage.disks expects []string but gets a map
+				content := "storage:\n  disks:\n    invalid: not-a-list"
+				err := os.WriteFile(filePath, []byte(content), 0o600)
+				require.NoError(t, err)
+				return filePath
+			},
+			wantErr:        true,
+			errContains:    "failed to parse YAML",
+			configExpected: false,
+		},
+		{
+			name: "error message contains file path",
+			setup: func(_ *testing.T) string {
+				return "/specific/path/that/should/appear/in/error.yaml"
+			},
+			wantErr:        true,
+			errContains:    "/specific/path/that/should/appear/in/error.yaml",
+			configExpected: false,
+		},
+		{
+			name: "binary content in YAML file",
+			setup: func(t *testing.T) string {
+				tmpDir := t.TempDir()
+				filePath := filepath.Join(tmpDir, "binary.yaml")
+				// Write some binary content
+				content := []byte{0x00, 0x01, 0x02, 0xFF, 0xFE, 0xFD}
+				err := os.WriteFile(filePath, content, 0o600)
+				require.NoError(t, err)
+				return filePath
+			},
+			wantErr:        true,
+			errContains:    "failed to parse YAML",
+			configExpected: false,
+		},
+		{
+			name: "YAML with only comments",
+			setup: func(t *testing.T) string {
+				tmpDir := t.TempDir()
+				filePath := filepath.Join(tmpDir, "comments.yaml")
+				content := "# This is a comment\n# Another comment\n"
+				err := os.WriteFile(filePath, []byte(content), 0o600)
+				require.NoError(t, err)
+				return filePath
+			},
+			wantErr:        false, // Valid YAML, just no data
+			configExpected: true,
+		},
+		{
+			name: "YAML with null document",
+			setup: func(t *testing.T) string {
+				tmpDir := t.TempDir()
+				filePath := filepath.Join(tmpDir, "null.yaml")
+				content := "null"
+				err := os.WriteFile(filePath, []byte(content), 0o600)
+				require.NoError(t, err)
+				return filePath
+			},
+			wantErr:        false, // yaml.Unmarshal handles null gracefully
+			configExpected: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			filePath := tt.setup(t)
+
+			cfg, err := LoadFromFile(filePath)
+
+			if tt.wantErr {
+				require.Error(t, err, "expected error for case: %s", tt.name)
+				if tt.errContains != "" {
+					assert.Contains(t, err.Error(), tt.errContains,
+						"error should contain expected message")
+				}
+				if tt.errIs != nil {
+					assert.ErrorIs(t, err, tt.errIs,
+						"error should wrap expected error type")
+				}
+			} else {
+				require.NoError(t, err, "unexpected error for case: %s", tt.name)
+			}
+
+			if tt.configExpected {
+				assert.NotNil(t, cfg, "config should not be nil")
+			} else {
+				assert.Nil(t, cfg, "config should be nil on error")
+			}
+		})
+	}
+}
+
+// TestLoadFromFileErrorWrapping verifies that errors are properly wrapped
+// and can be unwrapped to access the underlying error.
+func TestLoadFromFileErrorWrapping(t *testing.T) {
+	// Test that os.ErrNotExist is properly wrapped
+	_, err := LoadFromFile("/path/that/does/not/exist/config.yaml")
+	require.Error(t, err)
+
+	// Should be able to unwrap to os.ErrNotExist
+	assert.ErrorIs(t, err, os.ErrNotExist,
+		"error should be unwrappable to os.ErrNotExist")
+
+	// Should contain context about what went wrong
+	assert.Contains(t, err.Error(), "config file not found",
+		"error should describe the problem")
+}
+
+// TestLoadFromFileDirectoryInsteadOfFile verifies behavior when path points to a directory.
+func TestLoadFromFileDirectoryInsteadOfFile(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	cfg, err := LoadFromFile(tmpDir)
+
+	require.Error(t, err)
+	require.Nil(t, cfg)
+	assert.Contains(t, err.Error(), "failed to read config file")
+}
