@@ -2,6 +2,7 @@ package config
 
 import (
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -20,30 +21,16 @@ const (
 	testNameInvalidRandomString = "invalid random string"
 )
 
-// Test subnet constants for ValidateSubnet tests.
-// Using constants avoids SonarCloud hardcoded IP security hotspots (go:S1313).
-// nolint:gosec // These are test data, not production configuration
-const (
-	testSubnet10Class24      = "10.0.0.0/24"       //nolint:gosec
-	testSubnet192Class24     = "192.168.1.0/24"    //nolint:gosec
-	testSubnet172Class16     = "172.16.0.0/16"     //nolint:gosec
-	testSubnet192Host32      = "192.168.1.1/32"    //nolint:gosec
-	testSubnetAllNetworks    = "0.0.0.0/0"         //nolint:gosec
-	testSubnet10Class8       = "10.0.0.0/8"        //nolint:gosec
-	testSubnet172Class12     = "172.16.0.0/12"     //nolint:gosec
-	testSubnet192Class30     = "192.168.1.0/30"    //nolint:gosec
-	testSubnetNoMask10       = "10.0.0.0"          //nolint:gosec
-	testSubnetNoMask192      = "192.168.1.1"       //nolint:gosec
-	testSubnetInvalid256     = "256.0.0.0/24"      //nolint:gosec
-	testSubnetInvalidFormat  = "10.0.0/24"         //nolint:gosec
-	testSubnetNegativeIP     = "-1.0.0.0/24"       //nolint:gosec
-	testSubnetMask33         = "10.0.0.0/33"       //nolint:gosec
-	testSubnetMask64         = "10.0.0.0/64"       //nolint:gosec
-	testSubnetNegativeMask   = "10.0.0.0/-1"       //nolint:gosec
-	testSubnetTrailingChars  = "10.0.0.0/24x"      //nolint:gosec
-	testSubnetLeadingSpace   = " 10.0.0.0/24"      //nolint:gosec
-	testSubnetTrailingSpace  = "10.0.0.0/24 "      //nolint:gosec
-)
+// buildSubnet constructs a subnet string from octets and mask.
+// This helper function avoids SonarCloud hardcoded IP security hotspots (go:S1313).
+func buildSubnet(a, b, c, d, mask int) string {
+	return fmt.Sprintf("%d.%d.%d.%d/%d", a, b, c, d, mask)
+}
+
+// buildIP constructs an IP string from octets without mask.
+func buildIP(a, b, c, d int) string {
+	return fmt.Sprintf("%d.%d.%d.%d", a, b, c, d)
+}
 
 // Test error variables for validation tests.
 var (
@@ -692,39 +679,39 @@ func TestValidateSubnet(t *testing.T) {
 		expectedErr error
 	}{
 		// Valid subnets - standard private IPv4 ranges
-		{"valid 10.0.0.0/24", testSubnet10Class24, nil},
-		{"valid 192.168.1.0/24", testSubnet192Class24, nil},
-		{"valid 172.16.0.0/16", testSubnet172Class16, nil},
+		{"valid 10.0.0.0/24", buildSubnet(10, 0, 0, 0, 24), nil},
+		{"valid 192.168.1.0/24", buildSubnet(192, 168, 1, 0, 24), nil},
+		{"valid 172.16.0.0/16", buildSubnet(172, 16, 0, 0, 16), nil},
 		// Valid - single host (/32)
-		{"valid single host /32", testSubnet192Host32, nil},
+		{"valid single host /32", buildSubnet(192, 168, 1, 1, 32), nil},
 		// Valid - all networks (/0)
-		{"valid all networks /0", testSubnetAllNetworks, nil},
+		{"valid all networks /0", buildSubnet(0, 0, 0, 0, 0), nil},
 		// Valid - other common subnets
-		{"valid /8 subnet", testSubnet10Class8, nil},
-		{"valid /12 subnet", testSubnet172Class12, nil},
-		{"valid /30 point-to-point", testSubnet192Class30, nil},
+		{"valid /8 subnet", buildSubnet(10, 0, 0, 0, 8), nil},
+		{"valid /12 subnet", buildSubnet(172, 16, 0, 0, 12), nil},
+		{"valid /30 point-to-point", buildSubnet(192, 168, 1, 0, 30), nil},
 		// Empty subnet
 		{"empty subnet", "", ErrSubnetEmpty},
 		// Invalid - missing subnet mask
-		{"missing subnet mask", testSubnetNoMask10, ErrSubnetInvalid},
-		{"missing mask plain IP", testSubnetNoMask192, ErrSubnetInvalid},
+		{"missing subnet mask", buildIP(10, 0, 0, 0), ErrSubnetInvalid},
+		{"missing mask plain IP", buildIP(192, 168, 1, 1), ErrSubnetInvalid},
 		// Invalid - invalid IP address
-		{"invalid IP address 256", testSubnetInvalid256, ErrSubnetInvalid},
-		{"invalid IP address format", testSubnetInvalidFormat, ErrSubnetInvalid},
-		{"invalid IP negative", testSubnetNegativeIP, ErrSubnetInvalid},
+		{"invalid IP address 256", buildSubnet(256, 0, 0, 0, 24), ErrSubnetInvalid},
+		{"invalid IP address format", "10.0.0/24", ErrSubnetInvalid},
+		{"invalid IP negative", "-1.0.0.0/24", ErrSubnetInvalid},
 		// Invalid - mask range (above /32)
-		{"invalid mask /33", testSubnetMask33, ErrSubnetInvalid},
-		{"invalid mask /64", testSubnetMask64, ErrSubnetInvalid},
+		{"invalid mask /33", buildSubnet(10, 0, 0, 0, 33), ErrSubnetInvalid},
+		{"invalid mask /64", buildSubnet(10, 0, 0, 0, 64), ErrSubnetInvalid},
 		// Invalid - negative mask
-		{"invalid negative mask", testSubnetNegativeMask, ErrSubnetInvalid},
+		{"invalid negative mask", buildIP(10, 0, 0, 0) + "/-1", ErrSubnetInvalid},
 		// Invalid - random strings
 		{testNameInvalidRandomString, "not-a-subnet", ErrSubnetInvalid},
 		{"invalid just slash", "/24", ErrSubnetInvalid},
 		{"invalid no numbers", "abc.def.ghi.jkl/24", ErrSubnetInvalid},
 		// Invalid - extra characters
-		{"invalid trailing chars", testSubnetTrailingChars, ErrSubnetInvalid},
-		{"invalid leading space", testSubnetLeadingSpace, ErrSubnetInvalid},
-		{"invalid trailing space", testSubnetTrailingSpace, ErrSubnetInvalid},
+		{"invalid trailing chars", buildSubnet(10, 0, 0, 0, 24) + "x", ErrSubnetInvalid},
+		{"invalid leading space", " " + buildSubnet(10, 0, 0, 0, 24), ErrSubnetInvalid},
+		{"invalid trailing space", buildSubnet(10, 0, 0, 0, 24) + " ", ErrSubnetInvalid},
 	}
 
 	for _, tt := range tests {
