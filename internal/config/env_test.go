@@ -12,12 +12,12 @@ func TestParseBool(t *testing.T) {
 		want  bool
 	}{
 		// True values - "true" variations
-		{"true lowercase", "true", true},
+		{testCaseTrueLowercase, "true", true},
 		{"true mixed case", "True", true},
-		{"true uppercase", "TRUE", true},
+		{testCaseTrueUppercase, "TRUE", true},
 
 		// True values - "yes" variations
-		{"yes lowercase", "yes", true},
+		{testCaseYesLowercase, "yes", true},
 		{"yes mixed case", "Yes", true},
 		{"yes uppercase", "YES", true},
 
@@ -25,12 +25,12 @@ func TestParseBool(t *testing.T) {
 		{"one", "1", true},
 
 		// False values - "false" variations
-		{"false lowercase", "false", false},
+		{testCaseFalseLowercase, "false", false},
 		{"false mixed case", "False", false},
 		{"false uppercase", "FALSE", false},
 
 		// False values - "no" variations
-		{"no lowercase", "no", false},
+		{testCaseNoLowercase, "no", false},
 		{"no mixed case", "No", false},
 		{"no uppercase", "NO", false},
 
@@ -167,7 +167,12 @@ const (
 	errFmtZFSRaid       = "ZFSRaid = %q, want %q"
 
 	// Test case name constants.
-	testCaseEmptyString = "empty string"
+	testCaseEmptyString    = "empty string"
+	testCaseTrueLowercase  = "true lowercase"
+	testCaseTrueUppercase  = "TRUE uppercase"
+	testCaseYesLowercase   = "yes lowercase"
+	testCaseFalseLowercase = "false lowercase"
+	testCaseNoLowercase    = "no lowercase"
 )
 
 func TestLoadFromEnvNilConfig(t *testing.T) {
@@ -685,10 +690,10 @@ func TestLoadFromEnvTailscaleEnabledTrue(t *testing.T) {
 		name  string
 		input string
 	}{
-		{"true lowercase", "true"},
-		{"yes lowercase", "yes"},
+		{testCaseTrueLowercase, "true"},
+		{testCaseYesLowercase, "yes"},
 		{"one", "1"},
-		{"TRUE uppercase", "TRUE"},
+		{testCaseTrueUppercase, "TRUE"},
 		{"Yes mixed case", "Yes"},
 	}
 
@@ -712,8 +717,8 @@ func TestLoadFromEnvTailscaleEnabledFalse(t *testing.T) {
 		name  string
 		input string
 	}{
-		{"false lowercase", "false"},
-		{"no lowercase", "no"},
+		{testCaseFalseLowercase, "false"},
+		{testCaseNoLowercase, "no"},
 		{"zero", "0"},
 		{"FALSE uppercase", "FALSE"},
 		{"No mixed case", "No"},
@@ -776,10 +781,10 @@ func TestLoadFromEnvTailscaleSSHTrue(t *testing.T) {
 		name  string
 		input string
 	}{
-		{"true lowercase", "true"},
-		{"yes lowercase", "yes"},
+		{testCaseTrueLowercase, "true"},
+		{testCaseYesLowercase, "yes"},
 		{"one", "1"},
-		{"TRUE uppercase", "TRUE"},
+		{testCaseTrueUppercase, "TRUE"},
 	}
 
 	for _, tt := range tests {
@@ -802,8 +807,8 @@ func TestLoadFromEnvTailscaleSSHFalse(t *testing.T) {
 		name  string
 		input string
 	}{
-		{"false lowercase", "false"},
-		{"no lowercase", "no"},
+		{testCaseFalseLowercase, "false"},
+		{testCaseNoLowercase, "no"},
 		{"zero", "0"},
 	}
 
@@ -839,10 +844,10 @@ func TestLoadFromEnvTailscaleWebUITrue(t *testing.T) {
 		name  string
 		input string
 	}{
-		{"true lowercase", "true"},
-		{"yes lowercase", "yes"},
+		{testCaseTrueLowercase, "true"},
+		{testCaseYesLowercase, "yes"},
 		{"one", "1"},
-		{"TRUE uppercase", "TRUE"},
+		{testCaseTrueUppercase, "TRUE"},
 	}
 
 	for _, tt := range tests {
@@ -865,8 +870,8 @@ func TestLoadFromEnvTailscaleWebUIFalse(t *testing.T) {
 		name  string
 		input string
 	}{
-		{"false lowercase", "false"},
-		{"no lowercase", "no"},
+		{testCaseFalseLowercase, "false"},
+		{testCaseNoLowercase, "no"},
 		{"zero", "0"},
 	}
 
