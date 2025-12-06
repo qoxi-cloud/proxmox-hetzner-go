@@ -38,7 +38,7 @@ func TestParseBool(t *testing.T) {
 		{"zero", "0", false},
 
 		// Empty and whitespace
-		{"empty string", "", false},
+		{testCaseEmptyString, "", false},
 		{"whitespace only", "   ", false},
 
 		// Whitespace variations with valid values
@@ -165,6 +165,9 @@ const (
 	errFmtBridgeMode    = "BridgeMode = %q, want %q"
 	errFmtPrivateSubnet = "PrivateSubnet = %q, want %q"
 	errFmtZFSRaid       = "ZFSRaid = %q, want %q"
+
+	// Test case name constants.
+	testCaseEmptyString = "empty string"
 )
 
 func TestLoadFromEnvNilConfig(t *testing.T) {
@@ -578,7 +581,7 @@ func TestLoadFromEnvZFSRaidInvalidKeepsOriginal(t *testing.T) {
 		input string
 	}{
 		{"invalid value", "invalid"},
-		{"empty string", ""},
+		{testCaseEmptyString, ""},
 		{"raid5 unsupported", "raid5"},
 	}
 
@@ -628,7 +631,7 @@ func TestLoadFromEnvDisksKeepsOriginal(t *testing.T) {
 		name  string
 		input string
 	}{
-		{"empty string", ""},
+		{testCaseEmptyString, ""},
 		{"only commas", ",,,"},
 		{"only spaces and commas", " , , "},
 	}
