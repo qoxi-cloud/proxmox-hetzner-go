@@ -657,3 +657,62 @@ func TestValidateZFSRaid(t *testing.T) {
 		})
 	}
 }
+
+// ValidateSubnet tests
+
+func TestValidateSubnet(t *testing.T) {
+	tests := []struct {
+		name        string
+		subnet      string
+		expectedErr error
+	}{
+		// Valid subnets - standard private IPv4 ranges
+		{"valid 10.0.0.0/24", "10.0.0.0/24", nil},
+		{"valid 192.168.1.0/24", "192.168.1.0/24", nil},
+		{"valid 172.16.0.0/16", "172.16.0.0/16", nil},
+		// Valid - single host (/32)
+		{"valid single host /32", "192.168.1.1/32", nil},
+		// Valid - all networks (/0)
+		{"valid all networks /0", "0.0.0.0/0", nil},
+		// Valid - other common subnets
+		{"valid /8 subnet", "10.0.0.0/8", nil},
+		{"valid /12 subnet", "172.16.0.0/12", nil},
+		{"valid /30 point-to-point", "192.168.1.0/30", nil},
+		// Empty subnet
+		{"empty subnet", "", ErrSubnetEmpty},
+		// Invalid - missing subnet mask
+		{"missing subnet mask", "10.0.0.0", ErrSubnetInvalid},
+		{"missing mask plain IP", "192.168.1.1", ErrSubnetInvalid},
+		// Invalid - invalid IP address
+		{"invalid IP address 256", "256.0.0.0/24", ErrSubnetInvalid},
+		{"invalid IP address format", "10.0.0/24", ErrSubnetInvalid},
+		{"invalid IP negative", "-1.0.0.0/24", ErrSubnetInvalid},
+		// Invalid - mask range (above /32)
+		{"invalid mask /33", "10.0.0.0/33", ErrSubnetInvalid},
+		{"invalid mask /64", "10.0.0.0/64", ErrSubnetInvalid},
+		// Invalid - negative mask
+		{"invalid negative mask", "10.0.0.0/-1", ErrSubnetInvalid},
+		// Invalid - random strings
+		{testNameInvalidRandomString, "not-a-subnet", ErrSubnetInvalid},
+		{"invalid just slash", "/24", ErrSubnetInvalid},
+		{"invalid no numbers", "abc.def.ghi.jkl/24", ErrSubnetInvalid},
+		// Invalid - extra characters
+		{"invalid trailing chars", "10.0.0.0/24x", ErrSubnetInvalid},
+		{"invalid leading space", " 10.0.0.0/24", ErrSubnetInvalid},
+		{"invalid trailing space", "10.0.0.0/24 ", ErrSubnetInvalid},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateSubnet(tt.subnet)
+
+			if tt.expectedErr == nil {
+				assert.NoError(t, err)
+			} else {
+				require.Error(t, err)
+				assert.Equal(t, tt.expectedErr, err)
+				assert.True(t, errors.Is(err, tt.expectedErr))
+			}
+		})
+	}
+}

@@ -4,6 +4,7 @@ package config
 
 import (
 	"errors"
+	"net"
 	"regexp"
 	"strings"
 	"time"
@@ -81,6 +82,14 @@ var (
 	ErrZFSRaidEmpty = errors.New("ZFS RAID level is required")
 	// ErrZFSRaidInvalid is returned when ZFS RAID level is not a valid value.
 	ErrZFSRaidInvalid = errors.New("ZFS RAID level must be one of: single, raid0, raid1")
+)
+
+// Subnet validation errors.
+var (
+	// ErrSubnetEmpty is returned when subnet is empty.
+	ErrSubnetEmpty = errors.New("subnet is required")
+	// ErrSubnetInvalid is returned when subnet is not in valid CIDR notation.
+	ErrSubnetInvalid = errors.New("subnet must be in valid CIDR notation (e.g., 10.0.0.0/24)")
 )
 
 // hostnameRegex matches valid RFC 1123 hostname characters (alphanumeric and hyphens).
@@ -293,6 +302,25 @@ func ValidateZFSRaid(raid ZFSRaid) error {
 
 	if !raid.IsValid() {
 		return ErrZFSRaidInvalid
+	}
+
+	return nil
+}
+
+// ValidateSubnet validates a subnet in CIDR notation.
+// A valid subnet:
+//   - Must not be empty
+//   - Must be in valid CIDR notation (e.g., "10.0.0.0/24", "192.168.1.0/24")
+//
+// This function uses Go's net.ParseCIDR for validation.
+func ValidateSubnet(subnet string) error {
+	if subnet == "" {
+		return ErrSubnetEmpty
+	}
+
+	_, _, err := net.ParseCIDR(subnet)
+	if err != nil {
+		return ErrSubnetInvalid
 	}
 
 	return nil
