@@ -332,3 +332,244 @@ func TestSaveToFileNilReceiver(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "config is nil")
 }
+
+// LoadFromFile Tests
+
+func TestLoadFromFileValidYAML(t *testing.T) {
+	tmpDir := t.TempDir()
+	filePath := filepath.Join(tmpDir, testConfigFileName)
+
+	yamlContent := `
+system:
+  hostname: loaded-hostname
+  domain_suffix: example.com
+  timezone: America/Los_Angeles
+  email: loaded@example.com
+network:
+  interface: enp0s31f6
+  bridge_mode: external
+  private_subnet: 192.168.100.0/24
+storage:
+  zfs_raid: raid0
+  disks:
+    - /dev/nvme0n1
+    - /dev/nvme1n1
+tailscale:
+  enabled: true
+  ssh: false
+  webui: true
+`
+	err := os.WriteFile(filePath, []byte(yamlContent), 0o600)
+	require.NoError(t, err)
+
+	cfg, err := LoadFromFile(filePath)
+	require.NoError(t, err)
+	require.NotNil(t, cfg)
+
+	assert.Equal(t, "loaded-hostname", cfg.System.Hostname)
+	assert.Equal(t, "example.com", cfg.System.DomainSuffix)
+	assert.Equal(t, "America/Los_Angeles", cfg.System.Timezone)
+	assert.Equal(t, "loaded@example.com", cfg.System.Email)
+
+	assert.Equal(t, "enp0s31f6", cfg.Network.InterfaceName)
+	assert.Equal(t, BridgeModeExternal, cfg.Network.BridgeMode)
+	assert.Equal(t, "192.168.100.0/24", cfg.Network.PrivateSubnet) // NOSONAR(go:S1313) test data
+
+	assert.Equal(t, ZFSRaid0, cfg.Storage.ZFSRaid)
+	assert.Equal(t, []string{"/dev/nvme0n1", "/dev/nvme1n1"}, cfg.Storage.Disks)
+
+	assert.True(t, cfg.Tailscale.Enabled)
+	assert.False(t, cfg.Tailscale.SSH)
+	assert.True(t, cfg.Tailscale.WebUI)
+}
+
+func TestLoadFromFileNotFound(t *testing.T) {
+	cfg, err := LoadFromFile("/nonexistent/path/config.yaml")
+
+	require.Error(t, err)
+	require.Nil(t, cfg)
+	assert.Contains(t, err.Error(), "config file not found")
+	assert.ErrorIs(t, err, os.ErrNotExist)
+}
+
+func TestLoadFromFileMalformedYAML(t *testing.T) {
+	tmpDir := t.TempDir()
+	filePath := filepath.Join(tmpDir, testConfigFileName)
+
+	malformedYAML := `
+system:
+  hostname: test
+  invalid yaml content here: [unclosed
+`
+	err := os.WriteFile(filePath, []byte(malformedYAML), 0o600)
+	require.NoError(t, err)
+
+	cfg, err := LoadFromFile(filePath)
+
+	require.Error(t, err)
+	require.Nil(t, cfg)
+	assert.Contains(t, err.Error(), "failed to parse YAML")
+}
+
+func TestLoadFromFileDefaultsForMissingFields(t *testing.T) {
+	tmpDir := t.TempDir()
+	filePath := filepath.Join(tmpDir, testConfigFileName)
+
+	// Only specify hostname, all other fields should get defaults
+	partialYAML := `
+system:
+  hostname: partial-host
+`
+	err := os.WriteFile(filePath, []byte(partialYAML), 0o600)
+	require.NoError(t, err)
+
+	cfg, err := LoadFromFile(filePath)
+	require.NoError(t, err)
+	require.NotNil(t, cfg)
+
+	// Specified field
+	assert.Equal(t, "partial-host", cfg.System.Hostname)
+
+	// Default values for unspecified fields
+	defaults := DefaultConfig()
+	assert.Equal(t, defaults.System.DomainSuffix, cfg.System.DomainSuffix)
+	assert.Equal(t, defaults.System.Timezone, cfg.System.Timezone)
+	assert.Equal(t, defaults.System.Email, cfg.System.Email)
+	assert.Equal(t, defaults.Network.BridgeMode, cfg.Network.BridgeMode)
+	assert.Equal(t, defaults.Network.PrivateSubnet, cfg.Network.PrivateSubnet)
+	assert.Equal(t, defaults.Storage.ZFSRaid, cfg.Storage.ZFSRaid)
+	assert.Equal(t, defaults.Tailscale.Enabled, cfg.Tailscale.Enabled)
+	assert.Equal(t, defaults.Tailscale.SSH, cfg.Tailscale.SSH)
+}
+
+func TestLoadFromFilePartialMerge(t *testing.T) {
+	tmpDir := t.TempDir()
+	filePath := filepath.Join(tmpDir, testConfigFileName)
+
+	// Partial config with some fields from each section
+	partialYAML := `
+system:
+  hostname: merged-host
+network:
+  bridge_mode: both
+tailscale:
+  enabled: true
+`
+	err := os.WriteFile(filePath, []byte(partialYAML), 0o600)
+	require.NoError(t, err)
+
+	cfg, err := LoadFromFile(filePath)
+	require.NoError(t, err)
+
+	defaults := DefaultConfig()
+
+	// Specified fields
+	assert.Equal(t, "merged-host", cfg.System.Hostname)
+	assert.Equal(t, BridgeModeBoth, cfg.Network.BridgeMode)
+	assert.True(t, cfg.Tailscale.Enabled)
+
+	// Unspecified fields retain defaults
+	assert.Equal(t, defaults.System.DomainSuffix, cfg.System.DomainSuffix)
+	assert.Equal(t, defaults.System.Timezone, cfg.System.Timezone)
+	assert.Equal(t, defaults.Network.PrivateSubnet, cfg.Network.PrivateSubnet)
+	assert.Equal(t, defaults.Storage.ZFSRaid, cfg.Storage.ZFSRaid)
+	assert.Equal(t, defaults.Tailscale.SSH, cfg.Tailscale.SSH)
+}
+
+func TestLoadFromFileEmptyFile(t *testing.T) {
+	tmpDir := t.TempDir()
+	filePath := filepath.Join(tmpDir, testConfigFileName)
+
+	// Empty file should result in all defaults
+	err := os.WriteFile(filePath, []byte(""), 0o600)
+	require.NoError(t, err)
+
+	cfg, err := LoadFromFile(filePath)
+	require.NoError(t, err)
+	require.NotNil(t, cfg)
+
+	// All defaults should be preserved
+	defaults := DefaultConfig()
+	assert.Equal(t, defaults.System.Hostname, cfg.System.Hostname)
+	assert.Equal(t, defaults.System.DomainSuffix, cfg.System.DomainSuffix)
+	assert.Equal(t, defaults.Network.BridgeMode, cfg.Network.BridgeMode)
+	assert.Equal(t, defaults.Storage.ZFSRaid, cfg.Storage.ZFSRaid)
+	assert.Equal(t, defaults.Tailscale.Enabled, cfg.Tailscale.Enabled)
+}
+
+func TestLoadFromFileRoundTrip(t *testing.T) {
+	// Create a config, save it, load it back
+	original := DefaultConfig()
+	original.System.Hostname = "roundtrip-host"
+	original.System.Email = "roundtrip@example.com"
+	original.Network.BridgeMode = BridgeModeExternal
+	original.Storage.ZFSRaid = ZFSRaid0
+	original.Tailscale.Enabled = true
+
+	tmpDir := t.TempDir()
+	filePath := filepath.Join(tmpDir, testConfigFileName)
+
+	// Save
+	err := original.SaveToFile(filePath)
+	require.NoError(t, err)
+
+	// Load
+	loaded, err := LoadFromFile(filePath)
+	require.NoError(t, err)
+
+	// Verify non-sensitive fields match
+	assert.Equal(t, original.System.Hostname, loaded.System.Hostname)
+	assert.Equal(t, original.System.Email, loaded.System.Email)
+	assert.Equal(t, original.System.DomainSuffix, loaded.System.DomainSuffix)
+	assert.Equal(t, original.System.Timezone, loaded.System.Timezone)
+	assert.Equal(t, original.Network.BridgeMode, loaded.Network.BridgeMode)
+	assert.Equal(t, original.Network.PrivateSubnet, loaded.Network.PrivateSubnet)
+	assert.Equal(t, original.Storage.ZFSRaid, loaded.Storage.ZFSRaid)
+	assert.Equal(t, original.Tailscale.Enabled, loaded.Tailscale.Enabled)
+	assert.Equal(t, original.Tailscale.SSH, loaded.Tailscale.SSH)
+}
+
+func TestLoadFromFilePermissionDenied(t *testing.T) {
+	tmpDir := t.TempDir()
+	filePath := filepath.Join(tmpDir, testConfigFileName)
+
+	// Create file
+	err := os.WriteFile(filePath, []byte("system:\n  hostname: test"), 0o600)
+	require.NoError(t, err)
+
+	// Remove read permissions
+	err = os.Chmod(filePath, 0o000)
+	require.NoError(t, err)
+
+	// Restore permissions on cleanup
+	t.Cleanup(func() {
+		//nolint:errcheck // cleanup function, error is not critical
+		os.Chmod(filePath, 0o600)
+	})
+
+	cfg, err := LoadFromFile(filePath)
+
+	require.Error(t, err)
+	require.Nil(t, cfg)
+	assert.Contains(t, err.Error(), "failed to read config file")
+}
+
+func TestLoadFromFileWithDisks(t *testing.T) {
+	tmpDir := t.TempDir()
+	filePath := filepath.Join(tmpDir, testConfigFileName)
+
+	yamlContent := `
+storage:
+  disks:
+    - /dev/sda
+    - /dev/sdb
+    - /dev/sdc
+`
+	err := os.WriteFile(filePath, []byte(yamlContent), 0o600)
+	require.NoError(t, err)
+
+	cfg, err := LoadFromFile(filePath)
+	require.NoError(t, err)
+
+	assert.Equal(t, []string{"/dev/sda", "/dev/sdb", "/dev/sdc"}, cfg.Storage.Disks)
+}

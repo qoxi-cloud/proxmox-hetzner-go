@@ -10,6 +10,32 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// LoadFromFile loads configuration from a YAML file at the specified path.
+// It starts with DefaultConfig() values and overlays file contents on top.
+// Missing fields in the file retain their default values.
+// Returns an error if the file cannot be read or contains invalid YAML.
+func LoadFromFile(path string) (*Config, error) {
+	// Start with default configuration
+	cfg := DefaultConfig()
+
+	// Read the file
+	data, err := os.ReadFile(path) //nolint:gosec // path is provided by caller
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, fmt.Errorf("config file not found: %s: %w", path, err)
+		}
+
+		return nil, fmt.Errorf("failed to read config file %s: %w", path, err)
+	}
+
+	// Parse YAML and overlay onto defaults
+	if err := yaml.Unmarshal(data, cfg); err != nil {
+		return nil, fmt.Errorf("failed to parse YAML in %s: %w", path, err)
+	}
+
+	return cfg, nil
+}
+
 // SaveToFile saves the configuration to a YAML file at the specified path.
 // Sensitive fields (RootPassword, SSHPublicKey, AuthKey) are excluded from the output.
 // Parent directories are created automatically with 0750 permissions.
