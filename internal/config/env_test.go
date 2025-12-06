@@ -685,69 +685,69 @@ const (
 	errFmtTailscaleAuthKey = "Tailscale.AuthKey = %q, want %q"
 )
 
-func TestLoadFromEnvTailscaleEnabledTrue(t *testing.T) {
-	tests := []struct {
-		name  string
-		input string
-	}{
-		{testCaseTrueLowercase, "true"},
-		{testCaseYesLowercase, "yes"},
-		{"one", "1"},
-		{testCaseTrueUppercase, "TRUE"},
-		{"Yes mixed case", "Yes"},
-	}
+// tailscaleBoolTest defines a test case for Tailscale boolean fields.
+type tailscaleBoolTest struct {
+	envName  string
+	getField func(*Config) bool
+	setField func(*Config, bool)
+}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			cfg := DefaultConfig()
-			cfg.Tailscale.Enabled = false // Ensure it's false initially
-
-			t.Setenv("INSTALL_TAILSCALE", tt.input)
-			LoadFromEnv(cfg)
-
-			if !cfg.Tailscale.Enabled {
-				t.Errorf(errFmtTailscaleEnabled, cfg.Tailscale.Enabled, true)
-			}
-		})
+// getTailscaleBoolTests returns test definitions for Tailscale boolean fields.
+func getTailscaleBoolTests() []tailscaleBoolTest {
+	return []tailscaleBoolTest{
+		{"INSTALL_TAILSCALE", func(c *Config) bool { return c.Tailscale.Enabled },
+			func(c *Config, v bool) { c.Tailscale.Enabled = v }},
+		{"TAILSCALE_SSH", func(c *Config) bool { return c.Tailscale.SSH },
+			func(c *Config, v bool) { c.Tailscale.SSH = v }},
+		{"TAILSCALE_WEBUI", func(c *Config) bool { return c.Tailscale.WebUI },
+			func(c *Config, v bool) { c.Tailscale.WebUI = v }},
 	}
 }
 
-func TestLoadFromEnvTailscaleEnabledFalse(t *testing.T) {
-	tests := []struct {
-		name  string
-		input string
-	}{
-		{testCaseFalseLowercase, "false"},
-		{testCaseNoLowercase, "no"},
-		{"zero", "0"},
-		{"FALSE uppercase", "FALSE"},
-		{"No mixed case", "No"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			cfg := DefaultConfig()
-			cfg.Tailscale.Enabled = true // Ensure it's true initially
-
-			t.Setenv("INSTALL_TAILSCALE", tt.input)
-			LoadFromEnv(cfg)
-
-			if cfg.Tailscale.Enabled {
-				t.Errorf(errFmtTailscaleEnabled, cfg.Tailscale.Enabled, false)
-			}
-		})
+func TestLoadFromEnvTailscaleBoolTrueValues(t *testing.T) {
+	trueInputs := []string{"true", "yes", "1", "TRUE", "Yes"}
+	for _, bt := range getTailscaleBoolTests() {
+		for _, input := range trueInputs {
+			t.Run(bt.envName+"/"+input, func(t *testing.T) {
+				cfg := DefaultConfig()
+				bt.setField(cfg, false)
+				t.Setenv(bt.envName, input)
+				LoadFromEnv(cfg)
+				if !bt.getField(cfg) {
+					t.Errorf("%s=%q: got false, want true", bt.envName, input)
+				}
+			})
+		}
 	}
 }
 
-func TestLoadFromEnvTailscaleEnabledUnsetPreservesDefault(t *testing.T) {
-	cfg := DefaultConfig()
-	original := cfg.Tailscale.Enabled
+func TestLoadFromEnvTailscaleBoolFalseValues(t *testing.T) {
+	falseInputs := []string{"false", "no", "0", "FALSE", "No"}
+	for _, bt := range getTailscaleBoolTests() {
+		for _, input := range falseInputs {
+			t.Run(bt.envName+"/"+input, func(t *testing.T) {
+				cfg := DefaultConfig()
+				bt.setField(cfg, true)
+				t.Setenv(bt.envName, input)
+				LoadFromEnv(cfg)
+				if bt.getField(cfg) {
+					t.Errorf("%s=%q: got true, want false", bt.envName, input)
+				}
+			})
+		}
+	}
+}
 
-	// Do NOT set INSTALL_TAILSCALE - should preserve default
-	LoadFromEnv(cfg)
-
-	if cfg.Tailscale.Enabled != original {
-		t.Errorf("Unset INSTALL_TAILSCALE changed config: got %v, want %v", cfg.Tailscale.Enabled, original)
+func TestLoadFromEnvTailscaleBoolUnsetPreserves(t *testing.T) {
+	for _, bt := range getTailscaleBoolTests() {
+		t.Run(bt.envName, func(t *testing.T) {
+			cfg := DefaultConfig()
+			original := bt.getField(cfg)
+			LoadFromEnv(cfg)
+			if bt.getField(cfg) != original {
+				t.Errorf("Unset %s changed config: got %v, want %v", bt.envName, bt.getField(cfg), original)
+			}
+		})
 	}
 }
 
@@ -776,131 +776,9 @@ func TestLoadFromEnvTailscaleAuthKeyEmptyPreservesOriginal(t *testing.T) {
 	}
 }
 
-func TestLoadFromEnvTailscaleSSHTrue(t *testing.T) {
-	tests := []struct {
-		name  string
-		input string
-	}{
-		{testCaseTrueLowercase, "true"},
-		{testCaseYesLowercase, "yes"},
-		{"one", "1"},
-		{testCaseTrueUppercase, "TRUE"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			cfg := DefaultConfig()
-			cfg.Tailscale.SSH = false // Ensure it's false initially
-
-			t.Setenv("TAILSCALE_SSH", tt.input)
-			LoadFromEnv(cfg)
-
-			if !cfg.Tailscale.SSH {
-				t.Errorf(errFmtTailscaleSSH, cfg.Tailscale.SSH, true)
-			}
-		})
-	}
-}
-
-func TestLoadFromEnvTailscaleSSHFalse(t *testing.T) {
-	tests := []struct {
-		name  string
-		input string
-	}{
-		{testCaseFalseLowercase, "false"},
-		{testCaseNoLowercase, "no"},
-		{"zero", "0"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			cfg := DefaultConfig()
-			cfg.Tailscale.SSH = true // Ensure it's true initially (default)
-
-			t.Setenv("TAILSCALE_SSH", tt.input)
-			LoadFromEnv(cfg)
-
-			if cfg.Tailscale.SSH {
-				t.Errorf(errFmtTailscaleSSH, cfg.Tailscale.SSH, false)
-			}
-		})
-	}
-}
-
-func TestLoadFromEnvTailscaleSSHUnsetPreservesDefault(t *testing.T) {
-	cfg := DefaultConfig()
-	original := cfg.Tailscale.SSH
-
-	// Do NOT set TAILSCALE_SSH - should preserve default
-	LoadFromEnv(cfg)
-
-	if cfg.Tailscale.SSH != original {
-		t.Errorf("Unset TAILSCALE_SSH changed config: got %v, want %v", cfg.Tailscale.SSH, original)
-	}
-}
-
-func TestLoadFromEnvTailscaleWebUITrue(t *testing.T) {
-	tests := []struct {
-		name  string
-		input string
-	}{
-		{testCaseTrueLowercase, "true"},
-		{testCaseYesLowercase, "yes"},
-		{"one", "1"},
-		{testCaseTrueUppercase, "TRUE"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			cfg := DefaultConfig()
-			cfg.Tailscale.WebUI = false // Ensure it's false initially (default)
-
-			t.Setenv("TAILSCALE_WEBUI", tt.input)
-			LoadFromEnv(cfg)
-
-			if !cfg.Tailscale.WebUI {
-				t.Errorf(errFmtTailscaleWebUI, cfg.Tailscale.WebUI, true)
-			}
-		})
-	}
-}
-
-func TestLoadFromEnvTailscaleWebUIFalse(t *testing.T) {
-	tests := []struct {
-		name  string
-		input string
-	}{
-		{testCaseFalseLowercase, "false"},
-		{testCaseNoLowercase, "no"},
-		{"zero", "0"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			cfg := DefaultConfig()
-			cfg.Tailscale.WebUI = true // Ensure it's true initially
-
-			t.Setenv("TAILSCALE_WEBUI", tt.input)
-			LoadFromEnv(cfg)
-
-			if cfg.Tailscale.WebUI {
-				t.Errorf(errFmtTailscaleWebUI, cfg.Tailscale.WebUI, false)
-			}
-		})
-	}
-}
-
-func TestLoadFromEnvTailscaleWebUIUnsetPreservesDefault(t *testing.T) {
-	cfg := DefaultConfig()
-	original := cfg.Tailscale.WebUI
-
-	// Do NOT set TAILSCALE_WEBUI - should preserve default
-	LoadFromEnv(cfg)
-
-	if cfg.Tailscale.WebUI != original {
-		t.Errorf("Unset TAILSCALE_WEBUI changed config: got %v, want %v", cfg.Tailscale.WebUI, original)
-	}
-}
+// Note: TAILSCALE_SSH and TAILSCALE_WEBUI true/false/unset tests are covered
+// by TestLoadFromEnvTailscaleBoolTrueValues, TestLoadFromEnvTailscaleBoolFalseValues,
+// and TestLoadFromEnvTailscaleBoolUnsetPreserves above.
 
 func TestLoadFromEnvTailscaleMultipleFields(t *testing.T) {
 	cfg := DefaultConfig()
@@ -1356,43 +1234,57 @@ func TestLoadFromEnvEmptyVsUnset(t *testing.T) {
 	}
 }
 
-// TestLoadFromEnvBooleanEdgeCases tests all variations of boolean parsing
-// for the Tailscale boolean fields.
+// TestLoadFromEnvBooleanEdgeCases tests additional boolean parsing edge cases
+// beyond what's covered by TestLoadFromEnvTailscaleBoolTrueValues and
+// TestLoadFromEnvTailscaleBoolFalseValues.
 func TestLoadFromEnvBooleanEdgeCases(t *testing.T) {
-	// True values
-	trueValues := []string{"true", "True", "TRUE", "TrUe", "yes", "Yes", "YES", "yEs", "1"}
+	// Extended case variations (basic true/false covered elsewhere).
+	extendedTrue := []string{"TrUe", "yEs"}
+	extendedFalse := []string{"FaLsE", "nO"}
+	invalidValues := []string{"maybe", "2", "on", "off", "enabled", "disabled", "y", "n"}
 
-	// False values
-	falseValues := []string{"false", "False", "FALSE", "FaLsE", "no", "No", "NO", "nO", "0"}
-
-	// Invalid values that should be treated as false
-	invalidValues := []string{"maybe", "2", "on", "off", "enabled", "disabled", "y", "n", ""}
-
-	t.Run("INSTALL_TAILSCALE true values", func(t *testing.T) {
-		for _, v := range trueValues {
-			t.Run(v, func(t *testing.T) {
-				cfg := DefaultConfig()
-				cfg.Tailscale.Enabled = false
-
-				t.Setenv("INSTALL_TAILSCALE", v)
-				LoadFromEnv(cfg)
-
-				if !cfg.Tailscale.Enabled {
-					t.Errorf("INSTALL_TAILSCALE=%q: got false, want true", v)
-				}
-			})
+	// Test extended true values for all boolean fields.
+	t.Run("extended true values", func(t *testing.T) {
+		for _, bt := range getTailscaleBoolTests() {
+			for _, v := range extendedTrue {
+				t.Run(bt.envName+"/"+v, func(t *testing.T) {
+					cfg := DefaultConfig()
+					bt.setField(cfg, false)
+					t.Setenv(bt.envName, v)
+					LoadFromEnv(cfg)
+					if !bt.getField(cfg) {
+						t.Errorf("%s=%q: got false, want true", bt.envName, v)
+					}
+				})
+			}
 		}
 	})
 
-	t.Run("INSTALL_TAILSCALE false values", func(t *testing.T) {
-		for _, v := range falseValues {
+	// Test extended false values for all boolean fields.
+	t.Run("extended false values", func(t *testing.T) {
+		for _, bt := range getTailscaleBoolTests() {
+			for _, v := range extendedFalse {
+				t.Run(bt.envName+"/"+v, func(t *testing.T) {
+					cfg := DefaultConfig()
+					bt.setField(cfg, true)
+					t.Setenv(bt.envName, v)
+					LoadFromEnv(cfg)
+					if bt.getField(cfg) {
+						t.Errorf("%s=%q: got true, want false", bt.envName, v)
+					}
+				})
+			}
+		}
+	})
+
+	// Test invalid values (treated as false).
+	t.Run("invalid values treated as false", func(t *testing.T) {
+		for _, v := range invalidValues {
 			t.Run(v, func(t *testing.T) {
 				cfg := DefaultConfig()
 				cfg.Tailscale.Enabled = true
-
 				t.Setenv("INSTALL_TAILSCALE", v)
 				LoadFromEnv(cfg)
-
 				if cfg.Tailscale.Enabled {
 					t.Errorf("INSTALL_TAILSCALE=%q: got true, want false", v)
 				}
@@ -1400,81 +1292,22 @@ func TestLoadFromEnvBooleanEdgeCases(t *testing.T) {
 		}
 	})
 
-	t.Run("INSTALL_TAILSCALE invalid values treated as false", func(t *testing.T) {
-		for _, v := range invalidValues {
-			if v == "" {
-				continue // Empty string is special case - env var is set but empty
-			}
-
-			t.Run(v, func(t *testing.T) {
-				cfg := DefaultConfig()
-				cfg.Tailscale.Enabled = true
-
-				t.Setenv("INSTALL_TAILSCALE", v)
-				LoadFromEnv(cfg)
-
-				if cfg.Tailscale.Enabled {
-					t.Errorf("INSTALL_TAILSCALE=%q: got true, want false (invalid treated as false)", v)
-				}
-			})
-		}
-	})
-
-	t.Run("TAILSCALE_SSH true values", func(t *testing.T) {
-		for _, v := range trueValues {
-			t.Run(v, func(t *testing.T) {
-				cfg := DefaultConfig()
-				cfg.Tailscale.SSH = false
-
-				t.Setenv("TAILSCALE_SSH", v)
-				LoadFromEnv(cfg)
-
-				if !cfg.Tailscale.SSH {
-					t.Errorf("TAILSCALE_SSH=%q: got false, want true", v)
-				}
-			})
-		}
-	})
-
-	t.Run("TAILSCALE_WEBUI true values", func(t *testing.T) {
-		for _, v := range trueValues {
-			t.Run(v, func(t *testing.T) {
-				cfg := DefaultConfig()
-				cfg.Tailscale.WebUI = false
-
-				t.Setenv("TAILSCALE_WEBUI", v)
-				LoadFromEnv(cfg)
-
-				if !cfg.Tailscale.WebUI {
-					t.Errorf("TAILSCALE_WEBUI=%q: got false, want true", v)
-				}
-			})
-		}
-	})
-
-	t.Run("boolean with whitespace", func(t *testing.T) {
+	// Test whitespace handling.
+	t.Run("whitespace handling", func(t *testing.T) {
 		whitespaceTests := []struct {
 			input string
 			want  bool
 		}{
-			{" true", true},
-			{"true ", true},
-			{" true ", true},
-			{"\ttrue", true},
-			{"true\n", true},
-			{" \ttrue\n ", true},
-			{" false ", false},
-			{"\tno\n", false},
+			{" true", true}, {"true ", true}, {" true ", true},
+			{"\ttrue", true}, {"true\n", true}, {" \ttrue\n ", true},
+			{" false ", false}, {"\tno\n", false},
 		}
-
 		for _, tt := range whitespaceTests {
 			t.Run(tt.input, func(t *testing.T) {
 				cfg := DefaultConfig()
 				cfg.Tailscale.Enabled = !tt.want
-
 				t.Setenv("INSTALL_TAILSCALE", tt.input)
 				LoadFromEnv(cfg)
-
 				if cfg.Tailscale.Enabled != tt.want {
 					t.Errorf("INSTALL_TAILSCALE=%q: got %v, want %v", tt.input, cfg.Tailscale.Enabled, tt.want)
 				}
