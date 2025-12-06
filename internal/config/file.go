@@ -16,6 +16,10 @@ import (
 // The file is written with 0600 permissions for security.
 // The original Config instance is not modified.
 func (c *Config) SaveToFile(path string) error {
+	if c == nil {
+		return fmt.Errorf("config is nil")
+	}
+
 	// Create a safe copy to avoid modifying the original
 	safeCopy := *c
 	safeCopy.System.RootPassword = ""

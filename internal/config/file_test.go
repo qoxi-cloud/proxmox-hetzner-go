@@ -324,3 +324,11 @@ func TestSaveToFileWithSpecialCharactersInPath(t *testing.T) {
 	_, err = os.Stat(filePath)
 	require.NoError(t, err)
 }
+
+func TestSaveToFileNilReceiver(t *testing.T) {
+	var cfg *Config
+
+	err := cfg.SaveToFile("/tmp/config.yaml")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "config is nil")
+}
