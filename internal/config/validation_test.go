@@ -18,7 +18,8 @@ const (
 
 // Test name constants to avoid duplication.
 const (
-	testNameInvalidRandomString = "invalid random string"
+	testNameInvalidRandomString  = "invalid random string"
+	testNameInvalidTrailingSpace = "invalid trailing space"
 )
 
 // buildSubnet constructs a subnet string from octets and mask.
@@ -601,7 +602,7 @@ func TestValidateBridgeMode(t *testing.T) {
 		{"invalid partial match intern", BridgeMode("intern"), ErrBridgeModeInvalid},
 		{"invalid partial match extern", BridgeMode("extern"), ErrBridgeModeInvalid},
 		{"invalid with spaces", BridgeMode(" internal"), ErrBridgeModeInvalid},
-		{"invalid trailing space", BridgeMode("external "), ErrBridgeModeInvalid},
+		{testNameInvalidTrailingSpace, BridgeMode("external "), ErrBridgeModeInvalid},
 	}
 
 	for _, tt := range tests {
@@ -652,7 +653,7 @@ func TestValidateZFSRaid(t *testing.T) {
 		{"invalid partial sing", ZFSRaid("sing"), ErrZFSRaidInvalid},
 		// Invalid - with spaces
 		{"invalid leading space", ZFSRaid(" single"), ErrZFSRaidInvalid},
-		{"invalid trailing space", ZFSRaid("raid0 "), ErrZFSRaidInvalid},
+		{testNameInvalidTrailingSpace, ZFSRaid("raid0 "), ErrZFSRaidInvalid},
 	}
 
 	for _, tt := range tests {
@@ -711,7 +712,7 @@ func TestValidateSubnet(t *testing.T) {
 		// Invalid - extra characters
 		{"invalid trailing chars", buildSubnet(10, 0, 0, 0, 24) + "x", ErrSubnetInvalid},
 		{"invalid leading space", " " + buildSubnet(10, 0, 0, 0, 24), ErrSubnetInvalid},
-		{"invalid trailing space", buildSubnet(10, 0, 0, 0, 24) + " ", ErrSubnetInvalid},
+		{testNameInvalidTrailingSpace, buildSubnet(10, 0, 0, 0, 24) + " ", ErrSubnetInvalid},
 	}
 
 	for _, tt := range tests {
