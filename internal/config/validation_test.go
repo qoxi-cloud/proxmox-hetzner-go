@@ -458,3 +458,51 @@ func TestValidatePassword(t *testing.T) {
 		})
 	}
 }
+
+// ValidateSSHKey tests
+
+func TestValidateSSHKey(t *testing.T) {
+	tests := []struct {
+		name        string
+		key         string
+		expectedErr error
+	}{
+		// Valid SSH keys
+		{"valid ssh-rsa key", "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQ user@host", nil},
+		{"valid ssh-ed25519 key", "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI user@host", nil},
+		{"valid ssh-ecdsa key", "ssh-ecdsa AAAAE2VjZHNhLXNoYTItbmlzdHAy user@host", nil},
+		{"valid ecdsa-sha2-nistp256 key", "ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAy user@host", nil},
+		{"valid ecdsa-sha2-nistp384 key", "ecdsa-sha2-nistp384 AAAAE2VjZHNhLXNoYTItbmlzdHA user@host", nil},
+		{"valid ecdsa-sha2-nistp521 key", "ecdsa-sha2-nistp521 AAAAE2VjZHNhLXNoYTItbmlzdHA user@host", nil},
+		{"valid key without comment", "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQ", nil},
+		// Empty key
+		{"empty key", "", ErrSSHKeyEmpty},
+		// Invalid - missing prefix
+		{"no prefix random string", "AAAAB3NzaC1yc2EAAAADAQABAAABAQ user@host", ErrSSHKeyInvalidPrefix},
+		// Invalid - incorrect prefix
+		{"invalid prefix ssh-dsa", "ssh-dsa AAAAB3NzaC1yc2EAAAADAQABAAABAQ user@host", ErrSSHKeyInvalidPrefix},
+		{"invalid prefix ssh-rsa no space", "ssh-rsaAAAAB3NzaC1yc2EAAAADAQABAAABAQ", ErrSSHKeyInvalidPrefix},
+		{"invalid prefix ssh-ed25519 no space", "ssh-ed25519AAAAC3NzaC1lZDI1NTE5AAAAI", ErrSSHKeyInvalidPrefix},
+		{"invalid prefix ssh-ecdsa no space", "ssh-ecdsaAAAAE2VjZHNhLXNoYTItbmlzdHAy", ErrSSHKeyInvalidPrefix},
+		// Invalid - partial prefix
+		{"partial prefix ssh-rs", "ssh-rs AAAAB3NzaC1yc2EAAAADAQABAAABAQ", ErrSSHKeyInvalidPrefix},
+		{"partial prefix ssh-ed2551", "ssh-ed2551 AAAAC3NzaC1lZDI1NTE5AAAAI", ErrSSHKeyInvalidPrefix},
+		// Invalid - case sensitivity
+		{"uppercase SSH-RSA", "SSH-RSA AAAAB3NzaC1yc2EAAAADAQABAAABAQ", ErrSSHKeyInvalidPrefix},
+		{"uppercase SSH-ED25519", "SSH-ED25519 AAAAC3NzaC1lZDI1NTE5AAAAI", ErrSSHKeyInvalidPrefix},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateSSHKey(tt.key)
+
+			if tt.expectedErr == nil {
+				assert.NoError(t, err)
+			} else {
+				require.Error(t, err)
+				assert.Equal(t, tt.expectedErr, err)
+				assert.True(t, errors.Is(err, tt.expectedErr))
+			}
+		})
+	}
+}

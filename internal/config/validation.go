@@ -50,6 +50,14 @@ var (
 	ErrPasswordTooShort = errors.New("password must be at least 8 characters")
 )
 
+// SSH key validation errors.
+var (
+	// ErrSSHKeyEmpty is returned when SSH public key is empty.
+	ErrSSHKeyEmpty = errors.New("SSH public key is required")
+	// ErrSSHKeyInvalidPrefix is returned when SSH key doesn't start with a valid prefix.
+	ErrSSHKeyInvalidPrefix = errors.New("SSH key must start with ssh-rsa, ssh-ed25519, ssh-ecdsa, or ecdsa-sha2-")
+)
+
 // hostnameRegex matches valid RFC 1123 hostname characters (alphanumeric and hyphens).
 var hostnameRegex = regexp.MustCompile(`^[a-zA-Z0-9-]+$`)
 
@@ -183,4 +191,30 @@ func (v *ValidationError) Add(err error) {
 	if err != nil {
 		v.Errors = append(v.Errors, err)
 	}
+}
+
+// sshKeyPrefixes contains valid SSH public key prefixes.
+var sshKeyPrefixes = []string{
+	"ssh-rsa ",
+	"ssh-ed25519 ",
+	"ssh-ecdsa ",
+	"ecdsa-sha2-",
+}
+
+// ValidateSSHKey validates an SSH public key format.
+// A valid SSH public key:
+//   - Must not be empty
+//   - Must start with one of: ssh-rsa, ssh-ed25519, ssh-ecdsa, or ecdsa-sha2-
+func ValidateSSHKey(key string) error {
+	if key == "" {
+		return ErrSSHKeyEmpty
+	}
+
+	for _, prefix := range sshKeyPrefixes {
+		if strings.HasPrefix(key, prefix) {
+			return nil
+		}
+	}
+
+	return ErrSSHKeyInvalidPrefix
 }
