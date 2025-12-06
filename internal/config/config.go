@@ -78,3 +78,37 @@ type Config struct {
 	// Verbose enables verbose logging (runtime only, not saved).
 	Verbose bool `yaml:"-"`
 }
+
+// Default configuration values per PRD specification.
+// These are intentionally hardcoded as sensible defaults for the installer.
+const (
+	// DefaultPrivateSubnet is the default NAT network subnet (RFC 1918 Class A private range).
+	defaultPrivateSubnet = "10.0.0.0/24" // NOSONAR(go:S1313) RFC 1918 private range - default config value
+)
+
+// DefaultConfig returns a Config with sensible default values.
+// Each call returns a new Config instance to avoid shared state.
+func DefaultConfig() *Config {
+	return &Config{
+		System: SystemConfig{
+			Hostname:     "pve-qoxi-cloud",
+			DomainSuffix: "local",
+			Timezone:     "Europe/Kyiv",
+			Email:        "admin@qoxi.cloud",
+		},
+		Network: NetworkConfig{
+			BridgeMode:    BridgeModeInternal,
+			PrivateSubnet: defaultPrivateSubnet,
+		},
+		Storage: StorageConfig{
+			ZFSRaid: ZFSRaid1,
+			Disks:   []string{},
+		},
+		Tailscale: TailscaleConfig{
+			Enabled: false,
+			SSH:     true,
+			WebUI:   false,
+		},
+		Verbose: false,
+	}
+}
