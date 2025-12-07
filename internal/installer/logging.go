@@ -74,6 +74,42 @@ func NewLogger(verbose bool) (*Logger, error) {
 	return newLoggerWithPaths(verbose, []string{defaultLogPath, fallbackLogPath})
 }
 
+// NewLoggerWithPath creates a Logger with a custom log file path.
+//
+// This constructor is primarily useful for testing or special deployment scenarios
+// where the default log paths (/var/log/proxmox-install.log or /tmp/proxmox-install.log)
+// are not suitable. It allows tests to use temporary directories without requiring
+// root permissions.
+//
+// The log file is opened with O_CREATE|O_WRONLY|O_APPEND flags and 0644 permissions,
+// creating the file if it doesn't exist and appending new entries.
+//
+// Parameters:
+//   - path: the path where the log file should be created
+//   - verbose: when true, log entries will also be written to stdout
+//
+// Returns an error if the file cannot be opened or created at the specified path.
+//
+// Example usage:
+//
+//	// In tests
+//	tmpDir := t.TempDir()
+//	logPath := filepath.Join(tmpDir, "test.log")
+//	logger, err := NewLoggerWithPath(logPath, false)
+//	if err != nil {
+//	    t.Fatalf("failed to create logger: %v", err)
+//	}
+//	defer logger.Close()
+func NewLoggerWithPath(path string, verbose bool) (*Logger, error) {
+	//nolint:gosec // G304: user-provided path; G302: 0644 allows log readability in test scenarios
+	file, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open log file %s: %w", path, err)
+	}
+
+	return &Logger{file: file, verbose: verbose}, nil
+}
+
 // newLoggerWithPaths creates a Logger using the provided paths in order.
 //
 // This is an internal helper function that allows testing the path fallback logic

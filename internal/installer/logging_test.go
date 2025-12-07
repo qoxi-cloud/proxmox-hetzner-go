@@ -20,10 +20,11 @@ const (
 
 // Error message constants for test assertions.
 const (
-	errMsgUnexpectedError      = "newLoggerWithPaths() returned unexpected error: %v"
-	errMsgExpectedFileSet      = "Expected logger.file to be set"
-	errMsgExpectedVerboseFalse = "Expected logger.verbose to be false"
-	errMsgExpectedVerboseTrue  = "Expected logger.verbose to be true"
+	errMsgUnexpectedError             = "newLoggerWithPaths() returned unexpected error: %v"
+	errMsgNewLoggerWithPathUnexpected = "NewLoggerWithPath() returned unexpected error: %v"
+	errMsgExpectedFileSet             = "Expected logger.file to be set"
+	errMsgExpectedVerboseFalse        = "Expected logger.verbose to be false"
+	errMsgExpectedVerboseTrue         = "Expected logger.verbose to be true"
 )
 
 // Log method test constants.
@@ -52,6 +53,14 @@ const (
 const (
 	errMsgCreateUnwritableDir    = "Failed to create unwritable directory: %v"
 	errMsgSkipCannotCreateLogger = "Skipping test: cannot create logger with default paths: %v"
+)
+
+// Error handling test constants.
+const (
+	errMsgExpectedLoggerNil     = "Expected logger to be nil when error is returned"
+	errMsgFailedToOpenLogFile   = "failed to open log file"
+	errMsgExpectedErrorMsgStart = "Expected error message to start with %q, got %q"
+	testMsgBeforeClose          = "message before close"
 )
 
 // rfc3339Pattern matches RFC3339 timestamps in log entries.
@@ -290,13 +299,12 @@ func TestNewLoggerWithPathsAllPathsUnwritable(t *testing.T) {
 	}
 
 	if logger != nil {
-		t.Error("Expected logger to be nil when error is returned")
+		t.Error(errMsgExpectedLoggerNil)
 	}
 
 	// Verify error message contains expected text
-	expectedMsg := "failed to open log file"
-	if !strings.HasPrefix(err.Error(), expectedMsg) {
-		t.Errorf("Expected error message to start with %q, got %q", expectedMsg, err.Error())
+	if !strings.HasPrefix(err.Error(), errMsgFailedToOpenLogFile) {
+		t.Errorf(errMsgExpectedErrorMsgStart, errMsgFailedToOpenLogFile, err.Error())
 	}
 }
 
@@ -312,7 +320,7 @@ func TestNewLoggerWithPathsEmptyPaths(t *testing.T) {
 	}
 
 	if logger != nil {
-		t.Error("Expected logger to be nil when error is returned")
+		t.Error(errMsgExpectedLoggerNil)
 	}
 
 	expectedMsg := "failed to open log file: no paths provided"
@@ -1020,7 +1028,7 @@ func TestCloseLogAfterClose(t *testing.T) {
 	}
 
 	// Write initial message
-	logger.Log("message before close")
+	logger.Log(testMsgBeforeClose)
 
 	// Close the logger
 	err = logger.Close()
@@ -1044,7 +1052,7 @@ func TestCloseLogAfterClose(t *testing.T) {
 		t.Fatalf(errMsgLogFileReadFailed, err)
 	}
 
-	if !strings.Contains(string(content), "message before close") {
+	if !strings.Contains(string(content), testMsgBeforeClose) {
 		t.Error("Expected message before close to be present")
 	}
 
@@ -1380,4 +1388,352 @@ func TestLogPathAndCloseConcurrent(t *testing.T) {
 
 	// Test passes if no panic or race condition occurs
 	wg.Wait()
+}
+
+// ============================================================================
+// NewLoggerWithPath Tests
+// ============================================================================
+
+// TestNewLoggerWithPathCreatesFile verifies that NewLoggerWithPath creates a file at the specified path.
+func TestNewLoggerWithPathCreatesFile(t *testing.T) {
+	tmpDir := t.TempDir()
+	logPath := filepath.Join(tmpDir, "custom.log")
+
+	logger, err := NewLoggerWithPath(logPath, false)
+	if err != nil {
+		t.Fatalf(errMsgNewLoggerWithPathUnexpected, err)
+	}
+
+	t.Cleanup(func() {
+		if logger != nil {
+			logger.Close() //nolint:errcheck // best-effort cleanup in tests
+		}
+	})
+
+	// Verify file was created
+	if _, err := os.Stat(logPath); os.IsNotExist(err) {
+		t.Error("Expected log file to be created at specified path")
+	}
+
+	// Verify logger is properly initialized
+	if logger.file == nil {
+		t.Error(errMsgExpectedFileSet)
+	}
+}
+
+// TestNewLoggerWithPathInvalidPath verifies that NewLoggerWithPath returns error for invalid paths.
+func TestNewLoggerWithPathInvalidPath(t *testing.T) {
+	// Use a path in a non-existent directory
+	invalidPath := "/nonexistent/directory/path/test.log"
+
+	logger, err := NewLoggerWithPath(invalidPath, false)
+
+	if err == nil {
+		if logger != nil {
+			logger.Close() //nolint:errcheck // best-effort cleanup in tests
+		}
+		t.Fatal("Expected error for invalid path, got nil")
+	}
+
+	if logger != nil {
+		t.Error(errMsgExpectedLoggerNil)
+	}
+
+	// Verify error message contains the path
+	if !strings.HasPrefix(err.Error(), errMsgFailedToOpenLogFile) {
+		t.Errorf(errMsgExpectedErrorMsgStart, errMsgFailedToOpenLogFile, err.Error())
+	}
+
+	if !strings.Contains(err.Error(), invalidPath) {
+		t.Errorf("Expected error message to contain path %q, got %q", invalidPath, err.Error())
+	}
+}
+
+// TestNewLoggerWithPathUnwritablePath verifies that NewLoggerWithPath returns error for unwritable paths.
+func TestNewLoggerWithPathUnwritablePath(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// Create an unwritable directory
+	unwritableDir := filepath.Join(tmpDir, "unwritable")
+	//nolint:gosec // G301: intentionally testing unwritable directories
+	if err := os.Mkdir(unwritableDir, 0o555); err != nil {
+		t.Fatalf(errMsgCreateUnwritableDir, err)
+	}
+
+	t.Cleanup(func() {
+		os.Chmod(unwritableDir, 0o700) //nolint:errcheck,gosec // G302: directories need execute bit for cleanup
+	})
+
+	unwritablePath := filepath.Join(unwritableDir, "test.log")
+
+	logger, err := NewLoggerWithPath(unwritablePath, false)
+
+	if err == nil {
+		if logger != nil {
+			logger.Close() //nolint:errcheck // best-effort cleanup in tests
+		}
+		t.Fatal("Expected error for unwritable path, got nil")
+	}
+
+	if logger != nil {
+		t.Error(errMsgExpectedLoggerNil)
+	}
+
+	// Verify error message format
+	if !strings.HasPrefix(err.Error(), errMsgFailedToOpenLogFile) {
+		t.Errorf(errMsgExpectedErrorMsgStart, errMsgFailedToOpenLogFile, err.Error())
+	}
+}
+
+// TestNewLoggerWithPathVerboseFlagTrue verifies that verbose flag is set correctly when true.
+func TestNewLoggerWithPathVerboseFlagTrue(t *testing.T) {
+	tmpDir := t.TempDir()
+	logPath := filepath.Join(tmpDir, "verbose-true.log")
+
+	logger, err := NewLoggerWithPath(logPath, true)
+	if err != nil {
+		t.Fatalf(errMsgNewLoggerWithPathUnexpected, err)
+	}
+
+	t.Cleanup(func() {
+		if logger != nil {
+			logger.Close() //nolint:errcheck // best-effort cleanup in tests
+		}
+	})
+
+	if !logger.verbose {
+		t.Error(errMsgExpectedVerboseTrue)
+	}
+}
+
+// TestNewLoggerWithPathVerboseFlagFalse verifies that verbose flag is set correctly when false.
+func TestNewLoggerWithPathVerboseFlagFalse(t *testing.T) {
+	tmpDir := t.TempDir()
+	logPath := filepath.Join(tmpDir, "verbose-false.log")
+
+	logger, err := NewLoggerWithPath(logPath, false)
+	if err != nil {
+		t.Fatalf(errMsgNewLoggerWithPathUnexpected, err)
+	}
+
+	t.Cleanup(func() {
+		if logger != nil {
+			logger.Close() //nolint:errcheck // best-effort cleanup in tests
+		}
+	})
+
+	if logger.verbose {
+		t.Error(errMsgExpectedVerboseFalse)
+	}
+}
+
+// TestNewLoggerWithPathFilePermissions verifies that created files have 0644 permissions.
+func TestNewLoggerWithPathFilePermissions(t *testing.T) {
+	tmpDir := t.TempDir()
+	logPath := filepath.Join(tmpDir, "permissions.log")
+
+	logger, err := NewLoggerWithPath(logPath, false)
+	if err != nil {
+		t.Fatalf(errMsgNewLoggerWithPathUnexpected, err)
+	}
+
+	t.Cleanup(func() {
+		if logger != nil {
+			logger.Close() //nolint:errcheck // best-effort cleanup in tests
+		}
+	})
+
+	info, err := os.Stat(logPath)
+	if err != nil {
+		t.Fatalf("Failed to stat log file: %v", err)
+	}
+
+	// Check file permissions (0644 = rw-r--r--)
+	// Note: On some systems, umask may affect the actual permissions
+	perm := info.Mode().Perm()
+	expectedPerm := os.FileMode(0o644)
+
+	// Verify no extra permission bits beyond 0o644 are set.
+	// The umask might restrict permissions further (e.g., 0o600), which is acceptable.
+	if perm&0o644 != perm {
+		t.Errorf("Expected file permissions 0644 or more restrictive, got %04o", perm)
+	}
+
+	// On systems without restrictive umask, permissions should be exactly 0644
+	// We log this for debugging but don't fail the test due to umask variations
+	if perm != expectedPerm {
+		t.Logf("Note: File permissions are %04o (expected %04o, may be affected by umask)", perm, expectedPerm)
+	}
+}
+
+// TestNewLoggerWithPathIntegrationWithLog verifies that Log works correctly with NewLoggerWithPath.
+func TestNewLoggerWithPathIntegrationWithLog(t *testing.T) {
+	tmpDir := t.TempDir()
+	logPath := filepath.Join(tmpDir, "integration-log.log")
+
+	logger, err := NewLoggerWithPath(logPath, false)
+	if err != nil {
+		t.Fatalf(errMsgNewLoggerWithPathUnexpected, err)
+	}
+
+	t.Cleanup(func() {
+		if logger != nil {
+			logger.Close() //nolint:errcheck // best-effort cleanup in tests
+		}
+	})
+
+	// Write log messages
+	testMessages := []string{
+		"First test message",
+		"Second test message with value: 42",
+		"Third test message",
+	}
+
+	for _, msg := range testMessages {
+		logger.Log("%s", msg)
+	}
+
+	// Sync file to ensure content is flushed
+	if err := logger.file.Sync(); err != nil {
+		t.Fatalf(errMsgSyncLogFileFailed, err)
+	}
+
+	// Read file and verify messages
+	//nolint:gosec // G304: test file path from t.TempDir()
+	content, err := os.ReadFile(logPath)
+	if err != nil {
+		t.Fatalf(errMsgLogFileReadFailed, err)
+	}
+
+	for _, msg := range testMessages {
+		if !strings.Contains(string(content), msg) {
+			t.Errorf(errMsgMessageNotFound, msg)
+		}
+	}
+
+	// Verify timestamp format
+	if !rfc3339Pattern.MatchString(string(content)) {
+		t.Error(errMsgTimestampNotMatched)
+	}
+}
+
+// TestNewLoggerWithPathIntegrationWithLogPath verifies that LogPath returns the correct path.
+func TestNewLoggerWithPathIntegrationWithLogPath(t *testing.T) {
+	tmpDir := t.TempDir()
+	logPath := filepath.Join(tmpDir, "integration-logpath.log")
+
+	logger, err := NewLoggerWithPath(logPath, false)
+	if err != nil {
+		t.Fatalf(errMsgNewLoggerWithPathUnexpected, err)
+	}
+
+	t.Cleanup(func() {
+		if logger != nil {
+			logger.Close() //nolint:errcheck // best-effort cleanup in tests
+		}
+	})
+
+	result := logger.LogPath()
+	if result != logPath {
+		t.Errorf(errMsgLogPathExpectedPath, logPath, result)
+	}
+}
+
+// TestNewLoggerWithPathIntegrationWithClose verifies that Close works correctly.
+func TestNewLoggerWithPathIntegrationWithClose(t *testing.T) {
+	tmpDir := t.TempDir()
+	logPath := filepath.Join(tmpDir, "integration-close.log")
+
+	logger, err := NewLoggerWithPath(logPath, false)
+	if err != nil {
+		t.Fatalf(errMsgNewLoggerWithPathUnexpected, err)
+	}
+
+	// Write a message before closing
+	logger.Log(testMsgBeforeClose)
+
+	// Close should succeed
+	err = logger.Close()
+	if err != nil {
+		t.Errorf(errMsgCloseUnexpected, err)
+	}
+
+	// Verify LogPath returns empty string after close
+	if path := logger.LogPath(); path != "" {
+		t.Errorf("After Close: "+errMsgLogPathExpectedEmpty, path)
+	}
+
+	// Verify message was flushed to file
+	//nolint:gosec // G304: test file path from t.TempDir()
+	content, err := os.ReadFile(logPath)
+	if err != nil {
+		t.Fatalf(errMsgLogFileReadFailed, err)
+	}
+
+	if !strings.Contains(string(content), testMsgBeforeClose) {
+		t.Error("Expected message to be flushed to file before close")
+	}
+
+	// Verify Close is idempotent
+	err = logger.Close()
+	if err != nil {
+		t.Errorf("Second Close() should return nil, got: %v", err)
+	}
+}
+
+// TestNewLoggerWithPathAppendMode verifies that NewLoggerWithPath opens files in append mode.
+func TestNewLoggerWithPathAppendMode(t *testing.T) {
+	tmpDir := t.TempDir()
+	logPath := filepath.Join(tmpDir, "append-mode.log")
+
+	// Pre-create file with content
+	initialContent := "existing content\n"
+	if err := os.WriteFile(logPath, []byte(initialContent), 0o644); err != nil {
+		t.Fatalf("Failed to create initial file: %v", err)
+	}
+
+	logger, err := NewLoggerWithPath(logPath, false)
+	if err != nil {
+		t.Fatalf(errMsgNewLoggerWithPathUnexpected, err)
+	}
+
+	// Write new content
+	logger.Log("new message")
+
+	// Close to flush
+	err = logger.Close()
+	if err != nil {
+		t.Fatalf(errMsgCloseUnexpected, err)
+	}
+
+	// Read file and verify both contents exist
+	//nolint:gosec // G304: test file path from t.TempDir()
+	content, err := os.ReadFile(logPath)
+	if err != nil {
+		t.Fatalf(errMsgLogFileReadFailed, err)
+	}
+
+	if !strings.Contains(string(content), "existing content") {
+		t.Error("Expected initial content to be preserved")
+	}
+
+	if !strings.Contains(string(content), "new message") {
+		t.Error("Expected new message to be appended")
+	}
+}
+
+// TestNewLoggerWithPathEmptyPath verifies behavior with empty path string.
+func TestNewLoggerWithPathEmptyPath(t *testing.T) {
+	logger, err := NewLoggerWithPath("", false)
+
+	if err == nil {
+		if logger != nil {
+			logger.Close() //nolint:errcheck // best-effort cleanup in tests
+		}
+		t.Fatal("Expected error for empty path, got nil")
+	}
+
+	if logger != nil {
+		t.Error(errMsgExpectedLoggerNil)
+	}
 }
