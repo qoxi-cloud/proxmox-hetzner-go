@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"os/exec"
+	"strings"
 	"time"
 )
 
@@ -18,6 +19,16 @@ type ExecutedCommand struct {
 
 	// Stdin contains the stdin input provided to the command, if any.
 	Stdin string
+}
+
+// String returns a string representation of the executed command
+// in the format "name arg1 arg2 ...".
+func (c ExecutedCommand) String() string {
+	if len(c.Args) == 0 {
+		return c.Name
+	}
+
+	return c.Name + " " + strings.Join(c.Args, " ")
 }
 
 // Executor defines the interface for running system commands.
