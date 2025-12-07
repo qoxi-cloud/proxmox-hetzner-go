@@ -20,10 +20,11 @@ const (
 
 // Error message constants for test assertions.
 const (
-	errMsgUnexpectedError      = "newLoggerWithPaths() returned unexpected error: %v"
-	errMsgExpectedFileSet      = "Expected logger.file to be set"
-	errMsgExpectedVerboseFalse = "Expected logger.verbose to be false"
-	errMsgExpectedVerboseTrue  = "Expected logger.verbose to be true"
+	errMsgUnexpectedError             = "newLoggerWithPaths() returned unexpected error: %v"
+	errMsgNewLoggerWithPathUnexpected = "NewLoggerWithPath() returned unexpected error: %v"
+	errMsgExpectedFileSet             = "Expected logger.file to be set"
+	errMsgExpectedVerboseFalse        = "Expected logger.verbose to be false"
+	errMsgExpectedVerboseTrue         = "Expected logger.verbose to be true"
 )
 
 // Log method test constants.
@@ -1393,7 +1394,7 @@ func TestNewLoggerWithPathCreatesFile(t *testing.T) {
 
 	logger, err := NewLoggerWithPath(logPath, false)
 	if err != nil {
-		t.Fatalf("NewLoggerWithPath() returned unexpected error: %v", err)
+		t.Fatalf(errMsgNewLoggerWithPathUnexpected, err)
 	}
 
 	t.Cleanup(func() {
@@ -1486,7 +1487,7 @@ func TestNewLoggerWithPathVerboseFlagTrue(t *testing.T) {
 
 	logger, err := NewLoggerWithPath(logPath, true)
 	if err != nil {
-		t.Fatalf("NewLoggerWithPath() returned unexpected error: %v", err)
+		t.Fatalf(errMsgNewLoggerWithPathUnexpected, err)
 	}
 
 	t.Cleanup(func() {
@@ -1507,7 +1508,7 @@ func TestNewLoggerWithPathVerboseFlagFalse(t *testing.T) {
 
 	logger, err := NewLoggerWithPath(logPath, false)
 	if err != nil {
-		t.Fatalf("NewLoggerWithPath() returned unexpected error: %v", err)
+		t.Fatalf(errMsgNewLoggerWithPathUnexpected, err)
 	}
 
 	t.Cleanup(func() {
@@ -1528,7 +1529,7 @@ func TestNewLoggerWithPathFilePermissions(t *testing.T) {
 
 	logger, err := NewLoggerWithPath(logPath, false)
 	if err != nil {
-		t.Fatalf("NewLoggerWithPath() returned unexpected error: %v", err)
+		t.Fatalf(errMsgNewLoggerWithPathUnexpected, err)
 	}
 
 	t.Cleanup(func() {
@@ -1567,7 +1568,7 @@ func TestNewLoggerWithPathIntegrationWithLog(t *testing.T) {
 
 	logger, err := NewLoggerWithPath(logPath, false)
 	if err != nil {
-		t.Fatalf("NewLoggerWithPath() returned unexpected error: %v", err)
+		t.Fatalf(errMsgNewLoggerWithPathUnexpected, err)
 	}
 
 	t.Cleanup(func() {
@@ -1618,7 +1619,7 @@ func TestNewLoggerWithPathIntegrationWithLogPath(t *testing.T) {
 
 	logger, err := NewLoggerWithPath(logPath, false)
 	if err != nil {
-		t.Fatalf("NewLoggerWithPath() returned unexpected error: %v", err)
+		t.Fatalf(errMsgNewLoggerWithPathUnexpected, err)
 	}
 
 	t.Cleanup(func() {
@@ -1640,7 +1641,7 @@ func TestNewLoggerWithPathIntegrationWithClose(t *testing.T) {
 
 	logger, err := NewLoggerWithPath(logPath, false)
 	if err != nil {
-		t.Fatalf("NewLoggerWithPath() returned unexpected error: %v", err)
+		t.Fatalf(errMsgNewLoggerWithPathUnexpected, err)
 	}
 
 	// Write a message before closing
@@ -1688,7 +1689,7 @@ func TestNewLoggerWithPathAppendMode(t *testing.T) {
 
 	logger, err := NewLoggerWithPath(logPath, false)
 	if err != nil {
-		t.Fatalf("NewLoggerWithPath() returned unexpected error: %v", err)
+		t.Fatalf(errMsgNewLoggerWithPathUnexpected, err)
 	}
 
 	// Write new content
