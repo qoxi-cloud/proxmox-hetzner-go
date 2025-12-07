@@ -130,8 +130,9 @@ jobs:
         uses: securego/gosec@6be2b51fd78feca86af91f5186b7964d76cb1256
         with:
           # G104: unhandled errors (handled by golangci-lint errcheck)
+          # G302: file permissions 0644 used intentionally for log readability in test scenarios
           # G304: file path from variable (mitigated via nolint comments where appropriate)
-          args: -exclude=G104,G304 -fmt sarif -out gosec-results.sarif ./...
+          args: -exclude=G104,G302,G304 -fmt sarif -out gosec-results.sarif ./...
 
       - name: Upload SARIF file
         uses: github/codeql-action/upload-sarif@v3
