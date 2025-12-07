@@ -1,9 +1,3 @@
-// Package installer provides installation orchestration for Proxmox VE on Hetzner dedicated servers.
-//
-// The installer package coordinates all installation steps including pre-flight checks,
-// hardware detection, Proxmox installation, network configuration, and system optimization.
-// It uses the exec package for command execution and provides thread-safe logging throughout
-// the installation process.
 package installer
 
 import (
