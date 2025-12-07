@@ -15,6 +15,9 @@ const (
 	testPermissionDenied = "permission denied"
 	testCommandNotFound  = "command not found"
 	testInputData        = "input data"
+	testArgName          = "--name"
+	testSourceFile       = "source.txt"
+	testDestFile         = "dest.txt"
 )
 
 func TestMockExecutorImplementsInterface(t *testing.T) {
@@ -531,8 +534,8 @@ func TestMakeKey(t *testing.T) {
 		{
 			name:     "command with multiple args",
 			cmdName:  "docker",
-			args:     []string{"run", "-d", "--name", "test", "nginx"},
-			expected: "docker run -d --name test nginx",
+			args:     []string{"run", "-d", testArgName, "test", "nginx"},
+			expected: "docker run -d " + testArgName + " test nginx",
 		},
 	}
 
@@ -687,9 +690,9 @@ func TestMockExecutorWasCalledWith(t *testing.T) {
 		},
 		{
 			name:          "exact match with multiple args",
-			commandsToRun: [][]string{{"docker", "run", "-d", "--name", "test", "nginx"}},
+			commandsToRun: [][]string{{"docker", "run", "-d", testArgName, "test", "nginx"}},
 			checkName:     "docker",
-			checkArgs:     []string{"run", "-d", "--name", "test", "nginx"},
+			checkArgs:     []string{"run", "-d", testArgName, "test", "nginx"},
 			expected:      true,
 		},
 		{
@@ -755,32 +758,55 @@ func TestMockExecutorWasCalledWithPartialArgs(t *testing.T) {
 	ctx := t.Context()
 
 	// Execute command with multiple args
-	require.NoError(t, mock.Run(ctx, "docker", "run", "-d", "--name", "test"))
+	require.NoError(t, mock.Run(ctx, "docker", "run", "-d", testArgName, "test"))
 
 	// Partial match should return false (fewer args)
 	assert.False(t, mock.WasCalledWith("docker", "run", "-d"))
 
 	// Partial match should return false (more args)
-	assert.False(t, mock.WasCalledWith("docker", "run", "-d", "--name", "test", "extra"))
+	assert.False(t, mock.WasCalledWith("docker", "run", "-d", testArgName, "test", "extra"))
 
 	// Name only should return false when command had args
 	assert.False(t, mock.WasCalledWith("docker"))
 
 	// Exact match should return true
-	assert.True(t, mock.WasCalledWith("docker", "run", "-d", "--name", "test"))
+	assert.True(t, mock.WasCalledWith("docker", "run", "-d", testArgName, "test"))
 }
 
 func TestMockExecutorWasCalledWithDifferentOrder(t *testing.T) {
 	mock := NewMockExecutor()
 	ctx := t.Context()
 
-	require.NoError(t, mock.Run(ctx, "cp", "source.txt", "dest.txt"))
+	require.NoError(t, mock.Run(ctx, "cp", testSourceFile, testDestFile))
 
 	// Same args but different order should return false
-	assert.False(t, mock.WasCalledWith("cp", "dest.txt", "source.txt"))
+	assert.False(t, mock.WasCalledWith("cp", testDestFile, testSourceFile))
 
 	// Correct order should return true
-	assert.True(t, mock.WasCalledWith("cp", "source.txt", "dest.txt"))
+	assert.True(t, mock.WasCalledWith("cp", testSourceFile, testDestFile))
+}
+
+func TestMockExecutorWasCalledWithIgnoresStdin(t *testing.T) {
+	mock := NewMockExecutor()
+	ctx := t.Context()
+
+	// Run commands with same name+args but different stdin values
+	require.NoError(t, mock.RunWithStdin(ctx, "first stdin content", "cat", "-n"))
+	require.NoError(t, mock.RunWithStdin(ctx, "completely different stdin", "cat", "-n"))
+
+	// WasCalledWith should match on name + args only, ignoring stdin
+	// Both commands have same name and args, so this should return true
+	assert.True(t, mock.WasCalledWith("cat", "-n"))
+
+	// Verify both commands were recorded with their respective stdin values
+	commands := mock.Commands()
+	require.Len(t, commands, 2)
+	assert.Equal(t, "first stdin content", commands[0].Stdin)
+	assert.Equal(t, "completely different stdin", commands[1].Stdin)
+
+	// Verify that WasCalledWith still works for command without stdin
+	require.NoError(t, mock.Run(ctx, "echo", "hello"))
+	assert.True(t, mock.WasCalledWith("echo", "hello"))
 }
 
 func TestMockExecutorLastCommand(t *testing.T) {

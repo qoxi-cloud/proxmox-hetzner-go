@@ -195,7 +195,9 @@ func (m *MockExecutor) WasCalledWith(name string, args ...string) bool {
 }
 
 // LastCommand returns the most recently executed command, or nil if none.
-// Returns a deep copy to prevent external modification of internal state.
+// The returned ExecutedCommand has its Args slice deep-copied to prevent
+// external modification. Name and Stdin are string value types that are
+// safely copied by value (strings are immutable in Go).
 func (m *MockExecutor) LastCommand() *ExecutedCommand {
 	m.mu.Lock()
 	defer m.mu.Unlock()
