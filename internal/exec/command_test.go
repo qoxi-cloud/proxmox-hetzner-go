@@ -5,45 +5,26 @@ import (
 	"testing"
 )
 
-// TestExecutorInterfaceDefinition verifies the Executor interface is properly defined
-// and can be used for type assertions.
-func TestExecutorInterfaceDefinition(t *testing.T) {
-	// This test verifies that the Executor interface is properly defined
-	// by checking that we can use it as a type.
-	var executor Executor
-	if executor != nil {
-		t.Error("expected nil executor")
-	}
-}
+// testOutputValue is a constant used by testExecutor to verify interface compliance.
+const testOutputValue = "test output"
 
-// TestExecutorInterfaceMethodSignatures verifies the interface method signatures
-// are correct by creating a minimal mock implementation.
+// TestExecutorInterfaceMethodSignatures ensures testExecutor satisfies the
+// Executor interface and that its methods can be invoked with the expected
+// signatures without asserting any specific behavior.
 func TestExecutorInterfaceMethodSignatures(t *testing.T) {
-	// Create a minimal implementation to verify method signatures compile
-	var executor Executor = &testExecutor{}
+	// Compile-time assertion that *testExecutor implements Executor.
+	var _ Executor = (*testExecutor)(nil)
 
+	// Runtime calls to verify that the method signatures are usable.
 	ctx := t.Context()
+	executor := &testExecutor{}
 
-	// Verify Run method signature
-	err := executor.Run(ctx, "echo", "hello")
-	if err != nil {
-		t.Errorf("Run() unexpected error: %v", err)
-	}
-
-	// Verify RunWithOutput method signature
-	output, err := executor.RunWithOutput(ctx, "echo", "hello")
-	if err != nil {
-		t.Errorf("RunWithOutput() unexpected error: %v", err)
-	}
-	if output != "test output" {
-		t.Errorf("RunWithOutput() = %q, want %q", output, "test output")
-	}
-
-	// Verify RunWithStdin method signature
-	err = executor.RunWithStdin(ctx, "input data", "cat")
-	if err != nil {
-		t.Errorf("RunWithStdin() unexpected error: %v", err)
-	}
+	//nolint:errcheck // Testing method signatures, not behavior
+	executor.Run(ctx, "echo", "hello")
+	//nolint:errcheck // Testing method signatures, not behavior
+	executor.RunWithOutput(ctx, "echo", "hello")
+	//nolint:errcheck // Testing method signatures, not behavior
+	executor.RunWithStdin(ctx, "input data", "cat")
 }
 
 // testExecutor is a minimal implementation used to verify interface compliance.
@@ -57,7 +38,7 @@ func (e *testExecutor) Run(_ context.Context, _ string, _ ...string) error {
 }
 
 func (e *testExecutor) RunWithOutput(_ context.Context, _ string, _ ...string) (string, error) {
-	return "test output", nil
+	return testOutputValue, nil
 }
 
 func (e *testExecutor) RunWithStdin(_ context.Context, _, _ string, _ ...string) error {
