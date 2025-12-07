@@ -75,6 +75,7 @@ func (e *RealExecutor) Run(ctx context.Context, name string, args ...string) err
 	ctx, cancel := e.applyTimeout(ctx)
 	defer cancel()
 
+	// nosemgrep: go.lang.security.audit.dangerous-exec-command -- intentional dynamic command execution
 	return exec.CommandContext(ctx, name, args...).Run()
 }
 
@@ -83,6 +84,7 @@ func (e *RealExecutor) RunWithOutput(ctx context.Context, name string, args ...s
 	ctx, cancel := e.applyTimeout(ctx)
 	defer cancel()
 
+	// nosemgrep: go.lang.security.audit.dangerous-exec-command -- intentional dynamic command execution
 	out, err := exec.CommandContext(ctx, name, args...).CombinedOutput()
 
 	return string(out), err
@@ -93,6 +95,7 @@ func (e *RealExecutor) RunWithStdin(ctx context.Context, stdin, name string, arg
 	ctx, cancel := e.applyTimeout(ctx)
 	defer cancel()
 
+	// nosemgrep: go.lang.security.audit.dangerous-exec-command -- intentional dynamic command execution
 	cmd := exec.CommandContext(ctx, name, args...)
 	cmd.Stdin = bytes.NewBufferString(stdin)
 
