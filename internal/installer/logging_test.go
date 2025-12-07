@@ -48,6 +48,12 @@ const (
 	errMsgLogPathUnexpectedPrefix = "LogPath() expected path with prefix %q, got %q"
 )
 
+// Directory and skip message constants.
+const (
+	errMsgCreateUnwritableDir    = "Failed to create unwritable directory: %v"
+	errMsgSkipCannotCreateLogger = "Skipping test: cannot create logger with default paths: %v"
+)
+
 // rfc3339Pattern matches RFC3339 timestamps in log entries.
 // Example: [2024-01-15T10:30:45Z] or [2024-01-15T10:30:45+02:00].
 var rfc3339Pattern = regexp.MustCompile(`^\[\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(Z|[+-]\d{2}:\d{2})\]`)
@@ -214,7 +220,7 @@ func TestNewLoggerWithPathsFallbackToSecondPath(t *testing.T) {
 	unwritableDir := filepath.Join(tmpDir, "unwritable")
 	//nolint:gosec // G301: intentionally testing unwritable directories
 	if err := os.Mkdir(unwritableDir, 0o555); err != nil {
-		t.Fatalf("Failed to create unwritable directory: %v", err)
+		t.Fatalf(errMsgCreateUnwritableDir, err)
 	}
 
 	firstPath := filepath.Join(unwritableDir, testFirstLogFile)
@@ -414,7 +420,7 @@ func TestNewLoggerWithPathsMultipleFallbacks(t *testing.T) {
 	for _, dir := range []string{unwritable1, unwritable2, unwritable3} {
 		//nolint:gosec // G301: intentionally testing unwritable directories
 		if err := os.Mkdir(dir, 0o555); err != nil {
-			t.Fatalf("Failed to create unwritable directory: %v", err)
+			t.Fatalf(errMsgCreateUnwritableDir, err)
 		}
 	}
 
@@ -472,7 +478,7 @@ func TestNewLoggerConstants(t *testing.T) {
 func TestNewLoggerWithDefaultPaths(t *testing.T) {
 	logger, err := NewLogger(false)
 	if err != nil {
-		t.Skipf("Skipping test: cannot create logger with default paths: %v", err)
+		t.Skipf(errMsgSkipCannotCreateLogger, err)
 	}
 
 	t.Cleanup(func() {
@@ -493,7 +499,7 @@ func TestNewLoggerWithDefaultPaths(t *testing.T) {
 func TestNewLoggerVerboseTrue(t *testing.T) {
 	logger, err := NewLogger(true)
 	if err != nil {
-		t.Skipf("Skipping test: cannot create logger with default paths: %v", err)
+		t.Skipf(errMsgSkipCannotCreateLogger, err)
 	}
 
 	t.Cleanup(func() {
@@ -1236,7 +1242,7 @@ func TestLogPathConcurrent(t *testing.T) {
 func TestLogPathWithPrimaryPath(t *testing.T) {
 	logger, err := NewLogger(false)
 	if err != nil {
-		t.Skipf("Skipping test: cannot create logger with default paths: %v", err)
+		t.Skipf(errMsgSkipCannotCreateLogger, err)
 	}
 
 	t.Cleanup(func() {
@@ -1266,7 +1272,7 @@ func TestLogPathWithFallbackPath(t *testing.T) {
 	unwritableDir := filepath.Join(tmpDir, "unwritable")
 	//nolint:gosec // G301: intentionally testing unwritable directories
 	if err := os.Mkdir(unwritableDir, 0o555); err != nil {
-		t.Fatalf("Failed to create unwritable directory: %v", err)
+		t.Fatalf(errMsgCreateUnwritableDir, err)
 	}
 
 	t.Cleanup(func() {
@@ -1313,14 +1319,14 @@ func TestLogPathAndLogConcurrent(t *testing.T) {
 	var wg sync.WaitGroup
 
 	// Launch goroutines that call LogPath
+	// Note: t.Errorf is safe to call from multiple goroutines
 	for i := 0; i < goroutines/2; i++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 			result := logger.LogPath()
 			if result != logPath {
-				// Just verify consistency, don't fail test to avoid race in t.Errorf
-				_ = result
+				t.Errorf(errMsgLogPathExpectedPath, logPath, result)
 			}
 		}()
 	}
