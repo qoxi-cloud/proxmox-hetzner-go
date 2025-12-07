@@ -20,6 +20,29 @@
 //	logger.Log("Starting installation...")
 //	logger.Log("Processing step %d of %d", current, total)
 //
+// # Integration with Config.Verbose
+//
+// The Logger integrates with the Config.Verbose field, which is typically set from
+// the CLI --verbose flag. This allows the verbose setting to flow from the CLI
+// through the configuration to the Logger:
+//
+//	cfg := config.DefaultConfig()
+//	cfg.Verbose = verbose // from CLI flag (e.g., --verbose)
+//
+//	logger, err := installer.NewLogger(cfg.Verbose)
+//	if err != nil {
+//	    return fmt.Errorf("failed to create logger: %w", err)
+//	}
+//	defer logger.Close()
+//
+//	// In verbose mode, this message appears both in the log file and stdout
+//	logger.Log("Log file: %s", logger.LogPath())
+//
+// When Config.Verbose is false (the default), log messages are written only to
+// the log file, keeping the terminal clean. When Config.Verbose is true, log
+// messages are echoed to stdout as well, providing real-time feedback during
+// installation.
+//
 // Log files are written to /var/log/proxmox-install.log by default,
 // with automatic fallback to /tmp/proxmox-install.log if /var/log
 // is not writable.
