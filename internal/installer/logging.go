@@ -177,16 +177,25 @@ func (l *Logger) Close() error {
 	}
 
 	// Sync to flush any buffered data to disk before closing.
-	if err := l.file.Sync(); err != nil {
-		return fmt.Errorf("failed to sync log file: %w", err)
-	}
+	// We capture both errors to ensure the file is always closed,
+	// even if Sync fails, preventing file descriptor leaks.
+	syncErr := l.file.Sync()
+	closeErr := l.file.Close()
 
-	// Close the file and set to nil for idempotent behavior.
-	// Setting file to nil ensures:
+	// Set file to nil for idempotent behavior.
+	// This ensures:
 	// 1. Subsequent Close calls return nil without error
 	// 2. Log method becomes a no-op after Close
-	err := l.file.Close()
 	l.file = nil
 
-	return err
+	// Return sync error first (it's more informative about data loss)
+	if syncErr != nil {
+		return fmt.Errorf("failed to sync log file: %w", syncErr)
+	}
+
+	if closeErr != nil {
+		return fmt.Errorf("failed to close log file: %w", closeErr)
+	}
+
+	return nil
 }

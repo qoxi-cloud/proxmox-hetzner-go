@@ -36,6 +36,11 @@ const (
 	testFormatMessage         = "Value: %d, Name: %s"
 )
 
+// Close method test constants.
+const (
+	errMsgCloseUnexpected = "Close() returned unexpected error: %v"
+)
+
 // rfc3339Pattern matches RFC3339 timestamps in log entries.
 // Example: [2024-01-15T10:30:45Z] or [2024-01-15T10:30:45+02:00].
 var rfc3339Pattern = regexp.MustCompile(`^\[\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(Z|[+-]\d{2}:\d{2})\]`)
@@ -879,7 +884,7 @@ func TestCloseValidLogger(t *testing.T) {
 	// Close should succeed
 	err = logger.Close()
 	if err != nil {
-		t.Errorf("Close() returned unexpected error: %v", err)
+		t.Errorf(errMsgCloseUnexpected, err)
 	}
 
 	// Verify file exists and contains the message
@@ -974,7 +979,7 @@ func TestCloseFlushesData(t *testing.T) {
 	// Close should sync and close
 	err = logger.Close()
 	if err != nil {
-		t.Fatalf("Close() returned unexpected error: %v", err)
+		t.Fatalf(errMsgCloseUnexpected, err)
 	}
 
 	// Read file and verify all messages are present
@@ -1007,7 +1012,7 @@ func TestCloseLogAfterClose(t *testing.T) {
 	// Close the logger
 	err = logger.Close()
 	if err != nil {
-		t.Fatalf("Close() returned unexpected error: %v", err)
+		t.Fatalf(errMsgCloseUnexpected, err)
 	}
 
 	// Log after close should not panic and should be a no-op
@@ -1104,8 +1109,7 @@ func TestCloseAndLogConcurrent(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			// Ignore error - close after close returns nil
-			_ = logger.Close()
+			logger.Close() //nolint:errcheck // best-effort cleanup in concurrent test
 		}()
 	}
 
