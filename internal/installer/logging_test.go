@@ -452,3 +452,45 @@ func TestNewLoggerConstants(t *testing.T) {
 		t.Errorf("Expected fallbackLogPath to be '/tmp/proxmox-install.log', got %q", fallbackLogPath)
 	}
 }
+
+// TestNewLoggerWithDefaultPaths tests the public NewLogger constructor with verbose=false.
+// This test may skip if neither default log path is writable (e.g., in CI environments).
+func TestNewLoggerWithDefaultPaths(t *testing.T) {
+	logger, err := NewLogger(false)
+	if err != nil {
+		t.Skipf("Skipping test: cannot create logger with default paths: %v", err)
+	}
+
+	t.Cleanup(func() {
+		logger.file.Close() //nolint:errcheck // best-effort cleanup in tests
+	})
+
+	if logger.file == nil {
+		t.Error("Expected logger.file to be set")
+	}
+
+	if logger.verbose {
+		t.Error("Expected logger.verbose to be false")
+	}
+}
+
+// TestNewLoggerVerboseTrue tests the public NewLogger constructor with verbose=true.
+// This test may skip if neither default log path is writable (e.g., in CI environments).
+func TestNewLoggerVerboseTrue(t *testing.T) {
+	logger, err := NewLogger(true)
+	if err != nil {
+		t.Skipf("Skipping test: cannot create logger with default paths: %v", err)
+	}
+
+	t.Cleanup(func() {
+		logger.file.Close() //nolint:errcheck // best-effort cleanup in tests
+	})
+
+	if logger.file == nil {
+		t.Error("Expected logger.file to be set")
+	}
+
+	if !logger.verbose {
+		t.Error("Expected logger.verbose to be true")
+	}
+}

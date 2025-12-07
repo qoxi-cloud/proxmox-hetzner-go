@@ -61,8 +61,9 @@ type Logger struct {
 // This fallback mechanism ensures logging works in environments where /var/log
 // may not be accessible (e.g., development on macOS or non-root execution).
 //
-// The log file is opened with O_CREATE|O_WRONLY|O_APPEND flags and 0644 permissions,
-// allowing the file to be created if it doesn't exist and appending new entries.
+// The log file is opened with O_CREATE|O_WRONLY|O_APPEND flags and 0600 permissions,
+// creating the file if it doesn't exist, appending new entries, and restricting
+// access to the current user by default.
 //
 // Parameters:
 //   - verbose: when true, log entries will also be written to stdout
