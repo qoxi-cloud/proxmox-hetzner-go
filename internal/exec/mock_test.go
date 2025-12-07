@@ -9,6 +9,14 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// Test constants for commonly used literals.
+const (
+	testFileListOutput   = "file1.txt\nfile2.txt"
+	testPermissionDenied = "permission denied"
+	testCommandNotFound  = "command not found"
+	testInputData        = "input data"
+)
+
 func TestMockExecutorImplementsInterface(t *testing.T) {
 	// Compile-time assertion is in mock.go
 	// Runtime verification
@@ -39,8 +47,8 @@ func TestMockExecutorSetOutput(t *testing.T) {
 		{
 			name:           "simple command",
 			cmd:            "ls",
-			output:         "file1.txt\nfile2.txt",
-			expectedOutput: "file1.txt\nfile2.txt",
+			output:         testFileListOutput,
+			expectedOutput: testFileListOutput,
 		},
 		{
 			name:           "command with args",
@@ -81,14 +89,14 @@ func TestMockExecutorSetError(t *testing.T) {
 		{
 			name:        "simple error",
 			cmd:         "rm /protected",
-			err:         errors.New("permission denied"),
-			expectedErr: errors.New("permission denied"),
+			err:         errors.New(testPermissionDenied),
+			expectedErr: errors.New(testPermissionDenied),
 		},
 		{
 			name:        "command not found",
 			cmd:         "nonexistent",
-			err:         errors.New("command not found"),
-			expectedErr: errors.New("command not found"),
+			err:         errors.New(testCommandNotFound),
+			expectedErr: errors.New(testCommandNotFound),
 		},
 		{
 			name:        "nil error",
@@ -117,7 +125,7 @@ func TestMockExecutorSetError(t *testing.T) {
 	}
 }
 
-func TestMockExecutorGetCommands(t *testing.T) {
+func TestMockExecutorCommands(t *testing.T) {
 	mock := NewMockExecutor()
 	ctx := t.Context()
 
@@ -125,9 +133,9 @@ func TestMockExecutorGetCommands(t *testing.T) {
 	require.NoError(t, mock.Run(ctx, "echo", "hello"))
 	_, err := mock.RunWithOutput(ctx, "ls", "-la")
 	require.NoError(t, err)
-	require.NoError(t, mock.RunWithStdin(ctx, "input data", "cat"))
+	require.NoError(t, mock.RunWithStdin(ctx, testInputData, "cat"))
 
-	commands := mock.GetCommands()
+	commands := mock.Commands()
 
 	require.Len(t, commands, 3)
 
@@ -144,28 +152,30 @@ func TestMockExecutorGetCommands(t *testing.T) {
 	// Verify third command
 	assert.Equal(t, "cat", commands[2].Name)
 	assert.Empty(t, commands[2].Args)
-	assert.Equal(t, "input data", commands[2].Stdin)
+	assert.Equal(t, testInputData, commands[2].Stdin)
 }
 
-func TestMockExecutorGetCommandsReturnsCopy(t *testing.T) {
+func TestMockExecutorCommandsReturnsCopy(t *testing.T) {
 	mock := NewMockExecutor()
 	ctx := t.Context()
 
-	require.NoError(t, mock.Run(ctx, "echo", "hello"))
+	require.NoError(t, mock.Run(ctx, "echo", "hello", "world"))
 
-	// Get commands and modify the returned slice
-	commands := mock.GetCommands()
+	// Get commands and modify the returned slice (Name and Args)
+	commands := mock.Commands()
 	commands[0].Name = "modified"
+	commands[0].Args[0] = "modified-arg"
 
-	// Get commands again and verify original is unchanged
-	commandsAgain := mock.GetCommands()
-	assert.Equal(t, "echo", commandsAgain[0].Name)
+	// Get commands again and verify originals are unchanged (deep copy)
+	commandsAgain := mock.Commands()
+	assert.Equal(t, "echo", commandsAgain[0].Name, "Name should be unchanged")
+	assert.Equal(t, []string{"hello", "world"}, commandsAgain[0].Args, "Args should be unchanged")
 }
 
-func TestMockExecutorGetCommandsEmpty(t *testing.T) {
+func TestMockExecutorCommandsEmpty(t *testing.T) {
 	mock := NewMockExecutor()
 
-	commands := mock.GetCommands()
+	commands := mock.Commands()
 
 	assert.Empty(t, commands)
 	assert.NotNil(t, commands)
@@ -181,13 +191,13 @@ func TestMockExecutorReset(t *testing.T) {
 	require.NoError(t, mock.Run(ctx, "echo", "hello"))
 
 	// Verify state exists
-	assert.NotEmpty(t, mock.GetCommands())
+	assert.NotEmpty(t, mock.Commands())
 
 	// Reset
 	mock.Reset()
 
 	// Verify all state is cleared
-	commands := mock.GetCommands()
+	commands := mock.Commands()
 	assert.Empty(t, commands)
 
 	// Verify outputs and errors are cleared
@@ -222,7 +232,7 @@ func TestMockExecutorRun(t *testing.T) {
 			name:      "command with error",
 			cmd:       "rm",
 			args:      []string{"-rf", "/protected"},
-			configErr: errors.New("permission denied"),
+			configErr: errors.New(testPermissionDenied),
 			expectErr: true,
 			expectedCmd: ExecutedCommand{
 				Name:  "rm",
@@ -263,7 +273,7 @@ func TestMockExecutorRun(t *testing.T) {
 				assert.NoError(t, err)
 			}
 
-			commands := mock.GetCommands()
+			commands := mock.Commands()
 			require.Len(t, commands, 1)
 			assert.Equal(t, tt.expectedCmd.Name, commands[0].Name)
 			assert.Equal(t, tt.expectedCmd.Args, commands[0].Args)
@@ -286,10 +296,10 @@ func TestMockExecutorRunWithOutput(t *testing.T) {
 			name:           "successful command with output",
 			cmd:            "ls",
 			args:           []string{"-la"},
-			configOutput:   "file1.txt\nfile2.txt",
+			configOutput:   testFileListOutput,
 			configErr:      nil,
 			expectErr:      false,
-			expectedOutput: "file1.txt\nfile2.txt",
+			expectedOutput: testFileListOutput,
 		},
 		{
 			name:           "command with error and output",
@@ -334,7 +344,7 @@ func TestMockExecutorRunWithOutput(t *testing.T) {
 			}
 
 			// Verify command was recorded
-			commands := mock.GetCommands()
+			commands := mock.Commands()
 			require.Len(t, commands, 1)
 			assert.Equal(t, tt.cmd, commands[0].Name)
 		})
@@ -353,12 +363,12 @@ func TestMockExecutorRunWithStdin(t *testing.T) {
 	}{
 		{
 			name:          "command with stdin",
-			stdin:         "input data",
+			stdin:         testInputData,
 			cmd:           "cat",
 			args:          nil,
 			configErr:     nil,
 			expectErr:     false,
-			expectedStdin: "input data",
+			expectedStdin: testInputData,
 		},
 		{
 			name:          "grep with stdin and pattern",
@@ -399,7 +409,7 @@ func TestMockExecutorRunWithStdin(t *testing.T) {
 			}
 
 			// Verify command was recorded with stdin
-			commands := mock.GetCommands()
+			commands := mock.Commands()
 			require.Len(t, commands, 1)
 			assert.Equal(t, tt.cmd, commands[0].Name)
 			assert.Equal(t, tt.expectedStdin, commands[0].Stdin)
@@ -440,11 +450,11 @@ func TestMockExecutorThreadSafety(t *testing.T) {
 		}()
 	}
 
-	// Concurrent GetCommands calls
+	// Concurrent Commands calls
 	for i := 0; i < numGoroutines; i++ {
 		go func() {
 			defer wg.Done()
-			_ = mock.GetCommands()
+			_ = mock.Commands()
 		}()
 	}
 
@@ -452,7 +462,7 @@ func TestMockExecutorThreadSafety(t *testing.T) {
 	wg.Wait()
 
 	// Verify no panic occurred and state is consistent
-	commands := mock.GetCommands()
+	commands := mock.Commands()
 	assert.Len(t, commands, numGoroutines)
 }
 
@@ -477,13 +487,20 @@ func TestMockExecutorThreadSafetyReset(t *testing.T) {
 		}()
 		go func() {
 			defer wg.Done()
-			_ = mock.GetCommands()
+			_ = mock.Commands()
 		}()
 	}
 
 	wg.Wait()
-	// Verify no panic occurred - success if we reach this point
-	assert.True(t, true, "no panic or race condition occurred")
+
+	// Verify mock is still functional after concurrent operations
+	commands := mock.Commands()
+	assert.NotNil(t, commands, "Commands() should return non-nil slice after concurrent resets")
+
+	// Verify subsequent Run calls still record commands
+	require.NoError(t, mock.Run(ctx, "test", "arg"))
+	commandsAfter := mock.Commands()
+	assert.GreaterOrEqual(t, len(commandsAfter), 1, "Run should record commands after concurrent resets")
 }
 
 func TestMakeKey(t *testing.T) {
@@ -552,7 +569,7 @@ func TestMockExecutorMultipleCommands(t *testing.T) {
 	assert.Equal(t, "operation not permitted", err3.Error())
 
 	// Verify all commands were recorded in order
-	commands := mock.GetCommands()
+	commands := mock.Commands()
 	require.Len(t, commands, 3)
 	assert.Equal(t, "echo", commands[0].Name)
 	assert.Equal(t, "ls", commands[1].Name)

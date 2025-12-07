@@ -22,7 +22,7 @@ import (
 //	output, err := mock.RunWithOutput(ctx, "ls", "-la")
 //
 //	// Verify recorded commands
-//	commands := mock.GetCommands()
+//	commands := mock.Commands()
 type MockExecutor struct {
 	mu       sync.Mutex
 	commands []ExecutedCommand
@@ -73,15 +73,27 @@ func (m *MockExecutor) SetError(cmd string, err error) {
 	m.errors[cmd] = err
 }
 
-// GetCommands returns all executed commands in order of execution.
-// Returns a copy to prevent external modification of internal state.
-func (m *MockExecutor) GetCommands() []ExecutedCommand {
+// Commands returns all executed commands in order of execution.
+// Returns a deep copy to prevent external modification of internal state.
+func (m *MockExecutor) Commands() []ExecutedCommand {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	// Return a copy to prevent modification
+	// Return a deep copy to prevent modification
 	result := make([]ExecutedCommand, len(m.commands))
-	copy(result, m.commands)
+
+	for i, cmd := range m.commands {
+		var argsCopy []string
+		if cmd.Args != nil {
+			argsCopy = make([]string, len(cmd.Args))
+			copy(argsCopy, cmd.Args)
+		}
+		result[i] = ExecutedCommand{
+			Name:  cmd.Name,
+			Args:  argsCopy,
+			Stdin: cmd.Stdin,
+		}
+	}
 
 	return result
 }
@@ -107,9 +119,9 @@ func (m *MockExecutor) record(name string, args []string, stdin string) {
 	})
 }
 
-// getResponse returns the configured output and error for a command key.
+// response returns the configured output and error for a command key.
 // Must be called while holding the mutex.
-func (m *MockExecutor) getResponse(key string) (string, error) {
+func (m *MockExecutor) response(key string) (string, error) {
 	output := m.outputs[key]
 	err := m.errors[key]
 
@@ -124,7 +136,7 @@ func (m *MockExecutor) Run(_ context.Context, name string, args ...string) error
 
 	m.record(name, args, "")
 	key := makeKey(name, args...)
-	_, err := m.getResponse(key)
+	_, err := m.response(key)
 
 	return err
 }
@@ -138,7 +150,7 @@ func (m *MockExecutor) RunWithOutput(_ context.Context, name string, args ...str
 	m.record(name, args, "")
 	key := makeKey(name, args...)
 
-	return m.getResponse(key)
+	return m.response(key)
 }
 
 // RunWithStdin executes a command with stdin input.
@@ -149,7 +161,7 @@ func (m *MockExecutor) RunWithStdin(_ context.Context, stdin, name string, args 
 
 	m.record(name, args, stdin)
 	key := makeKey(name, args...)
-	_, err := m.getResponse(key)
+	_, err := m.response(key)
 
 	return err
 }
