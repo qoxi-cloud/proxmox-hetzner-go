@@ -1,11 +1,14 @@
 package installer
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 	"testing"
+	"time"
 )
 
 // Test file name constants to avoid duplication.
@@ -21,6 +24,19 @@ const (
 	errMsgExpectedVerboseFalse = "Expected logger.verbose to be false"
 	errMsgExpectedVerboseTrue  = "Expected logger.verbose to be true"
 )
+
+// Log method test constants.
+const (
+	errMsgLogFileReadFailed   = "Failed to read log file: %v"
+	errMsgTimestampNotMatched = "Log entry does not contain valid RFC3339 timestamp"
+	errMsgMessageNotFound     = "Expected message %q not found in log content"
+	testLogMessage            = "Test log message"
+	testFormatMessage         = "Value: %d, Name: %s"
+)
+
+// rfc3339Pattern matches RFC3339 timestamps in log entries.
+// Example: [2024-01-15T10:30:45Z] or [2024-01-15T10:30:45+02:00]
+var rfc3339Pattern = regexp.MustCompile(`^\[\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(Z|[+-]\d{2}:\d{2})\]`)
 
 // TestLoggerZeroValue verifies that Logger can be instantiated with zero values.
 // This ensures the struct has no unexported initialization requirements.
@@ -497,5 +513,475 @@ func TestNewLoggerVerboseTrue(t *testing.T) {
 
 	if !logger.verbose {
 		t.Error(errMsgExpectedVerboseTrue)
+	}
+}
+
+// TestLogWritesToFile verifies that Log writes messages to the log file.
+func TestLogWritesToFile(t *testing.T) {
+	tmpDir := t.TempDir()
+	logPath := filepath.Join(tmpDir, "test.log")
+
+	logger, err := newLoggerWithPaths(false, []string{logPath})
+	if err != nil {
+		t.Fatalf(errMsgUnexpectedError, err)
+	}
+
+	t.Cleanup(func() {
+		if logger != nil && logger.file != nil {
+			logger.file.Close() //nolint:errcheck // best-effort cleanup in tests
+		}
+	})
+
+	logger.Log(testLogMessage)
+
+	// Sync file to ensure content is flushed
+	if err := logger.file.Sync(); err != nil {
+		t.Fatalf("Failed to sync log file: %v", err)
+	}
+
+	//nolint:gosec // G304: test file path from t.TempDir()
+	content, err := os.ReadFile(logPath)
+	if err != nil {
+		t.Fatalf(errMsgLogFileReadFailed, err)
+	}
+
+	if !strings.Contains(string(content), testLogMessage) {
+		t.Errorf(errMsgMessageNotFound, testLogMessage)
+	}
+}
+
+// TestLogTimestampFormat verifies that Log uses RFC3339 (ISO 8601) timestamp format.
+func TestLogTimestampFormat(t *testing.T) {
+	tmpDir := t.TempDir()
+	logPath := filepath.Join(tmpDir, "timestamp.log")
+
+	logger, err := newLoggerWithPaths(false, []string{logPath})
+	if err != nil {
+		t.Fatalf(errMsgUnexpectedError, err)
+	}
+
+	t.Cleanup(func() {
+		if logger != nil && logger.file != nil {
+			logger.file.Close() //nolint:errcheck // best-effort cleanup in tests
+		}
+	})
+
+	beforeLog := time.Now()
+	logger.Log(testLogMessage)
+	afterLog := time.Now()
+
+	// Sync file to ensure content is flushed
+	if err := logger.file.Sync(); err != nil {
+		t.Fatalf("Failed to sync log file: %v", err)
+	}
+
+	//nolint:gosec // G304: test file path from t.TempDir()
+	content, err := os.ReadFile(logPath)
+	if err != nil {
+		t.Fatalf(errMsgLogFileReadFailed, err)
+	}
+
+	logLine := string(content)
+
+	// Verify timestamp format matches RFC3339 pattern
+	if !rfc3339Pattern.MatchString(logLine) {
+		t.Errorf("%s: got %q", errMsgTimestampNotMatched, logLine)
+	}
+
+	// Extract and parse the timestamp to verify it's within expected range
+	timestampMatch := regexp.MustCompile(`\[([^\]]+)\]`).FindStringSubmatch(logLine)
+	if len(timestampMatch) < 2 {
+		t.Fatalf("Could not extract timestamp from log line: %q", logLine)
+	}
+
+	parsedTime, err := time.Parse(time.RFC3339, timestampMatch[1])
+	if err != nil {
+		t.Fatalf("Failed to parse timestamp %q: %v", timestampMatch[1], err)
+	}
+
+	// Verify timestamp is within the expected time window
+	if parsedTime.Before(beforeLog.Add(-time.Second)) || parsedTime.After(afterLog.Add(time.Second)) {
+		t.Errorf("Timestamp %v is outside expected range [%v, %v]", parsedTime, beforeLog, afterLog)
+	}
+}
+
+// TestLogWithFormatArgs verifies that Log correctly formats messages with arguments.
+func TestLogWithFormatArgs(t *testing.T) {
+	tmpDir := t.TempDir()
+	logPath := filepath.Join(tmpDir, "format.log")
+
+	logger, err := newLoggerWithPaths(false, []string{logPath})
+	if err != nil {
+		t.Fatalf(errMsgUnexpectedError, err)
+	}
+
+	t.Cleanup(func() {
+		if logger != nil && logger.file != nil {
+			logger.file.Close() //nolint:errcheck // best-effort cleanup in tests
+		}
+	})
+
+	logger.Log(testFormatMessage, 42, "test")
+
+	// Sync file to ensure content is flushed
+	if err := logger.file.Sync(); err != nil {
+		t.Fatalf("Failed to sync log file: %v", err)
+	}
+
+	//nolint:gosec // G304: test file path from t.TempDir()
+	content, err := os.ReadFile(logPath)
+	if err != nil {
+		t.Fatalf(errMsgLogFileReadFailed, err)
+	}
+
+	expectedMsg := "Value: 42, Name: test"
+	if !strings.Contains(string(content), expectedMsg) {
+		t.Errorf(errMsgMessageNotFound, expectedMsg)
+	}
+}
+
+// TestLogVerboseModeWritesToStdout verifies that verbose mode outputs to stdout.
+func TestLogVerboseModeWritesToStdout(t *testing.T) {
+	tmpDir := t.TempDir()
+	logPath := filepath.Join(tmpDir, "verbose.log")
+
+	logger, err := newLoggerWithPaths(true, []string{logPath})
+	if err != nil {
+		t.Fatalf(errMsgUnexpectedError, err)
+	}
+
+	t.Cleanup(func() {
+		if logger != nil && logger.file != nil {
+			logger.file.Close() //nolint:errcheck // best-effort cleanup in tests
+		}
+	})
+
+	// Capture stdout
+	oldStdout := os.Stdout
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("Failed to create pipe: %v", err)
+	}
+
+	os.Stdout = w
+
+	logger.Log(testLogMessage)
+
+	// Close writer and restore stdout
+	w.Close()
+	os.Stdout = oldStdout
+
+	// Read captured output
+	var buf bytes.Buffer
+	if _, err := buf.ReadFrom(r); err != nil {
+		t.Fatalf("Failed to read from pipe: %v", err)
+	}
+
+	capturedOutput := buf.String()
+
+	// Verify message was written to stdout
+	if !strings.Contains(capturedOutput, testLogMessage) {
+		t.Errorf("Expected stdout to contain %q, got %q", testLogMessage, capturedOutput)
+	}
+
+	// Verify timestamp format in stdout
+	if !rfc3339Pattern.MatchString(capturedOutput) {
+		t.Errorf("%s in stdout: got %q", errMsgTimestampNotMatched, capturedOutput)
+	}
+}
+
+// TestLogNonVerboseModeNoStdout verifies that non-verbose mode does not output to stdout.
+func TestLogNonVerboseModeNoStdout(t *testing.T) {
+	tmpDir := t.TempDir()
+	logPath := filepath.Join(tmpDir, "nonverbose.log")
+
+	logger, err := newLoggerWithPaths(false, []string{logPath})
+	if err != nil {
+		t.Fatalf(errMsgUnexpectedError, err)
+	}
+
+	t.Cleanup(func() {
+		if logger != nil && logger.file != nil {
+			logger.file.Close() //nolint:errcheck // best-effort cleanup in tests
+		}
+	})
+
+	// Capture stdout
+	oldStdout := os.Stdout
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("Failed to create pipe: %v", err)
+	}
+
+	os.Stdout = w
+
+	logger.Log(testLogMessage)
+
+	// Close writer and restore stdout
+	w.Close()
+	os.Stdout = oldStdout
+
+	// Read captured output
+	var buf bytes.Buffer
+	if _, err := buf.ReadFrom(r); err != nil {
+		t.Fatalf("Failed to read from pipe: %v", err)
+	}
+
+	capturedOutput := buf.String()
+
+	// Verify nothing was written to stdout
+	if len(capturedOutput) > 0 {
+		t.Errorf("Expected no stdout output in non-verbose mode, got %q", capturedOutput)
+	}
+}
+
+// TestLogConcurrentCalls verifies that concurrent Log calls are thread-safe.
+func TestLogConcurrentCalls(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	logPath := filepath.Join(tmpDir, "concurrent.log")
+
+	logger, err := newLoggerWithPaths(false, []string{logPath})
+	if err != nil {
+		t.Fatalf(errMsgUnexpectedError, err)
+	}
+
+	t.Cleanup(func() {
+		if logger != nil && logger.file != nil {
+			logger.file.Close() //nolint:errcheck // best-effort cleanup in tests
+		}
+	})
+
+	const goroutines = 50
+	var wg sync.WaitGroup
+
+	// Launch multiple goroutines that all call Log
+	for i := 0; i < goroutines; i++ {
+		wg.Add(1)
+		go func(id int) {
+			defer wg.Done()
+			logger.Log("Goroutine %d logging", id)
+		}(i)
+	}
+
+	wg.Wait()
+
+	// Sync file to ensure content is flushed
+	if err := logger.file.Sync(); err != nil {
+		t.Fatalf("Failed to sync log file: %v", err)
+	}
+
+	//nolint:gosec // G304: test file path from t.TempDir()
+	content, err := os.ReadFile(logPath)
+	if err != nil {
+		t.Fatalf(errMsgLogFileReadFailed, err)
+	}
+
+	lines := strings.Split(strings.TrimSpace(string(content)), "\n")
+
+	// Verify we have exactly the expected number of log entries
+	if len(lines) != goroutines {
+		t.Errorf("Expected %d log lines, got %d", goroutines, len(lines))
+	}
+
+	// Verify each line has valid format (no interleaving)
+	for i, line := range lines {
+		// Check timestamp format
+		if !rfc3339Pattern.MatchString(line) {
+			t.Errorf("Line %d has invalid format (possible interleaving): %q", i+1, line)
+		}
+
+		// Check that line contains "Goroutine" message
+		if !strings.Contains(line, "Goroutine") {
+			t.Errorf("Line %d missing expected message: %q", i+1, line)
+		}
+
+		// Verify line ends with newline indicator (properly terminated)
+		if !strings.Contains(line, "logging") {
+			t.Errorf("Line %d appears to be truncated or interleaved: %q", i+1, line)
+		}
+	}
+}
+
+// TestLogMultipleMessages verifies that multiple Log calls append correctly.
+func TestLogMultipleMessages(t *testing.T) {
+	tmpDir := t.TempDir()
+	logPath := filepath.Join(tmpDir, "multiple.log")
+
+	logger, err := newLoggerWithPaths(false, []string{logPath})
+	if err != nil {
+		t.Fatalf(errMsgUnexpectedError, err)
+	}
+
+	t.Cleanup(func() {
+		if logger != nil && logger.file != nil {
+			logger.file.Close() //nolint:errcheck // best-effort cleanup in tests
+		}
+	})
+
+	messages := []string{
+		"First message",
+		"Second message",
+		"Third message",
+	}
+
+	for _, msg := range messages {
+		logger.Log("%s", msg)
+	}
+
+	// Sync file to ensure content is flushed
+	if err := logger.file.Sync(); err != nil {
+		t.Fatalf("Failed to sync log file: %v", err)
+	}
+
+	//nolint:gosec // G304: test file path from t.TempDir()
+	content, err := os.ReadFile(logPath)
+	if err != nil {
+		t.Fatalf(errMsgLogFileReadFailed, err)
+	}
+
+	// Verify all messages are present
+	for _, msg := range messages {
+		if !strings.Contains(string(content), msg) {
+			t.Errorf(errMsgMessageNotFound, msg)
+		}
+	}
+
+	// Verify order by checking line count
+	lines := strings.Split(strings.TrimSpace(string(content)), "\n")
+	if len(lines) != len(messages) {
+		t.Errorf("Expected %d log lines, got %d", len(messages), len(lines))
+	}
+}
+
+// TestLogEmptyMessage verifies that Log handles empty messages correctly.
+func TestLogEmptyMessage(t *testing.T) {
+	tmpDir := t.TempDir()
+	logPath := filepath.Join(tmpDir, "empty.log")
+
+	logger, err := newLoggerWithPaths(false, []string{logPath})
+	if err != nil {
+		t.Fatalf(errMsgUnexpectedError, err)
+	}
+
+	t.Cleanup(func() {
+		if logger != nil && logger.file != nil {
+			logger.file.Close() //nolint:errcheck // best-effort cleanup in tests
+		}
+	})
+
+	logger.Log("")
+
+	// Sync file to ensure content is flushed
+	if err := logger.file.Sync(); err != nil {
+		t.Fatalf("Failed to sync log file: %v", err)
+	}
+
+	//nolint:gosec // G304: test file path from t.TempDir()
+	content, err := os.ReadFile(logPath)
+	if err != nil {
+		t.Fatalf(errMsgLogFileReadFailed, err)
+	}
+
+	// Verify timestamp is still written even for empty message
+	if !rfc3339Pattern.MatchString(string(content)) {
+		t.Error("Expected timestamp to be written even for empty message")
+	}
+
+	// Verify format is "[timestamp] \n"
+	if !strings.Contains(string(content), "] \n") {
+		t.Error("Expected empty message format to be '[timestamp] \\n'")
+	}
+}
+
+// TestLogSpecialCharacters verifies that Log handles special characters correctly.
+func TestLogSpecialCharacters(t *testing.T) {
+	tmpDir := t.TempDir()
+	logPath := filepath.Join(tmpDir, "special.log")
+
+	logger, err := newLoggerWithPaths(false, []string{logPath})
+	if err != nil {
+		t.Fatalf(errMsgUnexpectedError, err)
+	}
+
+	t.Cleanup(func() {
+		if logger != nil && logger.file != nil {
+			logger.file.Close() //nolint:errcheck // best-effort cleanup in tests
+		}
+	})
+
+	tests := []struct {
+		name    string
+		message string
+	}{
+		{"unicode", "Message with unicode: \u4e2d\u6587"},
+		{"newlines", "Message with\nnewlines"},
+		{"tabs", "Message\twith\ttabs"},
+		{"special chars", "Special: !@#$%^&*()"},
+		{"quotes", `Message with "quotes" and 'apostrophes'`},
+	}
+
+	for _, tt := range tests {
+		logger.Log("%s", tt.message)
+	}
+
+	// Sync file to ensure content is flushed
+	if err := logger.file.Sync(); err != nil {
+		t.Fatalf("Failed to sync log file: %v", err)
+	}
+
+	//nolint:gosec // G304: test file path from t.TempDir()
+	content, err := os.ReadFile(logPath)
+	if err != nil {
+		t.Fatalf(errMsgLogFileReadFailed, err)
+	}
+
+	for _, tt := range tests {
+		if !strings.Contains(string(content), tt.message) {
+			t.Errorf("Test %q: "+errMsgMessageNotFound, tt.name, tt.message)
+		}
+	}
+}
+
+// TestLogLineFormat verifies the exact format of log lines.
+func TestLogLineFormat(t *testing.T) {
+	tmpDir := t.TempDir()
+	logPath := filepath.Join(tmpDir, "format.log")
+
+	logger, err := newLoggerWithPaths(false, []string{logPath})
+	if err != nil {
+		t.Fatalf(errMsgUnexpectedError, err)
+	}
+
+	t.Cleanup(func() {
+		if logger != nil && logger.file != nil {
+			logger.file.Close() //nolint:errcheck // best-effort cleanup in tests
+		}
+	})
+
+	testMsg := "Test format verification"
+	logger.Log("%s", testMsg)
+
+	// Sync file to ensure content is flushed
+	if err := logger.file.Sync(); err != nil {
+		t.Fatalf("Failed to sync log file: %v", err)
+	}
+
+	//nolint:gosec // G304: test file path from t.TempDir()
+	content, err := os.ReadFile(logPath)
+	if err != nil {
+		t.Fatalf(errMsgLogFileReadFailed, err)
+	}
+
+	// Verify exact format: [TIMESTAMP] MESSAGE\n
+	// Example: [2024-01-15T10:30:45Z] Test format verification\n
+	formatPattern := regexp.MustCompile(
+		`^\[\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(Z|[+-]\d{2}:\d{2})\] ` +
+			regexp.QuoteMeta(testMsg) + `\n$`)
+
+	if !formatPattern.Match(content) {
+		t.Errorf("Log line does not match expected format.\nExpected pattern: [TIMESTAMP] %s\\n\nGot: %q",
+			testMsg, string(content))
 	}
 }
