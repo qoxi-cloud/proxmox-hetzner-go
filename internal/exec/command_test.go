@@ -142,7 +142,7 @@ func TestExecutedCommandStringImplementsStringer(t *testing.T) {
 		Args: []string{"test", "./..."},
 	}
 
-	//nolint:gocritic,staticcheck // intentionally testing fmt.Stringer interface integration via fmt package
+	//nolint:gocritic // intentionally testing fmt.Stringer interface integration via fmt package
 	formatted := fmt.Sprintf("%s", cmd)
 	expected := "go test ./..."
 
