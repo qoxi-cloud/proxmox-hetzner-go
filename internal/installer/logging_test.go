@@ -121,7 +121,7 @@ func TestNewLoggerWithPathsFirstPathWritable(t *testing.T) {
 
 	t.Cleanup(func() {
 		if logger != nil && logger.file != nil {
-			_ = logger.file.Close()
+			logger.file.Close() //nolint:errcheck // best-effort cleanup in tests
 		}
 	})
 
@@ -165,10 +165,10 @@ func TestNewLoggerWithPathsFallbackToSecondPath(t *testing.T) {
 
 	t.Cleanup(func() {
 		if logger != nil && logger.file != nil {
-			_ = logger.file.Close()
+			logger.file.Close() //nolint:errcheck // best-effort cleanup in tests
 		}
 		// Restore permissions for cleanup
-		_ = os.Chmod(unwritableDir, 0o755)
+		os.Chmod(unwritableDir, 0o755) //nolint:errcheck // best-effort cleanup in tests
 	})
 
 	// Verify first path was NOT created (not writable)
@@ -205,8 +205,8 @@ func TestNewLoggerWithPathsAllPathsUnwritable(t *testing.T) {
 	}
 
 	t.Cleanup(func() {
-		_ = os.Chmod(unwritableDir1, 0o755)
-		_ = os.Chmod(unwritableDir2, 0o755)
+		os.Chmod(unwritableDir1, 0o755) //nolint:errcheck // best-effort cleanup in tests
+		os.Chmod(unwritableDir2, 0o755) //nolint:errcheck // best-effort cleanup in tests
 	})
 
 	firstPath := filepath.Join(unwritableDir1, testFirstLogFile)
@@ -216,7 +216,7 @@ func TestNewLoggerWithPathsAllPathsUnwritable(t *testing.T) {
 
 	if err == nil {
 		if logger != nil && logger.file != nil {
-			_ = logger.file.Close()
+			logger.file.Close() //nolint:errcheck // best-effort cleanup in tests
 		}
 		t.Fatal("Expected error when all paths are unwritable, got nil")
 	}
@@ -238,7 +238,7 @@ func TestNewLoggerWithPathsEmptyPaths(t *testing.T) {
 
 	if err == nil {
 		if logger != nil && logger.file != nil {
-			_ = logger.file.Close()
+			logger.file.Close() //nolint:errcheck // best-effort cleanup in tests
 		}
 		t.Fatal("Expected error when no paths provided, got nil")
 	}
@@ -265,7 +265,7 @@ func TestNewLoggerWithPathsVerboseFlagTrue(t *testing.T) {
 
 	t.Cleanup(func() {
 		if logger != nil && logger.file != nil {
-			_ = logger.file.Close()
+			logger.file.Close() //nolint:errcheck // best-effort cleanup in tests
 		}
 	})
 
@@ -286,7 +286,7 @@ func TestNewLoggerWithPathsVerboseFlagFalse(t *testing.T) {
 
 	t.Cleanup(func() {
 		if logger != nil && logger.file != nil {
-			_ = logger.file.Close()
+			logger.file.Close() //nolint:errcheck // best-effort cleanup in tests
 		}
 	})
 
@@ -314,11 +314,11 @@ func TestNewLoggerWithPathsFileAppendMode(t *testing.T) {
 	// Write something to the file
 	newContent := "new content\n"
 	if _, err := logger.file.WriteString(newContent); err != nil {
-		_ = logger.file.Close()
+		logger.file.Close() //nolint:errcheck // best-effort cleanup in tests
 		t.Fatalf("Failed to write to log file: %v", err)
 	}
 
-	_ = logger.file.Close()
+	logger.file.Close() //nolint:errcheck // best-effort cleanup in tests
 
 	// Read file and verify both contents exist
 	//nolint:gosec // G304: test file path from t.TempDir()
@@ -345,7 +345,7 @@ func TestNewLoggerWithPathsFilePermissions(t *testing.T) {
 
 	t.Cleanup(func() {
 		if logger != nil && logger.file != nil {
-			_ = logger.file.Close()
+			logger.file.Close() //nolint:errcheck // best-effort cleanup in tests
 		}
 	})
 
@@ -375,7 +375,7 @@ func TestNewLoggerWithPathsSinglePath(t *testing.T) {
 
 	t.Cleanup(func() {
 		if logger != nil && logger.file != nil {
-			_ = logger.file.Close()
+			logger.file.Close() //nolint:errcheck // best-effort cleanup in tests
 		}
 	})
 
@@ -406,7 +406,7 @@ func TestNewLoggerWithPathsMultipleFallbacks(t *testing.T) {
 
 	t.Cleanup(func() {
 		for _, dir := range []string{unwritable1, unwritable2, unwritable3} {
-			_ = os.Chmod(dir, 0o755)
+			os.Chmod(dir, 0o755) //nolint:errcheck // best-effort cleanup in tests
 		}
 	})
 
@@ -424,7 +424,7 @@ func TestNewLoggerWithPathsMultipleFallbacks(t *testing.T) {
 
 	t.Cleanup(func() {
 		if logger != nil && logger.file != nil {
-			_ = logger.file.Close()
+			logger.file.Close() //nolint:errcheck // best-effort cleanup in tests
 		}
 	})
 
