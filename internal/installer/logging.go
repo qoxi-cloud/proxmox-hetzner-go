@@ -85,7 +85,7 @@ func NewLogger(verbose bool) (*Logger, error) {
 // creating the file if it doesn't exist and appending new entries.
 //
 // Parameters:
-//   - path: the absolute path where the log file should be created
+//   - path: the path where the log file should be created
 //   - verbose: when true, log entries will also be written to stdout
 //
 // Returns an error if the file cannot be opened or created at the specified path.

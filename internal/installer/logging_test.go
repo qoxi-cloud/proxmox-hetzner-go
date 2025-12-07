@@ -1548,8 +1548,8 @@ func TestNewLoggerWithPathFilePermissions(t *testing.T) {
 	perm := info.Mode().Perm()
 	expectedPerm := os.FileMode(0o644)
 
-	// Verify the file is at least readable/writable by owner and readable by group/others
-	// The umask might restrict permissions, so we check the bits that should be set
+	// Verify no extra permission bits beyond 0o644 are set.
+	// The umask might restrict permissions further (e.g., 0o600), which is acceptable.
 	if perm&0o644 != perm {
 		t.Errorf("Expected file permissions 0644 or more restrictive, got %04o", perm)
 	}
