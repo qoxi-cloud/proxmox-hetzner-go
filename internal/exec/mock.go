@@ -91,6 +91,7 @@ func (m *MockExecutor) Commands() []ExecutedCommand {
 			argsCopy = make([]string, len(cmd.Args))
 			copy(argsCopy, cmd.Args)
 		}
+
 		result[i] = ExecutedCommand{
 			Name:  cmd.Name,
 			Args:  argsCopy,

@@ -126,10 +126,10 @@ func newLoggerWithPaths(verbose bool, paths []string) (*Logger, error) {
 
 		//nolint:gosec // G304: paths are controlled constants in production
 		file, err = os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
-
 		if err == nil {
 			break
 		}
+
 		lastErr = err
 	}
 

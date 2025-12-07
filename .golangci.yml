@@ -1,9 +1,8 @@
-# golangci-lint configuration
+# golangci-lint configuration v1
 # https://golangci-lint.run/usage/configuration/
 
 run:
   timeout: 5m
-  issues-exit-code: 1
   tests: true
   modules-download-mode: readonly
 
@@ -15,14 +14,18 @@ output:
   sort-results: true
 
 linters:
+  disable-all: true
   enable:
-    # Default linters
+    # Default linters (gosimple and stylecheck are now part of staticcheck)
     - errcheck
-    - gosimple
     - govet
     - ineffassign
     - staticcheck
     - unused
+
+    # Formatters (in v1 these are linters)
+    - gofmt
+    - goimports
 
     # Security
     - gosec
@@ -43,8 +46,6 @@ linters:
     - gocritic
     - gocyclo
     - godot
-    - gofmt
-    - goimports
     - goprintffuncname
     - maintidx
     - makezero
@@ -58,31 +59,12 @@ linters:
     - prealloc
     - predeclared
     - revive
-    - stylecheck
-    - usetesting   # replaced deprecated tenv
+    - usetesting
     - tparallel
     - unconvert
     - unparam
     - whitespace
     - wsl
-
-  disable:
-    # Too strict for this project
-    - depguard
-    - exhaustruct
-    - gochecknoglobals
-    - gochecknoinits
-    - godox
-    - err113        # renamed from goerr113
-    - ireturn
-    - lll
-    - nlreturn
-    - nonamedreturns
-    - paralleltest
-    - tagliatelle
-    - testpackage
-    - varnamelen
-    - wrapcheck
 
 linters-settings:
   cyclop:
@@ -132,9 +114,9 @@ linters-settings:
 
   gosec:
     excludes:
-      - G104 # Audit errors not checked (handled by errcheck)
+      - G104  # Audit errors not checked (handled by errcheck)
     config:
-      G306: "0644" # Expected file permissions
+      G306: "0644"  # Expected file permissions
 
   maintidx:
     under: 20
@@ -179,11 +161,11 @@ linters-settings:
       - name: unused-parameter
       - name: unreachable-code
 
-  stylecheck:
+  staticcheck:
     checks:
       - all
-      - -ST1000 # Package comments
-      - -ST1003 # MixedCaps naming
+      - -ST1000  # Package comments
+      - -ST1003  # MixedCaps naming
 
   unparam:
     check-exported: false
@@ -192,6 +174,9 @@ linters-settings:
     allow-assign-and-anything: true
 
 issues:
+  exclude-use-default: false
+  max-issues-per-linter: 0
+  max-same-issues: 0
   exclude-rules:
     # Exclude some linters from running on tests files
     - path: _test\.go
@@ -208,11 +193,6 @@ issues:
     - path: mock\.go
       linters:
         - dupl
-
-  exclude-use-default: false
-  max-issues-per-linter: 0
-  max-same-issues: 0
-  new: false
 
 severity:
   default-severity: warning
