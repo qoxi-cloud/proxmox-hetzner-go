@@ -55,6 +55,14 @@ const (
 	errMsgSkipCannotCreateLogger = "Skipping test: cannot create logger with default paths: %v"
 )
 
+// Error handling test constants.
+const (
+	errMsgExpectedLoggerNil     = "Expected logger to be nil when error is returned"
+	errMsgFailedToOpenLogFile   = "failed to open log file"
+	errMsgExpectedErrorMsgStart = "Expected error message to start with %q, got %q"
+	testMsgBeforeClose          = "message before close"
+)
+
 // rfc3339Pattern matches RFC3339 timestamps in log entries.
 // Example: [2024-01-15T10:30:45Z] or [2024-01-15T10:30:45+02:00].
 var rfc3339Pattern = regexp.MustCompile(`^\[\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(Z|[+-]\d{2}:\d{2})\]`)
@@ -291,13 +299,12 @@ func TestNewLoggerWithPathsAllPathsUnwritable(t *testing.T) {
 	}
 
 	if logger != nil {
-		t.Error("Expected logger to be nil when error is returned")
+		t.Error(errMsgExpectedLoggerNil)
 	}
 
 	// Verify error message contains expected text
-	expectedMsg := "failed to open log file"
-	if !strings.HasPrefix(err.Error(), expectedMsg) {
-		t.Errorf("Expected error message to start with %q, got %q", expectedMsg, err.Error())
+	if !strings.HasPrefix(err.Error(), errMsgFailedToOpenLogFile) {
+		t.Errorf(errMsgExpectedErrorMsgStart, errMsgFailedToOpenLogFile, err.Error())
 	}
 }
 
@@ -313,7 +320,7 @@ func TestNewLoggerWithPathsEmptyPaths(t *testing.T) {
 	}
 
 	if logger != nil {
-		t.Error("Expected logger to be nil when error is returned")
+		t.Error(errMsgExpectedLoggerNil)
 	}
 
 	expectedMsg := "failed to open log file: no paths provided"
@@ -1021,7 +1028,7 @@ func TestCloseLogAfterClose(t *testing.T) {
 	}
 
 	// Write initial message
-	logger.Log("message before close")
+	logger.Log(testMsgBeforeClose)
 
 	// Close the logger
 	err = logger.Close()
@@ -1045,7 +1052,7 @@ func TestCloseLogAfterClose(t *testing.T) {
 		t.Fatalf(errMsgLogFileReadFailed, err)
 	}
 
-	if !strings.Contains(string(content), "message before close") {
+	if !strings.Contains(string(content), testMsgBeforeClose) {
 		t.Error("Expected message before close to be present")
 	}
 
@@ -1429,13 +1436,12 @@ func TestNewLoggerWithPathInvalidPath(t *testing.T) {
 	}
 
 	if logger != nil {
-		t.Error("Expected logger to be nil when error is returned")
+		t.Error(errMsgExpectedLoggerNil)
 	}
 
 	// Verify error message contains the path
-	expectedMsgPrefix := "failed to open log file"
-	if !strings.HasPrefix(err.Error(), expectedMsgPrefix) {
-		t.Errorf("Expected error message to start with %q, got %q", expectedMsgPrefix, err.Error())
+	if !strings.HasPrefix(err.Error(), errMsgFailedToOpenLogFile) {
+		t.Errorf(errMsgExpectedErrorMsgStart, errMsgFailedToOpenLogFile, err.Error())
 	}
 
 	if !strings.Contains(err.Error(), invalidPath) {
@@ -1470,13 +1476,12 @@ func TestNewLoggerWithPathUnwritablePath(t *testing.T) {
 	}
 
 	if logger != nil {
-		t.Error("Expected logger to be nil when error is returned")
+		t.Error(errMsgExpectedLoggerNil)
 	}
 
 	// Verify error message format
-	expectedMsgPrefix := "failed to open log file"
-	if !strings.HasPrefix(err.Error(), expectedMsgPrefix) {
-		t.Errorf("Expected error message to start with %q, got %q", expectedMsgPrefix, err.Error())
+	if !strings.HasPrefix(err.Error(), errMsgFailedToOpenLogFile) {
+		t.Errorf(errMsgExpectedErrorMsgStart, errMsgFailedToOpenLogFile, err.Error())
 	}
 }
 
@@ -1645,7 +1650,7 @@ func TestNewLoggerWithPathIntegrationWithClose(t *testing.T) {
 	}
 
 	// Write a message before closing
-	logger.Log("message before close")
+	logger.Log(testMsgBeforeClose)
 
 	// Close should succeed
 	err = logger.Close()
@@ -1665,7 +1670,7 @@ func TestNewLoggerWithPathIntegrationWithClose(t *testing.T) {
 		t.Fatalf(errMsgLogFileReadFailed, err)
 	}
 
-	if !strings.Contains(string(content), "message before close") {
+	if !strings.Contains(string(content), testMsgBeforeClose) {
 		t.Error("Expected message to be flushed to file before close")
 	}
 
@@ -1729,6 +1734,6 @@ func TestNewLoggerWithPathEmptyPath(t *testing.T) {
 	}
 
 	if logger != nil {
-		t.Error("Expected logger to be nil when error is returned")
+		t.Error(errMsgExpectedLoggerNil)
 	}
 }
