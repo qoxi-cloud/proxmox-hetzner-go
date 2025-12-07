@@ -168,3 +168,68 @@ func (m *MockExecutor) RunWithStdin(_ context.Context, stdin, name string, args 
 
 	return err
 }
+
+// CommandCount returns the number of executed commands.
+// This is useful for verifying that the expected number of commands were run.
+func (m *MockExecutor) CommandCount() int {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	return len(m.commands)
+}
+
+// WasCalledWith checks if a command with the given name and args was executed.
+// Both the command name and all arguments must match exactly.
+// Returns true if at least one matching command was found.
+func (m *MockExecutor) WasCalledWith(name string, args ...string) bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	for _, cmd := range m.commands {
+		if cmd.Name == name && argsEqual(cmd.Args, args) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// LastCommand returns the most recently executed command, or nil if none.
+// Returns a deep copy to prevent external modification of internal state.
+func (m *MockExecutor) LastCommand() *ExecutedCommand {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if len(m.commands) == 0 {
+		return nil
+	}
+
+	cmd := m.commands[len(m.commands)-1]
+
+	// Create a deep copy of args to prevent external modification
+	var argsCopy []string
+	if cmd.Args != nil {
+		argsCopy = make([]string, len(cmd.Args))
+		copy(argsCopy, cmd.Args)
+	}
+
+	return &ExecutedCommand{
+		Name:  cmd.Name,
+		Args:  argsCopy,
+		Stdin: cmd.Stdin,
+	}
+}
+
+func argsEqual(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+
+	return true
+}
