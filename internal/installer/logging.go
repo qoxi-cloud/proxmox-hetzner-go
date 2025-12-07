@@ -101,9 +101,8 @@ func NewLogger(verbose bool) (*Logger, error) {
 //	}
 //	defer logger.Close()
 func NewLoggerWithPath(path string, verbose bool) (*Logger, error) {
-	// G304: path is user-provided for testing/special deployments
-	// G302: 0644 permissions allow log readability in test/deployment scenarios
-	file, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644) //nolint:gosec
+	//nolint:gosec // G304: user-provided path; G302: 0644 allows log readability in test scenarios
+	file, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open log file %s: %w", path, err)
 	}
