@@ -7,6 +7,19 @@ import (
 	"time"
 )
 
+// ExecutedCommand represents a command that was executed.
+// Used by MockExecutor to record command invocations for test assertions.
+type ExecutedCommand struct {
+	// Name is the command name (e.g., "ls", "grep").
+	Name string
+
+	// Args contains the command arguments.
+	Args []string
+
+	// Stdin contains the stdin input provided to the command, if any.
+	Stdin string
+}
+
 // Executor defines the interface for running system commands.
 // All methods support context.Context for cancellation and timeout.
 //
