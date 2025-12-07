@@ -2,7 +2,6 @@ package exec
 
 import (
 	"context"
-	"strings"
 	"sync"
 )
 
@@ -45,11 +44,7 @@ func NewMockExecutor() *MockExecutor {
 // makeKey creates a lookup key from command name and args.
 // The key format is "name arg1 arg2 ..." with single space separators.
 func makeKey(name string, args ...string) string {
-	if len(args) == 0 {
-		return name
-	}
-
-	return name + " " + strings.Join(args, " ")
+	return ExecutedCommand{Name: name, Args: args}.String()
 }
 
 // SetOutput configures the output to return for a specific command.
@@ -61,6 +56,10 @@ func (m *MockExecutor) SetOutput(cmd, output string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
+	if m.outputs == nil {
+		m.outputs = make(map[string]string)
+	}
+
 	m.outputs[cmd] = output
 }
 
@@ -69,6 +68,10 @@ func (m *MockExecutor) SetOutput(cmd, output string) {
 func (m *MockExecutor) SetError(cmd string, err error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+
+	if m.errors == nil {
+		m.errors = make(map[string]error)
+	}
 
 	m.errors[cmd] = err
 }
