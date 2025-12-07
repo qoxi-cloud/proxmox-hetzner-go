@@ -14,11 +14,11 @@ import (
 
 // Default log file paths in priority order.
 const (
-	// defaultLogPath is the primary log file location.
+	// Primary log file location.
 	// This path is typically writable only by root on Linux systems.
 	defaultLogPath = "/var/log/proxmox-install.log"
 
-	// fallbackLogPath is used when the primary path is not writable.
+	// Fallback log path used when the primary path is not writable.
 	// This path should be writable on most systems.
 	fallbackLogPath = "/tmp/proxmox-install.log"
 )
@@ -33,7 +33,7 @@ const (
 //
 // Usage:
 //
-//	logger, err := NewLogger("/var/log/pve-install.log", true)
+//	logger, err := NewLogger(true)
 //	if err != nil {
 //	    return err
 //	}
@@ -86,11 +86,15 @@ func newLoggerWithPaths(verbose bool, paths []string) (*Logger, error) {
 	}
 
 	var file *os.File
+
 	var lastErr error
 
 	for _, path := range paths {
 		var err error
-		file, err = os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+
+		//nolint:gosec // G304: paths are controlled constants in production
+		file, err = os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
+
 		if err == nil {
 			break
 		}

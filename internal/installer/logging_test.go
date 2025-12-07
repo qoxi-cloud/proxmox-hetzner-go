@@ -3,9 +3,19 @@ package installer
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 )
+
+// Test file name constants to avoid duplication.
+const (
+	testFirstLogFile  = "first.log"
+	testSecondLogFile = "second.log"
+)
+
+// Error message constant for newLoggerWithPaths errors.
+const errMsgUnexpectedError = "newLoggerWithPaths() returned unexpected error: %v"
 
 // TestLoggerZeroValue verifies that Logger can be instantiated with zero values.
 // This ensures the struct has no unexported initialization requirements.
@@ -101,17 +111,17 @@ func TestLoggerPointerInstantiation(t *testing.T) {
 // TestNewLoggerWithPathsFirstPathWritable verifies that the first writable path is used.
 func TestNewLoggerWithPathsFirstPathWritable(t *testing.T) {
 	tmpDir := t.TempDir()
-	firstPath := filepath.Join(tmpDir, "first.log")
-	secondPath := filepath.Join(tmpDir, "second.log")
+	firstPath := filepath.Join(tmpDir, testFirstLogFile)
+	secondPath := filepath.Join(tmpDir, testSecondLogFile)
 
 	logger, err := newLoggerWithPaths(false, []string{firstPath, secondPath})
 	if err != nil {
-		t.Fatalf("newLoggerWithPaths() returned unexpected error: %v", err)
+		t.Fatalf(errMsgUnexpectedError, err)
 	}
 
 	t.Cleanup(func() {
 		if logger != nil && logger.file != nil {
-			logger.file.Close()
+			_ = logger.file.Close()
 		}
 	})
 
@@ -140,24 +150,25 @@ func TestNewLoggerWithPathsFallbackToSecondPath(t *testing.T) {
 
 	// Create a directory that cannot be written to (no file can be created inside)
 	unwritableDir := filepath.Join(tmpDir, "unwritable")
-	if err := os.Mkdir(unwritableDir, 0555); err != nil {
+	//nolint:gosec // G301: intentionally testing unwritable directories
+	if err := os.Mkdir(unwritableDir, 0o555); err != nil {
 		t.Fatalf("Failed to create unwritable directory: %v", err)
 	}
 
-	firstPath := filepath.Join(unwritableDir, "first.log")
-	secondPath := filepath.Join(tmpDir, "second.log")
+	firstPath := filepath.Join(unwritableDir, testFirstLogFile)
+	secondPath := filepath.Join(tmpDir, testSecondLogFile)
 
 	logger, err := newLoggerWithPaths(true, []string{firstPath, secondPath})
 	if err != nil {
-		t.Fatalf("newLoggerWithPaths() returned unexpected error: %v", err)
+		t.Fatalf(errMsgUnexpectedError, err)
 	}
 
 	t.Cleanup(func() {
 		if logger != nil && logger.file != nil {
-			logger.file.Close()
+			_ = logger.file.Close()
 		}
 		// Restore permissions for cleanup
-		os.Chmod(unwritableDir, 0755)
+		_ = os.Chmod(unwritableDir, 0o755)
 	})
 
 	// Verify first path was NOT created (not writable)
@@ -184,26 +195,28 @@ func TestNewLoggerWithPathsAllPathsUnwritable(t *testing.T) {
 	unwritableDir1 := filepath.Join(tmpDir, "unwritable1")
 	unwritableDir2 := filepath.Join(tmpDir, "unwritable2")
 
-	if err := os.Mkdir(unwritableDir1, 0555); err != nil {
+	//nolint:gosec // G301: intentionally testing unwritable directories
+	if err := os.Mkdir(unwritableDir1, 0o555); err != nil {
 		t.Fatalf("Failed to create unwritable directory 1: %v", err)
 	}
-	if err := os.Mkdir(unwritableDir2, 0555); err != nil {
+	//nolint:gosec // G301: intentionally testing unwritable directories
+	if err := os.Mkdir(unwritableDir2, 0o555); err != nil {
 		t.Fatalf("Failed to create unwritable directory 2: %v", err)
 	}
 
 	t.Cleanup(func() {
-		os.Chmod(unwritableDir1, 0755)
-		os.Chmod(unwritableDir2, 0755)
+		_ = os.Chmod(unwritableDir1, 0o755)
+		_ = os.Chmod(unwritableDir2, 0o755)
 	})
 
-	firstPath := filepath.Join(unwritableDir1, "first.log")
-	secondPath := filepath.Join(unwritableDir2, "second.log")
+	firstPath := filepath.Join(unwritableDir1, testFirstLogFile)
+	secondPath := filepath.Join(unwritableDir2, testSecondLogFile)
 
 	logger, err := newLoggerWithPaths(false, []string{firstPath, secondPath})
 
 	if err == nil {
 		if logger != nil && logger.file != nil {
-			logger.file.Close()
+			_ = logger.file.Close()
 		}
 		t.Fatal("Expected error when all paths are unwritable, got nil")
 	}
@@ -214,7 +227,7 @@ func TestNewLoggerWithPathsAllPathsUnwritable(t *testing.T) {
 
 	// Verify error message contains expected text
 	expectedMsg := "failed to open log file"
-	if err.Error()[:len(expectedMsg)] != expectedMsg {
+	if !strings.HasPrefix(err.Error(), expectedMsg) {
 		t.Errorf("Expected error message to start with %q, got %q", expectedMsg, err.Error())
 	}
 }
@@ -225,7 +238,7 @@ func TestNewLoggerWithPathsEmptyPaths(t *testing.T) {
 
 	if err == nil {
 		if logger != nil && logger.file != nil {
-			logger.file.Close()
+			_ = logger.file.Close()
 		}
 		t.Fatal("Expected error when no paths provided, got nil")
 	}
@@ -247,12 +260,12 @@ func TestNewLoggerWithPathsVerboseFlagTrue(t *testing.T) {
 
 	logger, err := newLoggerWithPaths(true, []string{logPath})
 	if err != nil {
-		t.Fatalf("newLoggerWithPaths() returned unexpected error: %v", err)
+		t.Fatalf(errMsgUnexpectedError, err)
 	}
 
 	t.Cleanup(func() {
 		if logger != nil && logger.file != nil {
-			logger.file.Close()
+			_ = logger.file.Close()
 		}
 	})
 
@@ -268,12 +281,12 @@ func TestNewLoggerWithPathsVerboseFlagFalse(t *testing.T) {
 
 	logger, err := newLoggerWithPaths(false, []string{logPath})
 	if err != nil {
-		t.Fatalf("newLoggerWithPaths() returned unexpected error: %v", err)
+		t.Fatalf(errMsgUnexpectedError, err)
 	}
 
 	t.Cleanup(func() {
 		if logger != nil && logger.file != nil {
-			logger.file.Close()
+			_ = logger.file.Close()
 		}
 	})
 
@@ -289,25 +302,26 @@ func TestNewLoggerWithPathsFileAppendMode(t *testing.T) {
 
 	// Pre-create file with content
 	initialContent := "existing content\n"
-	if err := os.WriteFile(logPath, []byte(initialContent), 0644); err != nil {
+	if err := os.WriteFile(logPath, []byte(initialContent), 0o644); err != nil {
 		t.Fatalf("Failed to create initial file: %v", err)
 	}
 
 	logger, err := newLoggerWithPaths(false, []string{logPath})
 	if err != nil {
-		t.Fatalf("newLoggerWithPaths() returned unexpected error: %v", err)
+		t.Fatalf(errMsgUnexpectedError, err)
 	}
 
 	// Write something to the file
 	newContent := "new content\n"
 	if _, err := logger.file.WriteString(newContent); err != nil {
-		logger.file.Close()
+		_ = logger.file.Close()
 		t.Fatalf("Failed to write to log file: %v", err)
 	}
 
-	logger.file.Close()
+	_ = logger.file.Close()
 
 	// Read file and verify both contents exist
+	//nolint:gosec // G304: test file path from t.TempDir()
 	content, err := os.ReadFile(logPath)
 	if err != nil {
 		t.Fatalf("Failed to read log file: %v", err)
@@ -326,12 +340,12 @@ func TestNewLoggerWithPathsFilePermissions(t *testing.T) {
 
 	logger, err := newLoggerWithPaths(false, []string{logPath})
 	if err != nil {
-		t.Fatalf("newLoggerWithPaths() returned unexpected error: %v", err)
+		t.Fatalf(errMsgUnexpectedError, err)
 	}
 
 	t.Cleanup(func() {
 		if logger != nil && logger.file != nil {
-			logger.file.Close()
+			_ = logger.file.Close()
 		}
 	})
 
@@ -340,12 +354,12 @@ func TestNewLoggerWithPathsFilePermissions(t *testing.T) {
 		t.Fatalf("Failed to stat log file: %v", err)
 	}
 
-	// Check file permissions (0644 = rw-r--r--)
+	// Check file permissions (0600 = rw-------)
 	// Note: On some systems, umask may affect the actual permissions
 	perm := info.Mode().Perm()
-	// We check that the file is at least readable by owner and group
-	if perm&0644 != perm {
-		t.Errorf("Expected file permissions 0644 or more restrictive, got %04o", perm)
+	// We check that the file is readable/writable by owner only
+	if perm&0o600 != perm {
+		t.Errorf("Expected file permissions 0600 or more restrictive, got %04o", perm)
 	}
 }
 
@@ -356,12 +370,12 @@ func TestNewLoggerWithPathsSinglePath(t *testing.T) {
 
 	logger, err := newLoggerWithPaths(false, []string{logPath})
 	if err != nil {
-		t.Fatalf("newLoggerWithPaths() returned unexpected error: %v", err)
+		t.Fatalf(errMsgUnexpectedError, err)
 	}
 
 	t.Cleanup(func() {
 		if logger != nil && logger.file != nil {
-			logger.file.Close()
+			_ = logger.file.Close()
 		}
 	})
 
@@ -384,32 +398,33 @@ func TestNewLoggerWithPathsMultipleFallbacks(t *testing.T) {
 	unwritable3 := filepath.Join(tmpDir, "unwritable3")
 
 	for _, dir := range []string{unwritable1, unwritable2, unwritable3} {
-		if err := os.Mkdir(dir, 0555); err != nil {
+		//nolint:gosec // G301: intentionally testing unwritable directories
+		if err := os.Mkdir(dir, 0o555); err != nil {
 			t.Fatalf("Failed to create unwritable directory: %v", err)
 		}
 	}
 
 	t.Cleanup(func() {
 		for _, dir := range []string{unwritable1, unwritable2, unwritable3} {
-			os.Chmod(dir, 0755)
+			_ = os.Chmod(dir, 0o755)
 		}
 	})
 
 	paths := []string{
-		filepath.Join(unwritable1, "first.log"),
-		filepath.Join(unwritable2, "second.log"),
+		filepath.Join(unwritable1, testFirstLogFile),
+		filepath.Join(unwritable2, testSecondLogFile),
 		filepath.Join(unwritable3, "third.log"),
 		filepath.Join(tmpDir, "final.log"), // This one should work
 	}
 
 	logger, err := newLoggerWithPaths(false, paths)
 	if err != nil {
-		t.Fatalf("newLoggerWithPaths() returned unexpected error: %v", err)
+		t.Fatalf(errMsgUnexpectedError, err)
 	}
 
 	t.Cleanup(func() {
 		if logger != nil && logger.file != nil {
-			logger.file.Close()
+			_ = logger.file.Close()
 		}
 	})
 
