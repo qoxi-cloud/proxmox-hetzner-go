@@ -154,3 +154,39 @@ func (l *Logger) Log(format string, args ...interface{}) {
 		fmt.Print(line)
 	}
 }
+
+// Close flushes any buffered data and closes the log file.
+//
+// It should be called when the logger is no longer needed to ensure all
+// buffered data is written and the file handle is properly released.
+//
+// Close is safe for concurrent use. It is a no-op if the Logger is nil or
+// if the underlying file has already been closed (idempotent behavior).
+//
+// Returns an error if the file cannot be synced or closed properly.
+func (l *Logger) Close() error {
+	if l == nil {
+		return nil
+	}
+
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	if l.file == nil {
+		return nil
+	}
+
+	// Sync to flush any buffered data to disk before closing.
+	if err := l.file.Sync(); err != nil {
+		return fmt.Errorf("failed to sync log file: %w", err)
+	}
+
+	// Close the file and set to nil for idempotent behavior.
+	// Setting file to nil ensures:
+	// 1. Subsequent Close calls return nil without error
+	// 2. Log method becomes a no-op after Close
+	err := l.file.Close()
+	l.file = nil
+
+	return err
+}

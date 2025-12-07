@@ -862,3 +862,263 @@ func TestLogWithNilLogger(t *testing.T) {
 	logger.Log("test message should not panic")
 	logger.Log("formatted message: %d", 42)
 }
+
+// TestCloseValidLogger verifies that Close returns nil for a valid logger.
+func TestCloseValidLogger(t *testing.T) {
+	tmpDir := t.TempDir()
+	logPath := filepath.Join(tmpDir, testLogFileName)
+
+	logger, err := newLoggerWithPaths(false, []string{logPath})
+	if err != nil {
+		t.Fatalf(errMsgUnexpectedError, err)
+	}
+
+	// Write something to verify sync works
+	logger.Log("test message before close")
+
+	// Close should succeed
+	err = logger.Close()
+	if err != nil {
+		t.Errorf("Close() returned unexpected error: %v", err)
+	}
+
+	// Verify file exists and contains the message
+	//nolint:gosec // G304: test file path from t.TempDir()
+	content, err := os.ReadFile(logPath)
+	if err != nil {
+		t.Fatalf(errMsgLogFileReadFailed, err)
+	}
+
+	if !strings.Contains(string(content), "test message before close") {
+		t.Error("Expected log message to be flushed to file before close")
+	}
+}
+
+// TestCloseIdempotent verifies that calling Close twice is safe and idempotent.
+func TestCloseIdempotent(t *testing.T) {
+	tmpDir := t.TempDir()
+	logPath := filepath.Join(tmpDir, testLogFileName)
+
+	logger, err := newLoggerWithPaths(false, []string{logPath})
+	if err != nil {
+		t.Fatalf(errMsgUnexpectedError, err)
+	}
+
+	// First close should succeed
+	err = logger.Close()
+	if err != nil {
+		t.Errorf("First Close() returned unexpected error: %v", err)
+	}
+
+	// Second close should also succeed (return nil)
+	err = logger.Close()
+	if err != nil {
+		t.Errorf("Second Close() should return nil, got: %v", err)
+	}
+
+	// Third close for good measure
+	err = logger.Close()
+	if err != nil {
+		t.Errorf("Third Close() should return nil, got: %v", err)
+	}
+}
+
+// TestCloseNilLogger verifies that Close is safe when called on nil Logger.
+func TestCloseNilLogger(t *testing.T) {
+	var logger *Logger
+
+	// Verify Close doesn't panic on nil Logger
+	defer func() {
+		if r := recover(); r != nil {
+			t.Errorf("Close panicked on nil Logger: %v", r)
+		}
+	}()
+
+	err := logger.Close()
+	if err != nil {
+		t.Errorf("Close() on nil Logger should return nil, got: %v", err)
+	}
+}
+
+// TestCloseNilFile verifies that Close is safe when file is nil.
+func TestCloseNilFile(t *testing.T) {
+	// Create logger with nil file (zero value)
+	logger := &Logger{}
+
+	err := logger.Close()
+	if err != nil {
+		t.Errorf("Close() with nil file should return nil, got: %v", err)
+	}
+}
+
+// TestCloseFlushesData verifies that Close syncs data before closing.
+func TestCloseFlushesData(t *testing.T) {
+	tmpDir := t.TempDir()
+	logPath := filepath.Join(tmpDir, testLogFileName)
+
+	logger, err := newLoggerWithPaths(false, []string{logPath})
+	if err != nil {
+		t.Fatalf(errMsgUnexpectedError, err)
+	}
+
+	// Write multiple messages
+	messages := []string{
+		"First message to flush",
+		"Second message to flush",
+		"Third message to flush",
+	}
+	for _, msg := range messages {
+		logger.Log("%s", msg)
+	}
+
+	// Close should sync and close
+	err = logger.Close()
+	if err != nil {
+		t.Fatalf("Close() returned unexpected error: %v", err)
+	}
+
+	// Read file and verify all messages are present
+	//nolint:gosec // G304: test file path from t.TempDir()
+	content, err := os.ReadFile(logPath)
+	if err != nil {
+		t.Fatalf(errMsgLogFileReadFailed, err)
+	}
+
+	for _, msg := range messages {
+		if !strings.Contains(string(content), msg) {
+			t.Errorf("Expected message %q to be flushed to file", msg)
+		}
+	}
+}
+
+// TestCloseLogAfterClose verifies that Log becomes a no-op after Close.
+func TestCloseLogAfterClose(t *testing.T) {
+	tmpDir := t.TempDir()
+	logPath := filepath.Join(tmpDir, testLogFileName)
+
+	logger, err := newLoggerWithPaths(false, []string{logPath})
+	if err != nil {
+		t.Fatalf(errMsgUnexpectedError, err)
+	}
+
+	// Write initial message
+	logger.Log("message before close")
+
+	// Close the logger
+	err = logger.Close()
+	if err != nil {
+		t.Fatalf("Close() returned unexpected error: %v", err)
+	}
+
+	// Log after close should not panic and should be a no-op
+	defer func() {
+		if r := recover(); r != nil {
+			t.Errorf("Log after Close panicked: %v", r)
+		}
+	}()
+
+	logger.Log("message after close - should be ignored")
+
+	// Verify only the first message is in the file
+	//nolint:gosec // G304: test file path from t.TempDir()
+	content, err := os.ReadFile(logPath)
+	if err != nil {
+		t.Fatalf(errMsgLogFileReadFailed, err)
+	}
+
+	if !strings.Contains(string(content), "message before close") {
+		t.Error("Expected message before close to be present")
+	}
+
+	if strings.Contains(string(content), "message after close") {
+		t.Error("Message after close should not be written to file")
+	}
+}
+
+// TestCloseConcurrent verifies that concurrent Close calls are thread-safe.
+func TestCloseConcurrent(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	logPath := filepath.Join(tmpDir, testLogFileName)
+
+	logger, err := newLoggerWithPaths(false, []string{logPath})
+	if err != nil {
+		t.Fatalf(errMsgUnexpectedError, err)
+	}
+
+	// Write a message first
+	logger.Log("message before concurrent close")
+
+	const goroutines = 10
+	var wg sync.WaitGroup
+	errors := make(chan error, goroutines)
+
+	// Launch multiple goroutines that all try to close
+	for i := 0; i < goroutines; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if err := logger.Close(); err != nil {
+				errors <- err
+			}
+		}()
+	}
+
+	wg.Wait()
+	close(errors)
+
+	// Check for unexpected errors
+	// At most one goroutine should successfully close, others should get nil
+	for err := range errors {
+		t.Errorf("Unexpected error during concurrent Close: %v", err)
+	}
+}
+
+// TestCloseAndLogConcurrent verifies thread safety with concurrent Log and Close.
+func TestCloseAndLogConcurrent(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	logPath := filepath.Join(tmpDir, testLogFileName)
+
+	logger, err := newLoggerWithPaths(false, []string{logPath})
+	if err != nil {
+		t.Fatalf(errMsgUnexpectedError, err)
+	}
+
+	const goroutines = 20
+	var wg sync.WaitGroup
+
+	// Launch goroutines that log
+	for i := 0; i < goroutines/2; i++ {
+		wg.Add(1)
+		go func(id int) {
+			defer wg.Done()
+			logger.Log("Concurrent log %d", id)
+		}(i)
+	}
+
+	// Launch goroutines that try to close
+	for i := 0; i < goroutines/2; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			// Ignore error - close after close returns nil
+			_ = logger.Close()
+		}()
+	}
+
+	// Test passes if no panic or race condition occurs
+	wg.Wait()
+}
+
+// TestCloseWithZeroValueLogger verifies Close on zero-value Logger.
+func TestCloseWithZeroValueLogger(t *testing.T) {
+	var logger Logger
+
+	err := logger.Close()
+	if err != nil {
+		t.Errorf("Close() on zero-value Logger should return nil, got: %v", err)
+	}
+}
