@@ -14,8 +14,13 @@ const (
 	testSecondLogFile = "second.log"
 )
 
-// Error message constant for newLoggerWithPaths errors.
-const errMsgUnexpectedError = "newLoggerWithPaths() returned unexpected error: %v"
+// Error message constants for test assertions.
+const (
+	errMsgUnexpectedError      = "newLoggerWithPaths() returned unexpected error: %v"
+	errMsgExpectedFileSet      = "Expected logger.file to be set"
+	errMsgExpectedVerboseFalse = "Expected logger.verbose to be false"
+	errMsgExpectedVerboseTrue  = "Expected logger.verbose to be true"
+)
 
 // TestLoggerZeroValue verifies that Logger can be instantiated with zero values.
 // This ensures the struct has no unexported initialization requirements.
@@ -137,10 +142,10 @@ func TestNewLoggerWithPathsFirstPathWritable(t *testing.T) {
 
 	// Verify logger fields
 	if logger.file == nil {
-		t.Error("Expected logger.file to be set")
+		t.Error(errMsgExpectedFileSet)
 	}
 	if logger.verbose {
-		t.Error("Expected logger.verbose to be false")
+		t.Error(errMsgExpectedVerboseFalse)
 	}
 }
 
@@ -183,7 +188,7 @@ func TestNewLoggerWithPathsFallbackToSecondPath(t *testing.T) {
 
 	// Verify verbose flag
 	if !logger.verbose {
-		t.Error("Expected logger.verbose to be true")
+		t.Error(errMsgExpectedVerboseTrue)
 	}
 }
 
@@ -270,7 +275,7 @@ func TestNewLoggerWithPathsVerboseFlagTrue(t *testing.T) {
 	})
 
 	if !logger.verbose {
-		t.Error("Expected logger.verbose to be true")
+		t.Error(errMsgExpectedVerboseTrue)
 	}
 }
 
@@ -291,7 +296,7 @@ func TestNewLoggerWithPathsVerboseFlagFalse(t *testing.T) {
 	})
 
 	if logger.verbose {
-		t.Error("Expected logger.verbose to be false")
+		t.Error(errMsgExpectedVerboseFalse)
 	}
 }
 
@@ -380,7 +385,7 @@ func TestNewLoggerWithPathsSinglePath(t *testing.T) {
 	})
 
 	if logger.file == nil {
-		t.Error("Expected logger.file to be set")
+		t.Error(errMsgExpectedFileSet)
 	}
 
 	if _, err := os.Stat(logPath); os.IsNotExist(err) {
@@ -466,11 +471,11 @@ func TestNewLoggerWithDefaultPaths(t *testing.T) {
 	})
 
 	if logger.file == nil {
-		t.Error("Expected logger.file to be set")
+		t.Error(errMsgExpectedFileSet)
 	}
 
 	if logger.verbose {
-		t.Error("Expected logger.verbose to be false")
+		t.Error(errMsgExpectedVerboseFalse)
 	}
 }
 
@@ -487,10 +492,10 @@ func TestNewLoggerVerboseTrue(t *testing.T) {
 	})
 
 	if logger.file == nil {
-		t.Error("Expected logger.file to be set")
+		t.Error(errMsgExpectedFileSet)
 	}
 
 	if !logger.verbose {
-		t.Error("Expected logger.verbose to be true")
+		t.Error(errMsgExpectedVerboseTrue)
 	}
 }
