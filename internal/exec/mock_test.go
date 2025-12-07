@@ -15,6 +15,9 @@ const (
 	testPermissionDenied = "permission denied"
 	testCommandNotFound  = "command not found"
 	testInputData        = "input data"
+	testArgName          = "--name"
+	testSourceFile       = "source.txt"
+	testDestFile         = "dest.txt"
 )
 
 func TestMockExecutorImplementsInterface(t *testing.T) {
@@ -531,8 +534,8 @@ func TestMakeKey(t *testing.T) {
 		{
 			name:     "command with multiple args",
 			cmdName:  "docker",
-			args:     []string{"run", "-d", "--name", "test", "nginx"},
-			expected: "docker run -d --name test nginx",
+			args:     []string{"run", "-d", testArgName, "test", "nginx"},
+			expected: "docker run -d " + testArgName + " test nginx",
 		},
 	}
 
@@ -589,4 +592,438 @@ func TestMockExecutorOverwriteConfiguration(t *testing.T) {
 
 	assert.NoError(t, err)
 	assert.Equal(t, "second output", output)
+}
+
+func TestMockExecutorCommandCount(t *testing.T) {
+	tests := []struct {
+		name          string
+		commandsToRun [][]string // Each inner slice is [name, args...]
+		expectedCount int
+	}{
+		{
+			name:          "no commands",
+			commandsToRun: nil,
+			expectedCount: 0,
+		},
+		{
+			name:          "single command",
+			commandsToRun: [][]string{{"echo", "hello"}},
+			expectedCount: 1,
+		},
+		{
+			name: "multiple commands",
+			commandsToRun: [][]string{
+				{"echo", "hello"},
+				{"ls", "-la"},
+				{"pwd"},
+			},
+			expectedCount: 3,
+		},
+		{
+			name: "duplicate commands counted separately",
+			commandsToRun: [][]string{
+				{"echo", "hello"},
+				{"echo", "hello"},
+				{"echo", "hello"},
+			},
+			expectedCount: 3,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mock := NewMockExecutor()
+			ctx := t.Context()
+
+			for _, cmdParts := range tt.commandsToRun {
+				name := cmdParts[0]
+				args := cmdParts[1:]
+				require.NoError(t, mock.Run(ctx, name, args...))
+			}
+
+			count := mock.CommandCount()
+			assert.Equal(t, tt.expectedCount, count)
+		})
+	}
+}
+
+func TestMockExecutorCommandCountAfterReset(t *testing.T) {
+	mock := NewMockExecutor()
+	ctx := t.Context()
+
+	// Execute some commands
+	require.NoError(t, mock.Run(ctx, "echo", "hello"))
+	require.NoError(t, mock.Run(ctx, "ls", "-la"))
+
+	assert.Equal(t, 2, mock.CommandCount())
+
+	// Reset and verify count is zero
+	mock.Reset()
+	assert.Equal(t, 0, mock.CommandCount())
+
+	// Execute more commands
+	require.NoError(t, mock.Run(ctx, "pwd"))
+	assert.Equal(t, 1, mock.CommandCount())
+}
+
+func TestMockExecutorWasCalledWith(t *testing.T) {
+	tests := []struct {
+		name          string
+		commandsToRun [][]string // Each inner slice is [name, args...]
+		checkName     string
+		checkArgs     []string
+		expected      bool
+	}{
+		{
+			name:          "exact match with args",
+			commandsToRun: [][]string{{"git", "status"}},
+			checkName:     "git",
+			checkArgs:     []string{"status"},
+			expected:      true,
+		},
+		{
+			name:          "exact match without args",
+			commandsToRun: [][]string{{"pwd"}},
+			checkName:     "pwd",
+			checkArgs:     nil,
+			expected:      true,
+		},
+		{
+			name:          "exact match with multiple args",
+			commandsToRun: [][]string{{"docker", "run", "-d", testArgName, "test", "nginx"}},
+			checkName:     "docker",
+			checkArgs:     []string{"run", "-d", testArgName, "test", "nginx"},
+			expected:      true,
+		},
+		{
+			name:          "command not executed",
+			commandsToRun: [][]string{{"echo", "hello"}},
+			checkName:     "git",
+			checkArgs:     []string{"status"},
+			expected:      false,
+		},
+		{
+			name:          "name matches but args differ",
+			commandsToRun: [][]string{{"git", "status"}},
+			checkName:     "git",
+			checkArgs:     []string{"diff"},
+			expected:      false,
+		},
+		{
+			name:          "no commands executed",
+			commandsToRun: nil,
+			checkName:     "git",
+			checkArgs:     []string{"status"},
+			expected:      false,
+		},
+		{
+			name: "find among multiple commands",
+			commandsToRun: [][]string{
+				{"echo", "hello"},
+				{"git", "status"},
+				{"ls", "-la"},
+			},
+			checkName: "git",
+			checkArgs: []string{"status"},
+			expected:  true,
+		},
+		{
+			name:          "empty args vs no args",
+			commandsToRun: [][]string{{"pwd"}},
+			checkName:     "pwd",
+			checkArgs:     []string{},
+			expected:      true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mock := NewMockExecutor()
+			ctx := t.Context()
+
+			for _, cmdParts := range tt.commandsToRun {
+				name := cmdParts[0]
+				args := cmdParts[1:]
+				require.NoError(t, mock.Run(ctx, name, args...))
+			}
+
+			result := mock.WasCalledWith(tt.checkName, tt.checkArgs...)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestMockExecutorWasCalledWithPartialArgs(t *testing.T) {
+	mock := NewMockExecutor()
+	ctx := t.Context()
+
+	// Execute command with multiple args
+	require.NoError(t, mock.Run(ctx, "docker", "run", "-d", testArgName, "test"))
+
+	// Partial match should return false (fewer args)
+	assert.False(t, mock.WasCalledWith("docker", "run", "-d"))
+
+	// Partial match should return false (more args)
+	assert.False(t, mock.WasCalledWith("docker", "run", "-d", testArgName, "test", "extra"))
+
+	// Name only should return false when command had args
+	assert.False(t, mock.WasCalledWith("docker"))
+
+	// Exact match should return true
+	assert.True(t, mock.WasCalledWith("docker", "run", "-d", testArgName, "test"))
+}
+
+func TestMockExecutorWasCalledWithDifferentOrder(t *testing.T) {
+	mock := NewMockExecutor()
+	ctx := t.Context()
+
+	require.NoError(t, mock.Run(ctx, "cp", testSourceFile, testDestFile))
+
+	// Same args but different order should return false
+	assert.False(t, mock.WasCalledWith("cp", testDestFile, testSourceFile))
+
+	// Correct order should return true
+	assert.True(t, mock.WasCalledWith("cp", testSourceFile, testDestFile))
+}
+
+func TestMockExecutorWasCalledWithIgnoresStdin(t *testing.T) {
+	mock := NewMockExecutor()
+	ctx := t.Context()
+
+	// Run commands with same name+args but different stdin values
+	require.NoError(t, mock.RunWithStdin(ctx, "first stdin content", "cat", "-n"))
+	require.NoError(t, mock.RunWithStdin(ctx, "completely different stdin", "cat", "-n"))
+
+	// WasCalledWith should match on name + args only, ignoring stdin
+	// Both commands have same name and args, so this should return true
+	assert.True(t, mock.WasCalledWith("cat", "-n"))
+
+	// Verify both commands were recorded with their respective stdin values
+	commands := mock.Commands()
+	require.Len(t, commands, 2)
+	assert.Equal(t, "first stdin content", commands[0].Stdin)
+	assert.Equal(t, "completely different stdin", commands[1].Stdin)
+
+	// Verify that WasCalledWith still works for command without stdin
+	require.NoError(t, mock.Run(ctx, "echo", "hello"))
+	assert.True(t, mock.WasCalledWith("echo", "hello"))
+}
+
+func TestMockExecutorLastCommand(t *testing.T) {
+	tests := []struct {
+		name          string
+		commandsToRun [][]string // Each inner slice is [name, args...]
+		expectedName  string
+		expectedArgs  []string
+	}{
+		{
+			name:          "single command",
+			commandsToRun: [][]string{{"echo", "hello"}},
+			expectedName:  "echo",
+			expectedArgs:  []string{"hello"},
+		},
+		{
+			name: "multiple commands returns last",
+			commandsToRun: [][]string{
+				{"echo", "first"},
+				{"ls", "-la"},
+				{"git", "push", "origin", "main"},
+			},
+			expectedName: "git",
+			expectedArgs: []string{"push", "origin", "main"},
+		},
+		{
+			name:          "command without args",
+			commandsToRun: [][]string{{"pwd"}},
+			expectedName:  "pwd",
+			expectedArgs:  []string{}, // variadic args become empty slice, not nil
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mock := NewMockExecutor()
+			ctx := t.Context()
+
+			for _, cmdParts := range tt.commandsToRun {
+				name := cmdParts[0]
+				args := cmdParts[1:]
+				require.NoError(t, mock.Run(ctx, name, args...))
+			}
+
+			last := mock.LastCommand()
+			require.NotNil(t, last)
+			assert.Equal(t, tt.expectedName, last.Name)
+			assert.Equal(t, tt.expectedArgs, last.Args)
+		})
+	}
+}
+
+func TestMockExecutorLastCommandEmpty(t *testing.T) {
+	mock := NewMockExecutor()
+
+	last := mock.LastCommand()
+
+	assert.Nil(t, last)
+}
+
+func TestMockExecutorLastCommandAfterReset(t *testing.T) {
+	mock := NewMockExecutor()
+	ctx := t.Context()
+
+	require.NoError(t, mock.Run(ctx, "echo", "hello"))
+	require.NotNil(t, mock.LastCommand())
+
+	mock.Reset()
+
+	assert.Nil(t, mock.LastCommand())
+}
+
+func TestMockExecutorLastCommandReturnsCopy(t *testing.T) {
+	mock := NewMockExecutor()
+	ctx := t.Context()
+
+	require.NoError(t, mock.Run(ctx, "echo", "hello", "world"))
+
+	// Get last command and modify it
+	last := mock.LastCommand()
+	last.Name = "modified"
+	last.Args[0] = "modified-arg"
+
+	// Get last command again and verify original is unchanged
+	lastAgain := mock.LastCommand()
+	assert.Equal(t, "echo", lastAgain.Name, "Name should be unchanged")
+	assert.Equal(t, []string{"hello", "world"}, lastAgain.Args, "Args should be unchanged")
+}
+
+func TestMockExecutorLastCommandWithStdin(t *testing.T) {
+	mock := NewMockExecutor()
+	ctx := t.Context()
+
+	require.NoError(t, mock.RunWithStdin(ctx, testInputData, "cat"))
+
+	last := mock.LastCommand()
+	require.NotNil(t, last)
+	assert.Equal(t, "cat", last.Name)
+	assert.Empty(t, last.Args)
+	assert.Equal(t, testInputData, last.Stdin)
+}
+
+func TestArgsEqual(t *testing.T) {
+	tests := []struct {
+		name     string
+		a        []string
+		b        []string
+		expected bool
+	}{
+		{
+			name:     "both nil",
+			a:        nil,
+			b:        nil,
+			expected: true,
+		},
+		{
+			name:     "both empty",
+			a:        []string{},
+			b:        []string{},
+			expected: true,
+		},
+		{
+			name:     "nil and empty are equal",
+			a:        nil,
+			b:        []string{},
+			expected: true,
+		},
+		{
+			name:     "equal single element",
+			a:        []string{"hello"},
+			b:        []string{"hello"},
+			expected: true,
+		},
+		{
+			name:     "equal multiple elements",
+			a:        []string{"one", "two", "three"},
+			b:        []string{"one", "two", "three"},
+			expected: true,
+		},
+		{
+			name:     "different length",
+			a:        []string{"one", "two"},
+			b:        []string{"one"},
+			expected: false,
+		},
+		{
+			name:     "same length different content",
+			a:        []string{"one", "two"},
+			b:        []string{"one", "three"},
+			expected: false,
+		},
+		{
+			name:     "same content different order",
+			a:        []string{"one", "two"},
+			b:        []string{"two", "one"},
+			expected: false,
+		},
+		{
+			name:     "one nil one populated",
+			a:        nil,
+			b:        []string{"hello"},
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := argsEqual(tt.a, tt.b)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestMockExecutorHelperMethodsThreadSafety(t *testing.T) {
+	mock := NewMockExecutor()
+	ctx := t.Context()
+	const numGoroutines = 100
+
+	var wg sync.WaitGroup
+	wg.Add(numGoroutines * 4)
+
+	// Concurrent Run calls
+	for i := 0; i < numGoroutines; i++ {
+		go func() {
+			defer wg.Done()
+			_ = mock.Run(ctx, "echo", "hello") //nolint:errcheck // error irrelevant in concurrent stress test
+		}()
+	}
+
+	// Concurrent CommandCount calls
+	for i := 0; i < numGoroutines; i++ {
+		go func() {
+			defer wg.Done()
+			_ = mock.CommandCount()
+		}()
+	}
+
+	// Concurrent WasCalledWith calls
+	for i := 0; i < numGoroutines; i++ {
+		go func() {
+			defer wg.Done()
+			_ = mock.WasCalledWith("echo", "hello")
+		}()
+	}
+
+	// Concurrent LastCommand calls
+	for i := 0; i < numGoroutines; i++ {
+		go func() {
+			defer wg.Done()
+			_ = mock.LastCommand()
+		}()
+	}
+
+	wg.Wait()
+
+	// Verify state is consistent
+	assert.Equal(t, numGoroutines, mock.CommandCount())
+	assert.True(t, mock.WasCalledWith("echo", "hello"))
+	assert.NotNil(t, mock.LastCommand())
 }
