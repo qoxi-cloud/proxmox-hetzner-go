@@ -26,6 +26,7 @@ func ExampleNewLoggerWithPath() {
 		fmt.Println(msgFailedCreateTempDir)
 		return
 	}
+	//nolint:errcheck // Cleanup errors are intentionally ignored in examples.
 	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	logPath := filepath.Join(tmpDir, exampleLogFileName)
@@ -36,6 +37,7 @@ func ExampleNewLoggerWithPath() {
 		fmt.Println(msgFailedCreateLogger)
 		return
 	}
+	//nolint:errcheck // Cleanup errors are intentionally ignored in examples.
 	defer func() { _ = logger.Close() }()
 
 	// Write log messages
@@ -59,6 +61,7 @@ func ExampleLogger_Log() {
 		fmt.Println(msgFailedCreateTempDir)
 		return
 	}
+	//nolint:errcheck // Cleanup errors are intentionally ignored in examples.
 	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	logPath := filepath.Join(tmpDir, exampleLogFileName)
@@ -68,6 +71,7 @@ func ExampleLogger_Log() {
 		fmt.Println(msgFailedCreateLogger)
 		return
 	}
+	//nolint:errcheck // Cleanup errors are intentionally ignored in examples.
 	defer func() { _ = logger.Close() }()
 
 	// Log simple messages
@@ -92,6 +96,7 @@ func ExampleLogger_Close() {
 		fmt.Println(msgFailedCreateTempDir)
 		return
 	}
+	//nolint:errcheck // Cleanup errors are intentionally ignored in examples.
 	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	logPath := filepath.Join(tmpDir, exampleLogFileName)
@@ -135,6 +140,7 @@ func ExampleLogger_LogPath() {
 		fmt.Println(msgFailedCreateTempDir)
 		return
 	}
+	//nolint:errcheck // Cleanup errors are intentionally ignored in examples.
 	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	logPath := filepath.Join(tmpDir, exampleLogFileName)
@@ -144,6 +150,7 @@ func ExampleLogger_LogPath() {
 		fmt.Println(msgFailedCreateLogger)
 		return
 	}
+	//nolint:errcheck // Cleanup errors are intentionally ignored in examples.
 	defer func() { _ = logger.Close() }()
 
 	// Get the current log path
