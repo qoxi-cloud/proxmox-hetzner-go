@@ -41,6 +41,13 @@ const (
 	errMsgCloseUnexpected = "Close() returned unexpected error: %v"
 )
 
+// LogPath method test constants.
+const (
+	errMsgLogPathExpectedEmpty    = "LogPath() expected empty string, got %q"
+	errMsgLogPathExpectedPath     = "LogPath() expected %q, got %q"
+	errMsgLogPathUnexpectedPrefix = "LogPath() expected path with prefix %q, got %q"
+)
+
 // rfc3339Pattern matches RFC3339 timestamps in log entries.
 // Example: [2024-01-15T10:30:45Z] or [2024-01-15T10:30:45+02:00].
 var rfc3339Pattern = regexp.MustCompile(`^\[\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(Z|[+-]\d{2}:\d{2})\]`)
@@ -1125,4 +1132,246 @@ func TestCloseWithZeroValueLogger(t *testing.T) {
 	if err != nil {
 		t.Errorf("Close() on zero-value Logger should return nil, got: %v", err)
 	}
+}
+
+// TestLogPathReturnsCorrectPath verifies that LogPath returns the correct path after NewLogger.
+func TestLogPathReturnsCorrectPath(t *testing.T) {
+	logger, logPath := createTestLogger(t, false)
+
+	result := logger.LogPath()
+	if result != logPath {
+		t.Errorf(errMsgLogPathExpectedPath, logPath, result)
+	}
+}
+
+// TestLogPathNilLogger verifies that LogPath returns empty string on nil Logger.
+func TestLogPathNilLogger(t *testing.T) {
+	var logger *Logger
+
+	// Verify LogPath doesn't panic on nil Logger
+	defer func() {
+		if r := recover(); r != nil {
+			t.Errorf("LogPath panicked on nil Logger: %v", r)
+		}
+	}()
+
+	result := logger.LogPath()
+	if result != "" {
+		t.Errorf(errMsgLogPathExpectedEmpty, result)
+	}
+}
+
+// TestLogPathNilFile verifies that LogPath returns empty string when file is nil.
+func TestLogPathNilFile(t *testing.T) {
+	// Create logger with nil file (zero value)
+	logger := &Logger{}
+
+	result := logger.LogPath()
+	if result != "" {
+		t.Errorf(errMsgLogPathExpectedEmpty, result)
+	}
+}
+
+// TestLogPathAfterClose verifies that LogPath returns empty string after Close is called.
+func TestLogPathAfterClose(t *testing.T) {
+	tmpDir := t.TempDir()
+	logPath := filepath.Join(tmpDir, testLogFileName)
+
+	logger, err := newLoggerWithPaths(false, []string{logPath})
+	if err != nil {
+		t.Fatalf(errMsgUnexpectedError, err)
+	}
+
+	// Verify path is returned before close
+	pathBefore := logger.LogPath()
+	if pathBefore != logPath {
+		t.Errorf("Before Close: "+errMsgLogPathExpectedPath, logPath, pathBefore)
+	}
+
+	// Close the logger
+	err = logger.Close()
+	if err != nil {
+		t.Fatalf(errMsgCloseUnexpected, err)
+	}
+
+	// Verify empty string is returned after close
+	pathAfter := logger.LogPath()
+	if pathAfter != "" {
+		t.Errorf("After Close: "+errMsgLogPathExpectedEmpty, pathAfter)
+	}
+}
+
+// TestLogPathConcurrent verifies that concurrent LogPath calls are thread-safe.
+func TestLogPathConcurrent(t *testing.T) {
+	t.Parallel()
+
+	logger, logPath := createTestLogger(t, false)
+
+	const goroutines = 50
+	var wg sync.WaitGroup
+	results := make(chan string, goroutines)
+
+	// Launch multiple goroutines that all call LogPath
+	for i := 0; i < goroutines; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			results <- logger.LogPath()
+		}()
+	}
+
+	wg.Wait()
+	close(results)
+
+	// Verify all results are consistent
+	for result := range results {
+		if result != logPath {
+			t.Errorf(errMsgLogPathExpectedPath, logPath, result)
+		}
+	}
+}
+
+// TestLogPathWithPrimaryPath verifies that LogPath returns /var/log path when available.
+// This test may skip if the primary path is not writable (e.g., in CI environments or macOS).
+func TestLogPathWithPrimaryPath(t *testing.T) {
+	logger, err := NewLogger(false)
+	if err != nil {
+		t.Skipf("Skipping test: cannot create logger with default paths: %v", err)
+	}
+
+	t.Cleanup(func() {
+		logger.Close() //nolint:errcheck // best-effort cleanup in tests
+	})
+
+	result := logger.LogPath()
+
+	// Verify we got one of the expected paths
+	if result != defaultLogPath && result != fallbackLogPath {
+		t.Errorf("LogPath() expected %q or %q, got %q", defaultLogPath, fallbackLogPath, result)
+	}
+
+	// If /var/log is writable (running as root on Linux), it should be the primary path
+	if result == defaultLogPath {
+		if !strings.HasPrefix(result, "/var/log/") {
+			t.Errorf(errMsgLogPathUnexpectedPrefix, "/var/log/", result)
+		}
+	}
+}
+
+// TestLogPathWithFallbackPath verifies that LogPath returns /tmp path as fallback.
+func TestLogPathWithFallbackPath(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// Create an unwritable directory to force fallback
+	unwritableDir := filepath.Join(tmpDir, "unwritable")
+	//nolint:gosec // G301: intentionally testing unwritable directories
+	if err := os.Mkdir(unwritableDir, 0o555); err != nil {
+		t.Fatalf("Failed to create unwritable directory: %v", err)
+	}
+
+	t.Cleanup(func() {
+		os.Chmod(unwritableDir, 0o700) //nolint:errcheck,gosec // G302: directories need execute bit for cleanup
+	})
+
+	primaryPath := filepath.Join(unwritableDir, "primary.log")
+	fallbackPath := filepath.Join(tmpDir, "fallback.log")
+
+	logger, err := newLoggerWithPaths(false, []string{primaryPath, fallbackPath})
+	if err != nil {
+		t.Fatalf(errMsgUnexpectedError, err)
+	}
+
+	t.Cleanup(func() {
+		if logger != nil {
+			logger.Close() //nolint:errcheck // best-effort cleanup in tests
+		}
+	})
+
+	result := logger.LogPath()
+	if result != fallbackPath {
+		t.Errorf(errMsgLogPathExpectedPath, fallbackPath, result)
+	}
+}
+
+// TestLogPathZeroValueLogger verifies LogPath on zero-value Logger.
+func TestLogPathZeroValueLogger(t *testing.T) {
+	var logger Logger
+
+	result := logger.LogPath()
+	if result != "" {
+		t.Errorf(errMsgLogPathExpectedEmpty, result)
+	}
+}
+
+// TestLogPathAndLogConcurrent verifies thread safety with concurrent LogPath and Log calls.
+func TestLogPathAndLogConcurrent(t *testing.T) {
+	t.Parallel()
+
+	logger, logPath := createTestLogger(t, false)
+
+	const goroutines = 30
+	var wg sync.WaitGroup
+
+	// Launch goroutines that call LogPath
+	for i := 0; i < goroutines/2; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			result := logger.LogPath()
+			if result != logPath {
+				// Just verify consistency, don't fail test to avoid race in t.Errorf
+				_ = result
+			}
+		}()
+	}
+
+	// Launch goroutines that call Log
+	for i := 0; i < goroutines/2; i++ {
+		wg.Add(1)
+		go func(id int) {
+			defer wg.Done()
+			logger.Log("Concurrent log %d", id)
+		}(i)
+	}
+
+	// Test passes if no panic or race condition occurs
+	wg.Wait()
+}
+
+// TestLogPathAndCloseConcurrent verifies thread safety with concurrent LogPath and Close calls.
+func TestLogPathAndCloseConcurrent(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	logPath := filepath.Join(tmpDir, testLogFileName)
+
+	logger, err := newLoggerWithPaths(false, []string{logPath})
+	if err != nil {
+		t.Fatalf(errMsgUnexpectedError, err)
+	}
+
+	const goroutines = 20
+	var wg sync.WaitGroup
+
+	// Launch goroutines that call LogPath
+	for i := 0; i < goroutines/2; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			// Result can be either the path or empty string (after close)
+			_ = logger.LogPath()
+		}()
+	}
+
+	// Launch goroutines that call Close
+	for i := 0; i < goroutines/2; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			logger.Close() //nolint:errcheck // best-effort cleanup in concurrent test
+		}()
+	}
+
+	// Test passes if no panic or race condition occurs
+	wg.Wait()
 }

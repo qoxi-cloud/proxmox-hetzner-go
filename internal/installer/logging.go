@@ -199,3 +199,25 @@ func (l *Logger) Close() error {
 
 	return nil
 }
+
+// LogPath returns the path to the current log file.
+//
+// This is useful for displaying the log location to users in the TUI or CLI,
+// allowing them to know where logs are being written during installation.
+//
+// LogPath is safe for concurrent use. It returns an empty string if the Logger
+// is nil or if the underlying file has not been initialized or has been closed.
+func (l *Logger) LogPath() string {
+	if l == nil {
+		return ""
+	}
+
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	if l.file == nil {
+		return ""
+	}
+
+	return l.file.Name()
+}
