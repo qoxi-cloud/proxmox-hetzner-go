@@ -746,7 +746,6 @@ Configuration is in a separate file: `.mcp.json`
 
 | MCP Server | Description |
 |------------|-------------|
-| **filesystem** | Secure file operations |
 | **memory** | Persistent memory between sessions |
 
 ### 🔍 Code & Documentation
@@ -875,7 +874,6 @@ mcp__sonarcloud__show_rule(key: "go:S1192")
 | Parse PRD to tasks | task-master-ai |
 | Get next task | task-master-ai |
 | Update task status | task-master-ai |
-| Read/write code | filesystem |
 | Search documentation | fetch, context7 |
 | Complex tasks | sequential-thinking |
 | Save context | memory |

@@ -1,3 +1,5 @@
+//go:build !windows
+
 package exec
 
 import (
@@ -11,10 +13,7 @@ import (
 )
 
 func TestRealExecutorImplementsInterface(t *testing.T) {
-	// Compile-time assertion
-	var _ Executor = (*RealExecutor)(nil)
-
-	// Runtime verification
+	// Runtime verification (compile-time assertion is in command.go)
 	executor := NewRealExecutor()
 	assert.NotNil(t, executor)
 	assert.Zero(t, executor.Timeout)
@@ -93,15 +92,21 @@ func TestRealExecutorTimeout(t *testing.T) {
 	// Create executor with 100ms timeout
 	executor := NewRealExecutorWithTimeout(100 * time.Millisecond)
 
-	// Sleep for longer than timeout
+	start := time.Now()
 	err := executor.Run(t.Context(), "sleep", "5")
+	elapsed := time.Since(start)
+
 	require.Error(t, err)
 
-	// Check that error indicates process was killed/signaled
+	// Primary check: command was killed before sleep duration
+	assert.Less(t, elapsed, 5*time.Second,
+		"expected command to time out before sleep duration; elapsed=%s, err=%v", elapsed, err)
+
+	// Secondary check: error indicates process was killed/signaled
 	assert.True(t,
 		strings.Contains(err.Error(), "killed") ||
 			strings.Contains(err.Error(), "signal"),
-		"expected timeout error, got: %v", err)
+		"expected timeout-related error, got: %v", err)
 }
 
 func TestRealExecutorContextCancellation(t *testing.T) {

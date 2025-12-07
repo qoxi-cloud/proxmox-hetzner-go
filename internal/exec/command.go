@@ -31,6 +31,11 @@ type Executor interface {
 }
 
 // RealExecutor executes actual system commands using os/exec.
+//
+// Security note: RealExecutor intentionally accepts dynamic command names and arguments.
+// This is by design as it serves as the production implementation of the Executor interface.
+// Callers are responsible for validating and sanitizing command inputs before invoking
+// the executor methods. Use MockExecutor for testing to avoid executing real commands.
 type RealExecutor struct {
 	// Timeout is the default timeout for command execution.
 	// If zero, commands run with the context's deadline only.
@@ -59,7 +64,9 @@ func (e *RealExecutor) applyTimeout(ctx context.Context) (context.Context, conte
 		return context.WithTimeout(ctx, e.Timeout)
 	}
 
-	return ctx, func() {}
+	return ctx, func() {
+		// no-op cancel: safe to call even when no timeout is configured
+	}
 }
 
 // Run executes a command and returns an error if it fails.
