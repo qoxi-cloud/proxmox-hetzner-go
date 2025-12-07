@@ -120,19 +120,35 @@ func newLoggerWithPaths(verbose bool, paths []string) (*Logger, error) {
 //	[2024-01-15T10:30:45Z] Installation started
 //	[2024-01-15T10:30:46Z] Detected network interface: eth0
 //
-// Log is safe for concurrent use. Errors from writing to the file are
-// intentionally ignored to avoid interrupting the installation process.
+// Log is safe for concurrent use. It is a no-op if the Logger is nil or
+// if the underlying file has not been initialized. Errors from writing
+// to the file are intentionally ignored to avoid interrupting the
+// installation process.
+//
+//nolint:goprintffuncname // Log is the intended API name per project spec
 func (l *Logger) Log(format string, args ...interface{}) {
+	if l == nil {
+		return
+	}
+
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
-	timestamp := time.Now().Format(time.RFC3339)
+	if l.file == nil {
+		return
+	}
+
+	timestamp := time.Now().UTC().Format(time.RFC3339)
 	msg := fmt.Sprintf(format, args...)
 	line := fmt.Sprintf("[%s] %s\n", timestamp, msg)
 
 	// Write to file - errors are intentionally ignored as logging
-	// should not interrupt the installation process
-	_, _ = l.file.WriteString(line)
+	// should not interrupt the installation process.
+	if _, err := l.file.WriteString(line); err != nil {
+		// Intentionally ignored: logging failures should not
+		// interrupt the installation process.
+		_ = err
+	}
 
 	if l.verbose {
 		fmt.Print(line)

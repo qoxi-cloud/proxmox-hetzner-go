@@ -15,6 +15,7 @@ import (
 const (
 	testFirstLogFile  = "first.log"
 	testSecondLogFile = "second.log"
+	testLogFileName   = "test.log"
 )
 
 // Error message constants for test assertions.
@@ -30,12 +31,13 @@ const (
 	errMsgLogFileReadFailed   = "Failed to read log file: %v"
 	errMsgTimestampNotMatched = "Log entry does not contain valid RFC3339 timestamp"
 	errMsgMessageNotFound     = "Expected message %q not found in log content"
+	errMsgSyncLogFileFailed   = "Failed to sync log file: %v"
 	testLogMessage            = "Test log message"
 	testFormatMessage         = "Value: %d, Name: %s"
 )
 
 // rfc3339Pattern matches RFC3339 timestamps in log entries.
-// Example: [2024-01-15T10:30:45Z] or [2024-01-15T10:30:45+02:00]
+// Example: [2024-01-15T10:30:45Z] or [2024-01-15T10:30:45+02:00].
 var rfc3339Pattern = regexp.MustCompile(`^\[\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(Z|[+-]\d{2}:\d{2})\]`)
 
 // TestLoggerZeroValue verifies that Logger can be instantiated with zero values.
@@ -58,6 +60,9 @@ func TestLoggerZeroValue(t *testing.T) {
 		logger.mu.Lock()
 		defer logger.mu.Unlock()
 	}()
+
+	// Verify Log is a no-op and doesn't panic when file is nil
+	logger.Log("test message should not panic")
 }
 
 // TestLoggerStructFields verifies that Logger struct fields can be set directly.
@@ -277,7 +282,7 @@ func TestNewLoggerWithPathsEmptyPaths(t *testing.T) {
 // TestNewLoggerWithPathsVerboseFlagTrue verifies verbose flag is set correctly when true.
 func TestNewLoggerWithPathsVerboseFlagTrue(t *testing.T) {
 	tmpDir := t.TempDir()
-	logPath := filepath.Join(tmpDir, "test.log")
+	logPath := filepath.Join(tmpDir, testLogFileName)
 
 	logger, err := newLoggerWithPaths(true, []string{logPath})
 	if err != nil {
@@ -298,7 +303,7 @@ func TestNewLoggerWithPathsVerboseFlagTrue(t *testing.T) {
 // TestNewLoggerWithPathsVerboseFlagFalse verifies verbose flag is set correctly when false.
 func TestNewLoggerWithPathsVerboseFlagFalse(t *testing.T) {
 	tmpDir := t.TempDir()
-	logPath := filepath.Join(tmpDir, "test.log")
+	logPath := filepath.Join(tmpDir, testLogFileName)
 
 	logger, err := newLoggerWithPaths(false, []string{logPath})
 	if err != nil {
@@ -519,7 +524,7 @@ func TestNewLoggerVerboseTrue(t *testing.T) {
 // TestLogWritesToFile verifies that Log writes messages to the log file.
 func TestLogWritesToFile(t *testing.T) {
 	tmpDir := t.TempDir()
-	logPath := filepath.Join(tmpDir, "test.log")
+	logPath := filepath.Join(tmpDir, testLogFileName)
 
 	logger, err := newLoggerWithPaths(false, []string{logPath})
 	if err != nil {
@@ -536,7 +541,7 @@ func TestLogWritesToFile(t *testing.T) {
 
 	// Sync file to ensure content is flushed
 	if err := logger.file.Sync(); err != nil {
-		t.Fatalf("Failed to sync log file: %v", err)
+		t.Fatalf(errMsgSyncLogFileFailed, err)
 	}
 
 	//nolint:gosec // G304: test file path from t.TempDir()
@@ -572,7 +577,7 @@ func TestLogTimestampFormat(t *testing.T) {
 
 	// Sync file to ensure content is flushed
 	if err := logger.file.Sync(); err != nil {
-		t.Fatalf("Failed to sync log file: %v", err)
+		t.Fatalf(errMsgSyncLogFileFailed, err)
 	}
 
 	//nolint:gosec // G304: test file path from t.TempDir()
@@ -625,7 +630,7 @@ func TestLogWithFormatArgs(t *testing.T) {
 
 	// Sync file to ensure content is flushed
 	if err := logger.file.Sync(); err != nil {
-		t.Fatalf("Failed to sync log file: %v", err)
+		t.Fatalf(errMsgSyncLogFileFailed, err)
 	}
 
 	//nolint:gosec // G304: test file path from t.TempDir()
@@ -668,7 +673,7 @@ func TestLogVerboseModeWritesToStdout(t *testing.T) {
 	logger.Log(testLogMessage)
 
 	// Close writer and restore stdout
-	w.Close()
+	w.Close() //nolint:errcheck // best-effort cleanup in tests
 	os.Stdout = oldStdout
 
 	// Read captured output
@@ -718,7 +723,7 @@ func TestLogNonVerboseModeNoStdout(t *testing.T) {
 	logger.Log(testLogMessage)
 
 	// Close writer and restore stdout
-	w.Close()
+	w.Close() //nolint:errcheck // best-effort cleanup in tests
 	os.Stdout = oldStdout
 
 	// Read captured output
@@ -730,7 +735,7 @@ func TestLogNonVerboseModeNoStdout(t *testing.T) {
 	capturedOutput := buf.String()
 
 	// Verify nothing was written to stdout
-	if len(capturedOutput) > 0 {
+	if capturedOutput != "" {
 		t.Errorf("Expected no stdout output in non-verbose mode, got %q", capturedOutput)
 	}
 }
@@ -769,7 +774,7 @@ func TestLogConcurrentCalls(t *testing.T) {
 
 	// Sync file to ensure content is flushed
 	if err := logger.file.Sync(); err != nil {
-		t.Fatalf("Failed to sync log file: %v", err)
+		t.Fatalf(errMsgSyncLogFileFailed, err)
 	}
 
 	//nolint:gosec // G304: test file path from t.TempDir()
@@ -832,7 +837,7 @@ func TestLogMultipleMessages(t *testing.T) {
 
 	// Sync file to ensure content is flushed
 	if err := logger.file.Sync(); err != nil {
-		t.Fatalf("Failed to sync log file: %v", err)
+		t.Fatalf(errMsgSyncLogFileFailed, err)
 	}
 
 	//nolint:gosec // G304: test file path from t.TempDir()
@@ -875,7 +880,7 @@ func TestLogEmptyMessage(t *testing.T) {
 
 	// Sync file to ensure content is flushed
 	if err := logger.file.Sync(); err != nil {
-		t.Fatalf("Failed to sync log file: %v", err)
+		t.Fatalf(errMsgSyncLogFileFailed, err)
 	}
 
 	//nolint:gosec // G304: test file path from t.TempDir()
@@ -928,7 +933,7 @@ func TestLogSpecialCharacters(t *testing.T) {
 
 	// Sync file to ensure content is flushed
 	if err := logger.file.Sync(); err != nil {
-		t.Fatalf("Failed to sync log file: %v", err)
+		t.Fatalf(errMsgSyncLogFileFailed, err)
 	}
 
 	//nolint:gosec // G304: test file path from t.TempDir()
@@ -965,7 +970,7 @@ func TestLogLineFormat(t *testing.T) {
 
 	// Sync file to ensure content is flushed
 	if err := logger.file.Sync(); err != nil {
-		t.Fatalf("Failed to sync log file: %v", err)
+		t.Fatalf(errMsgSyncLogFileFailed, err)
 	}
 
 	//nolint:gosec // G304: test file path from t.TempDir()
@@ -984,4 +989,20 @@ func TestLogLineFormat(t *testing.T) {
 		t.Errorf("Log line does not match expected format.\nExpected pattern: [TIMESTAMP] %s\\n\nGot: %q",
 			testMsg, string(content))
 	}
+}
+
+// TestLogWithNilLogger verifies that Log is a no-op when called on nil Logger.
+func TestLogWithNilLogger(t *testing.T) {
+	var logger *Logger
+
+	// Verify Log doesn't panic when called on nil Logger
+	// Test passes if no panic occurs
+	defer func() {
+		if r := recover(); r != nil {
+			t.Errorf("Log panicked on nil Logger: %v", r)
+		}
+	}()
+
+	logger.Log("test message should not panic")
+	logger.Log("formatted message: %d", 42)
 }
