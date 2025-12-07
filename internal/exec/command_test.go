@@ -142,10 +142,11 @@ func TestExecutedCommandStringImplementsStringer(t *testing.T) {
 		Args: []string{"test", "./..."},
 	}
 
-	formatted := cmd.String()
+	//nolint:gocritic,gosimple // intentionally testing fmt.Stringer interface integration via fmt package
+	formatted := fmt.Sprintf("%s", cmd)
 	expected := "go test ./..."
 
 	if formatted != expected {
-		t.Errorf("cmd.String() = %q, want %q", formatted, expected)
+		t.Errorf("fmt.Sprintf(\"%%s\", cmd) = %q, want %q", formatted, expected)
 	}
 }
