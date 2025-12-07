@@ -168,7 +168,7 @@ func TestNewLoggerWithPathsFallbackToSecondPath(t *testing.T) {
 			logger.file.Close() //nolint:errcheck // best-effort cleanup in tests
 		}
 		// Restore permissions for cleanup
-		os.Chmod(unwritableDir, 0o755) //nolint:errcheck,gosec // best-effort cleanup in tests
+		os.Chmod(unwritableDir, 0o700) //nolint:errcheck // best-effort cleanup in tests
 	})
 
 	// Verify first path was NOT created (not writable)
@@ -205,8 +205,8 @@ func TestNewLoggerWithPathsAllPathsUnwritable(t *testing.T) {
 	}
 
 	t.Cleanup(func() {
-		os.Chmod(unwritableDir1, 0o755) //nolint:errcheck,gosec // best-effort cleanup in tests
-		os.Chmod(unwritableDir2, 0o755) //nolint:errcheck,gosec // best-effort cleanup in tests
+		os.Chmod(unwritableDir1, 0o700) //nolint:errcheck // best-effort cleanup in tests
+		os.Chmod(unwritableDir2, 0o700) //nolint:errcheck // best-effort cleanup in tests
 	})
 
 	firstPath := filepath.Join(unwritableDir1, testFirstLogFile)
@@ -406,7 +406,7 @@ func TestNewLoggerWithPathsMultipleFallbacks(t *testing.T) {
 
 	t.Cleanup(func() {
 		for _, dir := range []string{unwritable1, unwritable2, unwritable3} {
-			os.Chmod(dir, 0o755) //nolint:errcheck,gosec // best-effort cleanup in tests
+			os.Chmod(dir, 0o700) //nolint:errcheck // best-effort cleanup in tests
 		}
 	})
 
