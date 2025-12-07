@@ -27,10 +27,45 @@ import (
 //
 //	logger.Log("Log file: %s", logger.LogPath())
 
-// Test message constants.
+// Test message and error constants to avoid string literal duplication.
+// These constants are used across multiple test functions.
 const (
 	testIntegrationMessage = "Integration test message"
+
+	// Error format strings used in t.Fatalf calls.
+	errNewLoggerWithPath = "NewLoggerWithPath() returned unexpected error: %v"
+	errCreatePipe        = "Failed to create pipe: %v"
+	errReadPipe          = "Failed to read from pipe: %v"
+	errReadLogFile       = "Failed to read log file: %v"
 )
+
+// captureStdout captures stdout output during the execution of the provided function.
+// It returns the captured output as a string. This helper reduces code duplication
+// in tests that need to verify verbose logging output.
+func captureStdout(t *testing.T, fn func()) string {
+	t.Helper()
+
+	oldStdout := os.Stdout
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatalf(errCreatePipe, err)
+	}
+
+	os.Stdout = w
+
+	fn()
+
+	//nolint:errcheck // best-effort in tests - pipe close for capture
+	w.Close()
+	os.Stdout = oldStdout
+
+	var buf bytes.Buffer
+	if _, err := buf.ReadFrom(r); err != nil {
+		t.Fatalf(errReadPipe, err)
+	}
+
+	return buf.String()
+}
 
 // TestLoggerWithConfigVerboseTrue verifies that Logger produces stdout output
 // when created with Config.Verbose=true.
@@ -49,7 +84,7 @@ func TestLoggerWithConfigVerboseTrue(t *testing.T) {
 
 	logger, err := installer.NewLoggerWithPath(logPath, cfg.Verbose)
 	if err != nil {
-		t.Fatalf("NewLoggerWithPath() returned unexpected error: %v", err)
+		t.Fatalf(errNewLoggerWithPath, err)
 	}
 
 	t.Cleanup(func() {
@@ -57,30 +92,10 @@ func TestLoggerWithConfigVerboseTrue(t *testing.T) {
 		logger.Close()
 	})
 
-	// Capture stdout to verify verbose output
-	oldStdout := os.Stdout
-	r, w, err := os.Pipe()
-	if err != nil {
-		t.Fatalf("Failed to create pipe: %v", err)
-	}
-
-	os.Stdout = w
-
-	// Log a message - with Verbose=true, this should appear on stdout
-	logger.Log(testIntegrationMessage)
-
-	// Close writer and restore stdout
-	//nolint:errcheck // best-effort in tests
-	w.Close()
-	os.Stdout = oldStdout
-
-	// Read captured output
-	var buf bytes.Buffer
-	if _, err := buf.ReadFrom(r); err != nil {
-		t.Fatalf("Failed to read from pipe: %v", err)
-	}
-
-	capturedOutput := buf.String()
+	// Capture stdout and log a message - with Verbose=true, this should appear on stdout
+	capturedOutput := captureStdout(t, func() {
+		logger.Log(testIntegrationMessage)
+	})
 
 	// Verify message was written to stdout (verbose mode)
 	if !strings.Contains(capturedOutput, testIntegrationMessage) {
@@ -92,7 +107,7 @@ func TestLoggerWithConfigVerboseTrue(t *testing.T) {
 	//nolint:gosec // G304: test file path from t.TempDir()
 	content, err := os.ReadFile(logPath)
 	if err != nil {
-		t.Fatalf("Failed to read log file: %v", err)
+		t.Fatalf(errReadLogFile, err)
 	}
 
 	if !strings.Contains(string(content), testIntegrationMessage) {
@@ -117,7 +132,7 @@ func TestLoggerWithConfigVerboseFalse(t *testing.T) {
 
 	logger, err := installer.NewLoggerWithPath(logPath, cfg.Verbose)
 	if err != nil {
-		t.Fatalf("NewLoggerWithPath() returned unexpected error: %v", err)
+		t.Fatalf(errNewLoggerWithPath, err)
 	}
 
 	t.Cleanup(func() {
@@ -125,30 +140,10 @@ func TestLoggerWithConfigVerboseFalse(t *testing.T) {
 		logger.Close()
 	})
 
-	// Capture stdout to verify no output
-	oldStdout := os.Stdout
-	r, w, err := os.Pipe()
-	if err != nil {
-		t.Fatalf("Failed to create pipe: %v", err)
-	}
-
-	os.Stdout = w
-
-	// Log a message - with Verbose=false, this should NOT appear on stdout
-	logger.Log(testIntegrationMessage)
-
-	// Close writer and restore stdout
-	//nolint:errcheck // best-effort in tests
-	w.Close()
-	os.Stdout = oldStdout
-
-	// Read captured output
-	var buf bytes.Buffer
-	if _, err := buf.ReadFrom(r); err != nil {
-		t.Fatalf("Failed to read from pipe: %v", err)
-	}
-
-	capturedOutput := buf.String()
+	// Capture stdout and log a message - with Verbose=false, this should NOT appear on stdout
+	capturedOutput := captureStdout(t, func() {
+		logger.Log(testIntegrationMessage)
+	})
 
 	// Verify NO output was written to stdout (quiet mode)
 	if capturedOutput != "" {
@@ -159,7 +154,7 @@ func TestLoggerWithConfigVerboseFalse(t *testing.T) {
 	//nolint:gosec // G304: test file path from t.TempDir()
 	content, err := os.ReadFile(logPath)
 	if err != nil {
-		t.Fatalf("Failed to read log file: %v", err)
+		t.Fatalf(errReadLogFile, err)
 	}
 
 	if !strings.Contains(string(content), testIntegrationMessage) {
@@ -206,10 +201,18 @@ func TestLoggerIntegrationWithNewLogger(t *testing.T) {
 		t.Error("Expected LogPath() to return a valid path")
 	}
 
-	// Log a message to verify functionality
-	logger.Log("Integration test with NewLogger")
+	// Verify Verbose=true behavior by capturing stdout and checking log output
+	testMessage := "Integration test with NewLogger"
+	capturedOutput := captureStdout(t, func() {
+		logger.Log("%s", testMessage)
+	})
 
-	// If we got here without errors, integration works
+	// With Verbose=true, the message should appear on stdout
+	if !strings.Contains(capturedOutput, testMessage) {
+		t.Errorf("With Verbose=true, expected stdout to contain %q, got %q",
+			testMessage, capturedOutput)
+	}
+
 	t.Logf("Logger successfully created with Config.Verbose=%v, log path: %s",
 		cfg.Verbose, logPath)
 }
@@ -225,22 +228,13 @@ func TestLoggerMultipleMessagesWithConfigVerbose(t *testing.T) {
 
 	logger, err := installer.NewLoggerWithPath(logPath, cfg.Verbose)
 	if err != nil {
-		t.Fatalf("NewLoggerWithPath() returned unexpected error: %v", err)
+		t.Fatalf(errNewLoggerWithPath, err)
 	}
 
 	t.Cleanup(func() {
 		//nolint:errcheck // best-effort cleanup in tests
 		logger.Close()
 	})
-
-	// Capture stdout
-	oldStdout := os.Stdout
-	r, w, err := os.Pipe()
-	if err != nil {
-		t.Fatalf("Failed to create pipe: %v", err)
-	}
-
-	os.Stdout = w
 
 	// Log multiple messages
 	messages := []string{
@@ -250,22 +244,12 @@ func TestLoggerMultipleMessagesWithConfigVerbose(t *testing.T) {
 		"Installation complete",
 	}
 
-	for _, msg := range messages {
-		logger.Log("%s", msg)
-	}
-
-	// Close writer and restore stdout
-	//nolint:errcheck // best-effort in tests
-	w.Close()
-	os.Stdout = oldStdout
-
-	// Read captured output
-	var buf bytes.Buffer
-	if _, err := buf.ReadFrom(r); err != nil {
-		t.Fatalf("Failed to read from pipe: %v", err)
-	}
-
-	capturedOutput := buf.String()
+	// Capture stdout while logging all messages
+	capturedOutput := captureStdout(t, func() {
+		for _, msg := range messages {
+			logger.Log("%s", msg)
+		}
+	})
 
 	// Verify all messages appear in stdout
 	for _, msg := range messages {
@@ -278,7 +262,7 @@ func TestLoggerMultipleMessagesWithConfigVerbose(t *testing.T) {
 	//nolint:gosec // G304: test file path from t.TempDir()
 	content, err := os.ReadFile(logPath)
 	if err != nil {
-		t.Fatalf("Failed to read log file: %v", err)
+		t.Fatalf(errReadLogFile, err)
 	}
 
 	for _, msg := range messages {
@@ -299,7 +283,7 @@ func TestLoggerWithConfigVerboseDisplaysLogPath(t *testing.T) {
 
 	logger, err := installer.NewLoggerWithPath(logPath, cfg.Verbose)
 	if err != nil {
-		t.Fatalf("NewLoggerWithPath() returned unexpected error: %v", err)
+		t.Fatalf(errNewLoggerWithPath, err)
 	}
 
 	t.Cleanup(func() {
@@ -307,31 +291,13 @@ func TestLoggerWithConfigVerboseDisplaysLogPath(t *testing.T) {
 		logger.Close()
 	})
 
-	// Capture stdout
-	oldStdout := os.Stdout
-	r, w, err := os.Pipe()
-	if err != nil {
-		t.Fatalf("Failed to create pipe: %v", err)
-	}
-
-	os.Stdout = w
-
 	// Common pattern: log the log file path when in verbose mode
 	actualLogPath := logger.LogPath()
-	logger.Log("Log file: %s", actualLogPath)
 
-	// Close writer and restore stdout
-	//nolint:errcheck // best-effort in tests
-	w.Close()
-	os.Stdout = oldStdout
-
-	// Read captured output
-	var buf bytes.Buffer
-	if _, err := buf.ReadFrom(r); err != nil {
-		t.Fatalf("Failed to read from pipe: %v", err)
-	}
-
-	capturedOutput := buf.String()
+	// Capture stdout while logging the path
+	capturedOutput := captureStdout(t, func() {
+		logger.Log("Log file: %s", actualLogPath)
+	})
 
 	// Verify the log path is displayed in verbose mode
 	if !strings.Contains(capturedOutput, logPath) {
