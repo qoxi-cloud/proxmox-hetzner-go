@@ -7,8 +7,20 @@
 package installer
 
 import (
+	"fmt"
 	"os"
 	"sync"
+)
+
+// Default log file paths in priority order.
+const (
+	// Primary log file location.
+	// This path is typically writable only by root on Linux systems.
+	defaultLogPath = "/var/log/proxmox-install.log"
+
+	// Fallback log path used when the primary path is not writable.
+	// This path should be writable on most systems.
+	fallbackLogPath = "/tmp/proxmox-install.log"
 )
 
 // Logger provides thread-safe logging to file with optional stdout output.
@@ -21,7 +33,7 @@ import (
 //
 // Usage:
 //
-//	logger, err := NewLogger("/var/log/pve-install.log", true)
+//	logger, err := NewLogger(true)
 //	if err != nil {
 //	    return err
 //	}
@@ -40,4 +52,59 @@ type Logger struct {
 
 	// mu protects concurrent access to the file handle.
 	mu sync.Mutex
+}
+
+// NewLogger creates a new Logger instance.
+//
+// It attempts to open the log file at /var/log/proxmox-install.log first,
+// falling back to /tmp/proxmox-install.log if the primary path is not writable.
+// This fallback mechanism ensures logging works in environments where /var/log
+// may not be accessible (e.g., development on macOS or non-root execution).
+//
+// The log file is opened with O_CREATE|O_WRONLY|O_APPEND flags and 0600 permissions,
+// creating the file if it doesn't exist, appending new entries, and restricting
+// access to the current user by default.
+//
+// Parameters:
+//   - verbose: when true, log entries will also be written to stdout
+//
+// Returns an error if neither log path is writable.
+func NewLogger(verbose bool) (*Logger, error) {
+	return newLoggerWithPaths(verbose, []string{defaultLogPath, fallbackLogPath})
+}
+
+// newLoggerWithPaths creates a Logger using the provided paths in order.
+//
+// This is an internal helper function that allows testing the path fallback logic
+// without requiring access to system directories like /var/log.
+//
+// The function tries each path in order, returning a Logger using the first
+// path that can be opened successfully. If all paths fail, it returns an error
+// wrapping the last encountered error.
+func newLoggerWithPaths(verbose bool, paths []string) (*Logger, error) {
+	if len(paths) == 0 {
+		return nil, fmt.Errorf("failed to open log file: no paths provided")
+	}
+
+	var file *os.File
+
+	var lastErr error
+
+	for _, path := range paths {
+		var err error
+
+		//nolint:gosec // G304: paths are controlled constants in production
+		file, err = os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
+
+		if err == nil {
+			break
+		}
+		lastErr = err
+	}
+
+	if file == nil {
+		return nil, fmt.Errorf("failed to open log file: %w", lastErr)
+	}
+
+	return &Logger{file: file, verbose: verbose}, nil
 }
