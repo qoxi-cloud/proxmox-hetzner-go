@@ -42,13 +42,15 @@ var rfc3339Pattern = regexp.MustCompile(`^\[\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(
 
 // createTestLogger creates a Logger for testing with automatic cleanup.
 // It returns the logger and the path to the log file.
-func createTestLogger(t *testing.T, verbose bool) (*Logger, string) {
+func createTestLogger(t *testing.T, verbose bool) (logger *Logger, logPath string) {
 	t.Helper()
 
 	tmpDir := t.TempDir()
-	logPath := filepath.Join(tmpDir, testLogFileName)
+	logPath = filepath.Join(tmpDir, testLogFileName)
 
-	logger, err := newLoggerWithPaths(verbose, []string{logPath})
+	var err error
+
+	logger, err = newLoggerWithPaths(verbose, []string{logPath})
 	if err != nil {
 		t.Fatalf(errMsgUnexpectedError, err)
 	}
