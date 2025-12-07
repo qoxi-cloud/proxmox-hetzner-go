@@ -21,8 +21,11 @@ func TestLoggerZeroValue(t *testing.T) {
 	}
 
 	// Verify mutex is usable (zero value is valid)
-	logger.mu.Lock()
-	defer logger.mu.Unlock()
+	// We test that Lock/Unlock don't panic on zero-value mutex
+	func() {
+		logger.mu.Lock()
+		defer logger.mu.Unlock()
+	}()
 }
 
 // TestLoggerStructFields verifies that Logger struct fields can be set directly.
