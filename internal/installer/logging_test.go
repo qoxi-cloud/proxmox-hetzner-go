@@ -40,6 +40,28 @@ const (
 // Example: [2024-01-15T10:30:45Z] or [2024-01-15T10:30:45+02:00].
 var rfc3339Pattern = regexp.MustCompile(`^\[\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(Z|[+-]\d{2}:\d{2})\]`)
 
+// createTestLogger creates a Logger for testing with automatic cleanup.
+// It returns the logger and the path to the log file.
+func createTestLogger(t *testing.T, verbose bool) (*Logger, string) {
+	t.Helper()
+
+	tmpDir := t.TempDir()
+	logPath := filepath.Join(tmpDir, testLogFileName)
+
+	logger, err := newLoggerWithPaths(verbose, []string{logPath})
+	if err != nil {
+		t.Fatalf(errMsgUnexpectedError, err)
+	}
+
+	t.Cleanup(func() {
+		if logger != nil && logger.file != nil {
+			logger.file.Close() //nolint:errcheck // best-effort cleanup in tests
+		}
+	})
+
+	return logger, logPath
+}
+
 // TestLoggerZeroValue verifies that Logger can be instantiated with zero values.
 // This ensures the struct has no unexported initialization requirements.
 func TestLoggerZeroValue(t *testing.T) {
@@ -281,19 +303,7 @@ func TestNewLoggerWithPathsEmptyPaths(t *testing.T) {
 
 // TestNewLoggerWithPathsVerboseFlagTrue verifies verbose flag is set correctly when true.
 func TestNewLoggerWithPathsVerboseFlagTrue(t *testing.T) {
-	tmpDir := t.TempDir()
-	logPath := filepath.Join(tmpDir, testLogFileName)
-
-	logger, err := newLoggerWithPaths(true, []string{logPath})
-	if err != nil {
-		t.Fatalf(errMsgUnexpectedError, err)
-	}
-
-	t.Cleanup(func() {
-		if logger != nil && logger.file != nil {
-			logger.file.Close() //nolint:errcheck // best-effort cleanup in tests
-		}
-	})
+	logger, _ := createTestLogger(t, true)
 
 	if !logger.verbose {
 		t.Error(errMsgExpectedVerboseTrue)
@@ -302,19 +312,7 @@ func TestNewLoggerWithPathsVerboseFlagTrue(t *testing.T) {
 
 // TestNewLoggerWithPathsVerboseFlagFalse verifies verbose flag is set correctly when false.
 func TestNewLoggerWithPathsVerboseFlagFalse(t *testing.T) {
-	tmpDir := t.TempDir()
-	logPath := filepath.Join(tmpDir, testLogFileName)
-
-	logger, err := newLoggerWithPaths(false, []string{logPath})
-	if err != nil {
-		t.Fatalf(errMsgUnexpectedError, err)
-	}
-
-	t.Cleanup(func() {
-		if logger != nil && logger.file != nil {
-			logger.file.Close() //nolint:errcheck // best-effort cleanup in tests
-		}
-	})
+	logger, _ := createTestLogger(t, false)
 
 	if logger.verbose {
 		t.Error(errMsgExpectedVerboseFalse)
@@ -361,19 +359,7 @@ func TestNewLoggerWithPathsFileAppendMode(t *testing.T) {
 
 // TestNewLoggerWithPathsFilePermissions verifies that created files have correct permissions.
 func TestNewLoggerWithPathsFilePermissions(t *testing.T) {
-	tmpDir := t.TempDir()
-	logPath := filepath.Join(tmpDir, "perms.log")
-
-	logger, err := newLoggerWithPaths(false, []string{logPath})
-	if err != nil {
-		t.Fatalf(errMsgUnexpectedError, err)
-	}
-
-	t.Cleanup(func() {
-		if logger != nil && logger.file != nil {
-			logger.file.Close() //nolint:errcheck // best-effort cleanup in tests
-		}
-	})
+	_, logPath := createTestLogger(t, false)
 
 	info, err := os.Stat(logPath)
 	if err != nil {
@@ -391,19 +377,7 @@ func TestNewLoggerWithPathsFilePermissions(t *testing.T) {
 
 // TestNewLoggerWithPathsSinglePath verifies behavior with only one path.
 func TestNewLoggerWithPathsSinglePath(t *testing.T) {
-	tmpDir := t.TempDir()
-	logPath := filepath.Join(tmpDir, "single.log")
-
-	logger, err := newLoggerWithPaths(false, []string{logPath})
-	if err != nil {
-		t.Fatalf(errMsgUnexpectedError, err)
-	}
-
-	t.Cleanup(func() {
-		if logger != nil && logger.file != nil {
-			logger.file.Close() //nolint:errcheck // best-effort cleanup in tests
-		}
-	})
+	logger, logPath := createTestLogger(t, false)
 
 	if logger.file == nil {
 		t.Error(errMsgExpectedFileSet)
@@ -523,19 +497,7 @@ func TestNewLoggerVerboseTrue(t *testing.T) {
 
 // TestLogWritesToFile verifies that Log writes messages to the log file.
 func TestLogWritesToFile(t *testing.T) {
-	tmpDir := t.TempDir()
-	logPath := filepath.Join(tmpDir, testLogFileName)
-
-	logger, err := newLoggerWithPaths(false, []string{logPath})
-	if err != nil {
-		t.Fatalf(errMsgUnexpectedError, err)
-	}
-
-	t.Cleanup(func() {
-		if logger != nil && logger.file != nil {
-			logger.file.Close() //nolint:errcheck // best-effort cleanup in tests
-		}
-	})
+	logger, logPath := createTestLogger(t, false)
 
 	logger.Log(testLogMessage)
 
@@ -557,19 +519,7 @@ func TestLogWritesToFile(t *testing.T) {
 
 // TestLogTimestampFormat verifies that Log uses RFC3339 (ISO 8601) timestamp format.
 func TestLogTimestampFormat(t *testing.T) {
-	tmpDir := t.TempDir()
-	logPath := filepath.Join(tmpDir, "timestamp.log")
-
-	logger, err := newLoggerWithPaths(false, []string{logPath})
-	if err != nil {
-		t.Fatalf(errMsgUnexpectedError, err)
-	}
-
-	t.Cleanup(func() {
-		if logger != nil && logger.file != nil {
-			logger.file.Close() //nolint:errcheck // best-effort cleanup in tests
-		}
-	})
+	logger, logPath := createTestLogger(t, false)
 
 	beforeLog := time.Now()
 	logger.Log(testLogMessage)
@@ -612,19 +562,7 @@ func TestLogTimestampFormat(t *testing.T) {
 
 // TestLogWithFormatArgs verifies that Log correctly formats messages with arguments.
 func TestLogWithFormatArgs(t *testing.T) {
-	tmpDir := t.TempDir()
-	logPath := filepath.Join(tmpDir, "format.log")
-
-	logger, err := newLoggerWithPaths(false, []string{logPath})
-	if err != nil {
-		t.Fatalf(errMsgUnexpectedError, err)
-	}
-
-	t.Cleanup(func() {
-		if logger != nil && logger.file != nil {
-			logger.file.Close() //nolint:errcheck // best-effort cleanup in tests
-		}
-	})
+	logger, logPath := createTestLogger(t, false)
 
 	logger.Log(testFormatMessage, 42, "test")
 
@@ -647,19 +585,7 @@ func TestLogWithFormatArgs(t *testing.T) {
 
 // TestLogVerboseModeWritesToStdout verifies that verbose mode outputs to stdout.
 func TestLogVerboseModeWritesToStdout(t *testing.T) {
-	tmpDir := t.TempDir()
-	logPath := filepath.Join(tmpDir, "verbose.log")
-
-	logger, err := newLoggerWithPaths(true, []string{logPath})
-	if err != nil {
-		t.Fatalf(errMsgUnexpectedError, err)
-	}
-
-	t.Cleanup(func() {
-		if logger != nil && logger.file != nil {
-			logger.file.Close() //nolint:errcheck // best-effort cleanup in tests
-		}
-	})
+	logger, _ := createTestLogger(t, true)
 
 	// Capture stdout
 	oldStdout := os.Stdout
@@ -697,19 +623,7 @@ func TestLogVerboseModeWritesToStdout(t *testing.T) {
 
 // TestLogNonVerboseModeNoStdout verifies that non-verbose mode does not output to stdout.
 func TestLogNonVerboseModeNoStdout(t *testing.T) {
-	tmpDir := t.TempDir()
-	logPath := filepath.Join(tmpDir, "nonverbose.log")
-
-	logger, err := newLoggerWithPaths(false, []string{logPath})
-	if err != nil {
-		t.Fatalf(errMsgUnexpectedError, err)
-	}
-
-	t.Cleanup(func() {
-		if logger != nil && logger.file != nil {
-			logger.file.Close() //nolint:errcheck // best-effort cleanup in tests
-		}
-	})
+	logger, _ := createTestLogger(t, false)
 
 	// Capture stdout
 	oldStdout := os.Stdout
@@ -744,19 +658,7 @@ func TestLogNonVerboseModeNoStdout(t *testing.T) {
 func TestLogConcurrentCalls(t *testing.T) {
 	t.Parallel()
 
-	tmpDir := t.TempDir()
-	logPath := filepath.Join(tmpDir, "concurrent.log")
-
-	logger, err := newLoggerWithPaths(false, []string{logPath})
-	if err != nil {
-		t.Fatalf(errMsgUnexpectedError, err)
-	}
-
-	t.Cleanup(func() {
-		if logger != nil && logger.file != nil {
-			logger.file.Close() //nolint:errcheck // best-effort cleanup in tests
-		}
-	})
+	logger, logPath := createTestLogger(t, false)
 
 	const goroutines = 50
 	var wg sync.WaitGroup
@@ -811,19 +713,7 @@ func TestLogConcurrentCalls(t *testing.T) {
 
 // TestLogMultipleMessages verifies that multiple Log calls append correctly.
 func TestLogMultipleMessages(t *testing.T) {
-	tmpDir := t.TempDir()
-	logPath := filepath.Join(tmpDir, "multiple.log")
-
-	logger, err := newLoggerWithPaths(false, []string{logPath})
-	if err != nil {
-		t.Fatalf(errMsgUnexpectedError, err)
-	}
-
-	t.Cleanup(func() {
-		if logger != nil && logger.file != nil {
-			logger.file.Close() //nolint:errcheck // best-effort cleanup in tests
-		}
-	})
+	logger, logPath := createTestLogger(t, false)
 
 	messages := []string{
 		"First message",
@@ -862,19 +752,7 @@ func TestLogMultipleMessages(t *testing.T) {
 
 // TestLogEmptyMessage verifies that Log handles empty messages correctly.
 func TestLogEmptyMessage(t *testing.T) {
-	tmpDir := t.TempDir()
-	logPath := filepath.Join(tmpDir, "empty.log")
-
-	logger, err := newLoggerWithPaths(false, []string{logPath})
-	if err != nil {
-		t.Fatalf(errMsgUnexpectedError, err)
-	}
-
-	t.Cleanup(func() {
-		if logger != nil && logger.file != nil {
-			logger.file.Close() //nolint:errcheck // best-effort cleanup in tests
-		}
-	})
+	logger, logPath := createTestLogger(t, false)
 
 	logger.Log("")
 
@@ -902,19 +780,7 @@ func TestLogEmptyMessage(t *testing.T) {
 
 // TestLogSpecialCharacters verifies that Log handles special characters correctly.
 func TestLogSpecialCharacters(t *testing.T) {
-	tmpDir := t.TempDir()
-	logPath := filepath.Join(tmpDir, "special.log")
-
-	logger, err := newLoggerWithPaths(false, []string{logPath})
-	if err != nil {
-		t.Fatalf(errMsgUnexpectedError, err)
-	}
-
-	t.Cleanup(func() {
-		if logger != nil && logger.file != nil {
-			logger.file.Close() //nolint:errcheck // best-effort cleanup in tests
-		}
-	})
+	logger, logPath := createTestLogger(t, false)
 
 	tests := []struct {
 		name    string
@@ -951,19 +817,7 @@ func TestLogSpecialCharacters(t *testing.T) {
 
 // TestLogLineFormat verifies the exact format of log lines.
 func TestLogLineFormat(t *testing.T) {
-	tmpDir := t.TempDir()
-	logPath := filepath.Join(tmpDir, "format.log")
-
-	logger, err := newLoggerWithPaths(false, []string{logPath})
-	if err != nil {
-		t.Fatalf(errMsgUnexpectedError, err)
-	}
-
-	t.Cleanup(func() {
-		if logger != nil && logger.file != nil {
-			logger.file.Close() //nolint:errcheck // best-effort cleanup in tests
-		}
-	})
+	logger, logPath := createTestLogger(t, false)
 
 	testMsg := "Test format verification"
 	logger.Log("%s", testMsg)
